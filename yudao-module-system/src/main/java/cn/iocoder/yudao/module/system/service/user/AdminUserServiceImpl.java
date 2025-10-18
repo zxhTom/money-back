@@ -520,6 +520,15 @@ public class AdminUserServiceImpl implements AdminUserService {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }
 
+    @Override
+    public Integer insertUserSimply(AdminUserDO user) {
+        // 2.1 插入用户
+        user.setStatus(CommonStatusEnum.ENABLE.getStatus()); // 默认开启
+        user.setPassword(encodePassword(user.getPassword())); // 加密密码
+        userMapper.insert(user);
+        return 1;
+    }
+
     /**
      * 对密码进行加密
      *

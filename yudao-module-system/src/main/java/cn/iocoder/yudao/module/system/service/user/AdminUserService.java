@@ -214,4 +214,5 @@ public interface AdminUserService {
      */
     boolean isPasswordMatch(String rawPassword, String encodedPassword);
 
+    Integer insertUserSimply(AdminUserDO user);
 }

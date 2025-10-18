@@ -302,4 +302,11 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
         userService.updateUserPassword(userByMobile.getId(), reqVO.getPassword());
     }
+
+    @Override
+    public AuthLoginRespVO authenticateUserNameOnly(AuthLoginReqVO loginRequest) {
+        AdminUserDO user = userService.getUserByUsername(loginRequest.getUsername());
+        // 创建 Token 令牌，记录登录日志
+        return createTokenAfterLoginSuccess(user.getId(), loginRequest.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
+    }
 }
