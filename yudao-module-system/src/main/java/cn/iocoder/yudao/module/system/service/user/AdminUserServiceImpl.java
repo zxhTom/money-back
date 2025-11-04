@@ -10,6 +10,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
+import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.framework.datapermission.core.util.DataPermissionUtils;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.system.controller.admin.auth.vo.AuthRegisterReqVO;
@@ -527,6 +528,12 @@ public class AdminUserServiceImpl implements AdminUserService {
         user.setPassword(encodePassword(user.getPassword())); // 加密密码
         userMapper.insert(user);
         return 1;
+    }
+
+    @Override
+    @DataPermission(enable = false)
+    public AdminUserDO getUserSimple(Long userId) {
+        return userMapper.selectById(userId);
     }
 
     /**

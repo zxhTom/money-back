@@ -7,6 +7,7 @@ import org.hibernate.validator.constraints.URL;
 
 import javax.validation.constraints.Email;
 import javax.validation.constraints.Size;
+import java.util.Date;
 
 
 @Schema(description = "管理后台 - 用户个人信息更新 Request VO")
@@ -32,5 +33,18 @@ public class UserProfileUpdateReqVO {
     @Schema(description = "角色头像", example = "https://www.iocoder.cn/1.png")
     @URL(message = "头像地址格式不正确")
     private String avatar;
+
+    @Schema(description = "生日", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private Date birthDate;
+    @Schema(description = "居住地址", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private String address;
+    @Schema(description = "", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private Integer occupation;
+    @Schema(description = "学历", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private Integer education;
+    @Schema(description = "真实姓名", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private String realname;
+    @Schema(description = "身份证", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private String idNo;
 
 }

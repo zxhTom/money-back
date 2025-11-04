@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 
 // WechatConfig.java
 @Configuration
-@ConfigurationProperties(prefix = "wechat.mini-program")
+@ConfigurationProperties(prefix = "wx.miniapp")
 @Data // Lombok 注解，自动生成getter/setter
 public class WechatConfig {
     private String appid;

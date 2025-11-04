@@ -8,10 +8,12 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Set;
 
 /**
@@ -33,6 +35,33 @@ public class AdminUserDO extends TenantBaseDO {
      */
     @TableId
     private Long id;
+
+    /**
+     * 身份证号码
+     */
+    private String idNo;
+
+    /**
+     * 真实姓名
+     */
+    private String realname;
+    /**
+     * 生日
+     */
+    private Date birthDate;
+    /**
+     * 居住地址
+     */
+    private String address;
+    /**
+     * 职业
+     */
+    private Integer occupation;
+    /**
+     * 学历
+     */
+    private Integer education;
+
     /**
      * 用户账号
      */

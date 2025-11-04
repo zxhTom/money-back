@@ -54,7 +54,7 @@ public class WechatLoginController {
         // 3. 生成自定义登录态 (Token)
         String token = String.format("%s", loginResponse.getAccessToken());
 
-        return ApiResponse.success(token);
+        return ApiResponse.success(loginResponse);
     }
     @PostMapping("/login")
     public ApiResponse login(@RequestBody WechatLoginRequest request) {
@@ -67,7 +67,7 @@ public class WechatLoginController {
         }
 
         String openid = sessionResponse.getOpenid();
-        CombineUser combineUser = miniUserService.selectMiniUserOrInitUserWithPrefix(request.getAppId(), openid, "wechat_");
+        CombineUser combineUser = miniUserService.selectMiniUserOrInitUserWithPrefix(request.getAppId(), openid, "wechat");
         // 2. 业务逻辑：根据 openid 查找或创建用户
         AdminUserDO user = combineUser.getMaltcloud();
         AuthLoginReqVO loginRequest = new AuthLoginReqVO();

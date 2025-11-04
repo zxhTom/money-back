@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 
 @Data
@@ -16,6 +17,18 @@ public class UserProfileRespVO {
     @Schema(description = "用户编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Long id;
 
+    @Schema(description = "身份证号码", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private String idNo;
+    @Schema(description = "生日", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private Date birthDate;
+    @Schema(description = "居住地址", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private String address;
+    @Schema(description = "", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private Integer occupation;
+    @Schema(description = "学历", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private Integer education;
+    @Schema(description = "真实姓名", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private String realname;
     @Schema(description = "用户账号", requiredMode = Schema.RequiredMode.REQUIRED, example = "yudao")
     private String username;
 

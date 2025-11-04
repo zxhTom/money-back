@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.custom.service.wechat.MiniUserService;
 import cn.iocoder.yudao.module.custom.service.wechat.model.CombineUser;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import com.anji.captcha.util.MD5Util;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +22,7 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 public class MiniUserServiceImpl implements MiniUserService {
-    @Value("zxhtom.security.user.password:123456")
+    @Value("${zxhtom.security.user.password:123456}")
     String password;
     @Autowired
     MiniUserMapper miniUserMapper;
@@ -43,6 +44,7 @@ public class MiniUserServiceImpl implements MiniUserService {
             AdminUserDO user = new AdminUserDO();
             user.setId(System.currentTimeMillis());
             user.setUsername(String.format("%s_%s_%s", prefix, appId, openId));
+            user.setNickname(MD5Util.md5(user.getUsername()));
 //            user.setUserCode(openId.hashCode());
             user.setPassword(password);
             userService.insertUserSimply(user);
@@ -57,7 +59,16 @@ public class MiniUserServiceImpl implements MiniUserService {
             combineUser.setRegisted(false);
         } else {
             combineUser.setRegisted(true);
-            AdminUserDO user = userService.getUser(miniUser.getUserId());
+            AdminUserDO user = userService.getUserSimple(miniUser.getUserId());
+            if (user == null) {
+                user = new AdminUserDO();
+                user.setId(System.currentTimeMillis());
+                user.setUsername(String.format("%s_%s_%s", prefix, appId, openId));
+                user.setNickname(MD5Util.md5(user.getUsername()));
+//            user.setUserCode(openId.hashCode());
+                user.setPassword(password);
+                userService.insertUserSimply(user);
+            }
             combineUser.setMaltcloud(user);
         }
         combineUser.setOutUser(miniUser);
