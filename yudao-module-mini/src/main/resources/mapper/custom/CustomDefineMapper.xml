@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper">
+    <select id="staticsContractByTimePeriod"
+            resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.StaticsContractPeriodRespVO">
+        SELECT
+        -- 当日统计
+        COUNT(CASE WHEN DATE(create_time) = CURDATE() THEN 1 END) AS today_count,
+        COALESCE(SUM(CASE WHEN DATE(create_time) = CURDATE() THEN salary ELSE 0 END), 0) AS today_revenue,
+        -- 当月统计
+        COUNT(CASE WHEN create_time >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN 1 END) AS month_count,
+        COALESCE(SUM(CASE WHEN create_time >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN salary ELSE 0 END), 0) AS month_revenue,
+        -- 累计统计
+        COUNT(*) AS total_count,
+        COALESCE(SUM(salary), 0) AS total_revenue,
+        -- 平均值
+        COALESCE(AVG(salary), 0) AS avg_salary,
+        COALESCE(AVG(CASE WHEN DATE(create_time) = CURDATE() THEN salary END), 0) AS today_avg_salary,
+        -- 日期信息
+        CURDATE() AS stat_date,
+        DATE_FORMAT(CURDATE(), '%Y-%m-01') AS month_start_date
+        FROM custom_contract;
+    </select>
+    <select id="userDimension"
+            resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.UserDimensionRespVO">
+        -- 获取用户维度统计数据（实时计算）
+        SELECT
+        -- 活跃用户数（最近30天有交易的用户）
+        COUNT(DISTINCT CASE WHEN create_time >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN username END) AS active_users,
+        -- 新增用户数（今日首次交易的用户）
+        COUNT(DISTINCT CASE WHEN DATE(create_time) = CURDATE() THEN username END) AS new_users,
+        -- VIP用户数（累计交易金额 > 10000 的用户）
+        COUNT(DISTINCT CASE WHEN total_amount > 10000 THEN username END) AS vip_users
+        FROM (
+        SELECT
+        username,
+        create_time,
+        SUM(1) OVER (PARTITION BY username) as total_amount
+        FROM system_users
+        WHERE deleted = 0
+        ) t;
+    </select>
+    <select id="userDimensions"
+            resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.UserDimensionRespVO">
+        SELECT
+        DATE_FORMAT(create_time, '%Y-%m') AS keyName,
+        COUNT(DISTINCT CASE WHEN create_time >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN username END) AS active_users,
+        COUNT(DISTINCT username) AS new_users
+        FROM system_users
+        WHERE create_time >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+        AND deleted = 0
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m')
+        ORDER BY keyName;
+    </select>
+    <select id="rencentContractList"
+            resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.RecentContractVO">
+        select
+            indebted_name as name,
+            indebted_id as id_no,
+            su.avatar
+        from custom_contract cc
+        left join system_users su on su.id_no =cc.creditor_id
+        <where>
+            <if test="idNo!=null and idNo!=''">
+                and cc.creditor_id =#{idNo}
+            </if>
+        </where>
+        order by cc.create_time desc
+        limit 10
+    </select>
+    <select id="creditSearch"
+            resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.CreditSearchVO">
+       select
+        c.status AS code,
+        d.label AS status_name,
+        d.value,
+        t.type,
+        t.name,
+        COUNT(*) AS count,
+        sum(salary) as salary
+        FROM custom_contract c
+        LEFT JOIN system_dict_data d ON d.value = c.status
+        LEFT JOIN system_dict_type t ON t.type = d.dict_type
+        WHERE t.type = 'contract_status'
+        GROUP BY c.status, d.label, d.value, t.type, t.name
+        ORDER BY c.status
+    </select>
+</mapper>

@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * 客户端 Mapper
@@ -15,8 +16,9 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface ContractMapper extends BaseMapperX<ContractDO> {
 
+    PageResult<ContractDO> selectPageCustom(@Param("query") ContractPageReqVO reqVO) ;
     default PageResult<ContractDO> selectPage(ContractPageReqVO reqVO) {
-        return selectPage(reqVO, new LambdaQueryWrapperX<ContractDO>()
+        return selectPage(reqVO, reqVO.getSortFields(),new LambdaQueryWrapperX<ContractDO>()
                 .likeIfPresent(ContractDO::getIndebtedName, reqVO.getIndebtedName())
                 .eqIfPresent(ContractDO::getIndebtedId, reqVO.getIndebtedId())
                 .likeIfPresent(ContractDO::getCreditorName, reqVO.getCreditorName())

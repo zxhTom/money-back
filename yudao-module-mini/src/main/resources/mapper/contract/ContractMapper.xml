@@ -8,5 +8,146 @@
         代码生成器暂时只生成 Mapper XML 文件本身，更多推荐 MybatisX 快速开发插件来生成查询。
         文档可见：https://www.iocoder.cn/MyBatis/x-plugins/
      -->
+    <!-- 动态查询条件 -->
+    <sql id="CustomContractQueryCondition">
+        <where>
+            deleted = 0
+            <!-- 欠款人相关条件 -->
+            <if test="query.indebtedName != null and query.indebtedName != ''">
+                AND indebted_name LIKE CONCAT('%', #{query.indebtedName}, '%')
+            </if>
+            <if test="query.indebtedId != null and query.indebtedId != ''">
+                AND indebted_id = #{query.indebtedId}
+            </if>
+            <!-- 被欠款人相关条件 -->
+            <if test="query.creditorName != null and query.creditorName != ''">
+                AND creditor_name LIKE CONCAT('%', #{query.creditorName}, '%')
+            </if>
+            <if test="query.creditorId != null and query.creditorId != ''">
+                AND creditor_id = #{query.creditorId}
+            </if>
+            <!-- 状态条件 -->
+            <if test="query.status != null">
+                AND status = #{query.status}
+            </if>
+            <if test="query.statusList != null and query.statusList.size() > 0">
+                AND status IN
+                <foreach collection="query.statusList" item="status" open="(" close=")" separator=",">
+                    #{status}
+                </foreach>
+            </if>
+            <!-- 时间范围条件 -->
+            <if test="query.createTime != null and query.createTime.length>0">
+                AND create_time >= #{query.createTime[0}
+            </if>
+            <if test="query.createTime != null and query.createTime.length>1">
+                AND create_time &lt;= #{query.createTime[1}
+            </if>
+            <if test="query.startDate != null and query.startDate.length>0">
+                AND start_date >= #{query.startDate[0]}
+            </if>
+            <if test="query.startDate != null and query.startDate.length>1">
+                AND start_date &lt;= #{query.startDate[1]}
+            </if>
+            <if test="query.endDate != null and query.endDate.length>0">
+                AND end_date >= #{query.endDate[0]}
+            </if>
+            <if test="query.endDate != null and query.endDate.length>1">
+                AND end_date &lt;= #{query.endDate[1]}
+            </if>
+            <!-- 金额范围条件 -->
+            <if test="query.salary != null and query.salary.length>0">
+                AND salary >= #{query.salary[0]}
+            </if>
+            <if test="query.salary != null and query.salary.length>1">
+                AND salary &lt;= #{query.salary[1]}
+            </if>
+            <if test="query.tariff != null and query.tariff.length>0" >
+                AND tariff >= #{query.tariffMin}
+            </if>
+            <if test="query.tariff != null and query.tariff.length>1">
+                AND tariff &lt;= #{query.tariff[1]}
+            </if>
+            <!-- 还款方式和理由条件 -->
+            <if test="query.returnType != null and query.returnType != ''">
+                AND return_type = #{query.returnType}
+            </if>
+            <if test="query.reasonType != null and query.reasonType != ''">
+                AND reason_type = #{query.reasonType}
+            </if>
+            <if test="query.detailReason != null and query.detailReason != ''">
+                AND detail_reason LIKE CONCAT('%', #{query.detailReason}, '%')
+            </if>
+        </where>
+    </sql>
 
+    <!-- 动态排序 -->
+    <sql id="CustomContractOrderBy">
+        <choose>
+            <when test="query.sortFields != null and query.sortFields.size() > 0">
+                ORDER BY
+                <foreach collection="query.sortFields" item="sortField" separator=",">
+                    <choose>
+                        <!-- 主键和时间字段 -->
+                        <when test="sortField.field == 'id'">id ${sortField.direction}</when>
+                        <when test="sortField.field == 'createTime'">create_time ${sortField.direction}</when>
+                        <when test="sortField.field == 'updateTime'">update_time ${sortField.direction}</when>
+
+                        <!-- 合同日期字段 -->
+                        <when test="sortField.field == 'startDate'">start_date ${sortField.direction}</when>
+                        <when test="sortField.field == 'endDate'">end_date ${sortField.direction}</when>
+                        <when test="sortField.field == 'signDate'">sign_date ${sortField.direction}</when>
+
+                        <!-- 金额相关字段 -->
+                        <when test="sortField.field == 'salary'">salary ${sortField.direction}</when>
+                        <when test="sortField.field == 'tariff'">tariff ${sortField.direction}</when>
+                        <when test="sortField.field == 'totalAmount'">total_amount ${sortField.direction}</when>
+                        <when test="sortField.field == 'paidAmount'">paid_amount ${sortField.direction}</when>
+                        <when test="sortField.field == 'unpaidAmount'">unpaid_amount ${sortField.direction}</when>
+
+                        <!-- 名称相关字段 -->
+                        <when test="sortField.field == 'indebtedName'">indebted_name ${sortField.direction}</when>
+                        <when test="sortField.field == 'creditorName'">creditor_name ${sortField.direction}</when>
+                        <when test="sortField.field == 'contractName'">contract_name ${sortField.direction}</when>
+                        <when test="sortField.field == 'contractNo'">contract_no ${sortField.direction}</when>
+
+                        <!-- 状态字段 -->
+                        <when test="sortField.field == 'status'">status ${sortField.direction}</when>
+                        <when test="sortField.field == 'contractStatus'">contract_status ${sortField.direction}</when>
+                        <when test="sortField.field == 'paymentStatus'">payment_status ${sortField.direction}</when>
+                        <when test="sortField.field == 'auditStatus'">audit_status ${sortField.direction}</when>
+
+                        <!-- 其他业务字段 -->
+                        <when test="sortField.field == 'code'">code ${sortField.direction}</when>
+                        <when test="sortField.field == 'type'">type ${sortField.direction}</when>
+                        <when test="sortField.field == 'level'">level ${sortField.direction}</when>
+                        <when test="sortField.field == 'priority'">priority ${sortField.direction}</when>
+
+                        <!-- 默认使用传入的字段名（小写转换） -->
+                        <otherwise>${@org.apache.commons.lang3.StringUtils@lowerCase(sortField.field)} ${sortField.direction}</otherwise>
+                    </choose>
+                </foreach>
+            </when>
+            <otherwise>
+                <!-- 默认排序规则 -->
+                ORDER BY
+                update_time DESC,
+                create_time DESC
+            </otherwise>
+        </choose>
+    </sql>
+
+    <!-- 查询总数 -->
+    <select id="selectCustomContractCount" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM custom_contract
+        <include refid="CustomContractQueryCondition"/>
+    </select>
+    <select id="selectPageCustom"
+            resultType="cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO">
+        SELECT *
+        FROM custom_contract
+        <include refid="CustomContractQueryCondition"/>
+        <include refid="CustomContractOrderBy"/>
+    </select>
 </mapper>

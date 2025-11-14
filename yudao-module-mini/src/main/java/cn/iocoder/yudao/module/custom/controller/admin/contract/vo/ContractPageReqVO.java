@@ -1,11 +1,13 @@
 package cn.iocoder.yudao.module.custom.controller.admin.contract.vo;
 
-import lombok.*;
-import java.util.*;
-import io.swagger.v3.oas.annotations.media.Schema;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import cn.iocoder.yudao.framework.common.pojo.SortingField;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
 
@@ -30,9 +32,32 @@ public class ContractPageReqVO extends PageParam {
 
     @Schema(description = "合同状态", example = "1")
     private Integer status;
+    private List<Integer> statusList;
+
 
     @Schema(description = "创建时间")
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] createTime;
 
+    @Schema(description = "开始时间")
+    @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
+    private LocalDateTime[] startDate;
+
+    @Schema(description = "结束时间")
+    @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
+    private LocalDateTime[] endDate;
+
+    @Schema(description = "薪资范围")
+    private Double[] salary;
+
+    @Schema(description = "费率范围")
+    private Double[] tariff;
+    @Schema(description = "偿还方式")
+    private String returnType;
+    @Schema(description = "理由")
+    private String reasonType;
+    @Schema(description = "具体理由")
+    private String detailReason;
+
+    private List<SortingField> sortFields;
 }
