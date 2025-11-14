@@ -1,22 +1,27 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
-import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
-import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
-import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
-import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
-import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
+import cn.hutool.core.collection.CollUtil;
+import cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants;
 import org.springframework.stereotype.Service;
-import org.springframework.validation.annotation.Validated;
-
 import javax.annotation.Resource;
-import java.util.List;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
+import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+
+import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS;
+import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
+import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.diffList;
 
 /**
- * 客户端 Service 实现类
+ * 合同 Service 实现类
  *
  * @author 芋道源码
  */
@@ -63,7 +68,7 @@ public class ContractServiceImpl implements ContractService {
 
     private void validateContractExists(Long id) {
         if (contractMapper.selectById(id) == null) {
-            throw exception(CONTRACT_NOT_EXISTS);
+            throw exception(CustomErrorCodeConstants.CONTRACT_NOT_EXISTS);
         }
     }
 

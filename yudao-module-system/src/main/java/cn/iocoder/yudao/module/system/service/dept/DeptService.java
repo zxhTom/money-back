@@ -121,4 +121,5 @@ public interface DeptService {
      */
     void validateDeptList(Collection<Long> ids);
 
+    DeptDO getDeptByName(String deptName);
 }

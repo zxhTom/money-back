@@ -4,7 +4,13 @@ import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
 import cn.iocoder.yudao.module.custom.dal.mysql.wechat.MiniUserMapper;
 import cn.iocoder.yudao.module.custom.service.wechat.MiniUserService;
 import cn.iocoder.yudao.module.custom.service.wechat.model.CombineUser;
+import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
+import cn.iocoder.yudao.module.system.service.dept.DeptService;
+import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import com.anji.captcha.util.MD5Util;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -27,7 +33,13 @@ public class MiniUserServiceImpl implements MiniUserService {
     @Autowired
     MiniUserMapper miniUserMapper;
     @Autowired
+    RoleService roleService;
+    @Autowired
+    UserRoleMapper userRoleMapper;
+    @Autowired
     private AdminUserService userService;
+    @Autowired
+    DeptService deptService;
     @Override
     public MiniUserDo selectMiniUser(String appId, String openId) {
         QueryWrapper<MiniUserDo> miniUserDoQueryWrapper = new QueryWrapper<>();
@@ -47,6 +59,17 @@ public class MiniUserServiceImpl implements MiniUserService {
             user.setNickname(MD5Util.md5(user.getUsername()));
 //            user.setUserCode(openId.hashCode());
             user.setPassword(password);
+            DeptDO deptDO = deptService.getDeptByName("合同管理部");
+            if (deptDO != null) {
+                user.setDeptId(deptDO.getId());
+            }
+            RoleDO roleDO = roleService.getRoleByName("contract");
+            if (roleDO != null) {
+                UserRoleDO userRoleDO = new UserRoleDO();
+                userRoleDO.setUserId(user.getId());
+                userRoleDO.setRoleId(roleDO.getId());
+                userRoleMapper.insert(userRoleDO);
+            }
             userService.insertUserSimply(user);
             log.debug("mini user init successful");
             combineUser.setMaltcloud(user);

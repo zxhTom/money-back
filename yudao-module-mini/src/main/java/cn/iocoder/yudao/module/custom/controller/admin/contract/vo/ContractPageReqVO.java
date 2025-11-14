@@ -11,7 +11,7 @@ import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
 
-@Schema(description = "管理后台 - 客户端分页 Request VO")
+@Schema(description = "管理后台 - 合同分页 Request VO")
 @Data
 public class ContractPageReqVO extends PageParam {
 
@@ -47,17 +47,23 @@ public class ContractPageReqVO extends PageParam {
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] endDate;
 
-    @Schema(description = "薪资范围")
-    private Double[] salary;
-
-    @Schema(description = "费率范围")
-    private Double[] tariff;
-    @Schema(description = "偿还方式")
+    @Schema(description = "还款方式", example = "2")
     private String returnType;
-    @Schema(description = "理由")
+
+    @Schema(description = "理由", example = "1")
     private String reasonType;
-    @Schema(description = "具体理由")
+
+    @Schema(description = "详细理由", example = "不喜欢")
     private String detailReason;
 
+    @Schema(description = "金额")
+    private Long salary;
+
+    @Schema(description = "费率")
+    private Long tariff;
+
+    @Schema(description = "借条附件")
+    private String file;
     private List<SortingField> sortFields;
+
 }

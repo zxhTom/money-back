@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.system.controller.admin.dept.vo.dept.DeptSaveReqV
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
 import cn.iocoder.yudao.module.system.dal.mysql.dept.DeptMapper;
 import cn.iocoder.yudao.module.system.dal.redis.RedisKeyConstants;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.annotations.VisibleForTesting;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -233,6 +234,14 @@ public class DeptServiceImpl implements DeptService {
                 throw exception(DEPT_NOT_ENABLE, dept.getName());
             }
         });
+    }
+
+    @Override
+    public DeptDO getDeptByName(String deptName) {
+        QueryWrapper<DeptDO> deptDOQueryWrapper = new QueryWrapper<>();
+        deptDOQueryWrapper.eq("name", deptName);
+        deptDOQueryWrapper.last("limit 1");
+        return deptMapper.selectOne(deptDOQueryWrapper);
     }
 
 }

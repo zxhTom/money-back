@@ -128,4 +128,5 @@ public interface RoleService {
      */
     void validateRoleList(Collection<Long> ids);
 
+    RoleDO getRoleByName(String roleName);
 }

@@ -1,15 +1,17 @@
 package cn.iocoder.yudao.module.custom.dal.mysql.contract;
 
+import java.util.*;
+
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
-import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
+import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 
 /**
- * 客户端 Mapper
+ * 合同 Mapper
  *
  * @author 芋道源码
  */
@@ -26,6 +28,14 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
                 .eqIfPresent(ContractDO::getDescription, reqVO.getDescription())
                 .eqIfPresent(ContractDO::getStatus, reqVO.getStatus())
                 .betweenIfPresent(ContractDO::getCreateTime, reqVO.getCreateTime())
+                .betweenIfPresent(ContractDO::getStartDate, reqVO.getStartDate())
+                .betweenIfPresent(ContractDO::getEndDate, reqVO.getEndDate())
+                .eqIfPresent(ContractDO::getReturnType, reqVO.getReturnType())
+                .eqIfPresent(ContractDO::getReasonType, reqVO.getReasonType())
+                .eqIfPresent(ContractDO::getDetailReason, reqVO.getDetailReason())
+                .eqIfPresent(ContractDO::getSalary, reqVO.getSalary())
+                .eqIfPresent(ContractDO::getTariff, reqVO.getTariff())
+                .eqIfPresent(ContractDO::getFile, reqVO.getFile())
                 .orderByDesc(ContractDO::getId));
     }
 

@@ -4,6 +4,6 @@ import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 
 public interface CustomErrorCodeConstants {
 
-    ErrorCode CONTRACT_NOT_EXISTS = new ErrorCode(10001, "客户端不存在");
+    ErrorCode CONTRACT_NOT_EXISTS = new ErrorCode(10001, "合同不存在");
 
 }

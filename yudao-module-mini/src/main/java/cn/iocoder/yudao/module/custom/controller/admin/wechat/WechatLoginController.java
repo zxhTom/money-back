@@ -104,7 +104,7 @@ public class WechatLoginController {
     @Data
     @AllArgsConstructor
     public static class WechatLoginResponse {
-        private String token;
+        private String accessToken;
         private AdminUserDO user;
         private boolean registed;
     }

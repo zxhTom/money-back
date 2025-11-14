@@ -15,6 +15,7 @@ public class ApiResponse {
     private boolean success;
     private String message;
     private Object data;
+    private int code;
 
     public static ApiResponse success(Object data) {
         ApiResponse response = new ApiResponse();

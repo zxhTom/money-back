@@ -17,6 +17,7 @@ import cn.iocoder.yudao.module.system.dal.redis.RedisKeyConstants;
 import cn.iocoder.yudao.module.system.enums.permission.DataScopeEnum;
 import cn.iocoder.yudao.module.system.enums.permission.RoleCodeEnum;
 import cn.iocoder.yudao.module.system.enums.permission.RoleTypeEnum;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.service.impl.DiffParseFunction;
@@ -260,6 +261,14 @@ public class RoleServiceImpl implements RoleService {
                 throw exception(ROLE_IS_DISABLE, role.getName());
             }
         });
+    }
+
+    @Override
+    public RoleDO getRoleByName(String roleName) {
+        QueryWrapper<RoleDO> roleDOQueryWrapper = new QueryWrapper<>();
+        roleDOQueryWrapper.eq("name", roleName);
+        roleDOQueryWrapper.last("limit 1");
+        return roleMapper.selectOne(roleDOQueryWrapper);
     }
 
     /**

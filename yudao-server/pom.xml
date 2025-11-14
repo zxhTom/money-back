@@ -58,18 +58,18 @@
 <!--            <version>${revision}</version>-->
 <!--        </dependency>-->
         <!-- 支付服务。默认注释，保证编译速度 -->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.boot</groupId>-->
-<!--            <artifactId>yudao-module-pay</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-pay</artifactId>
+            <version>${revision}</version>
+        </dependency>
 
         <!-- 微信公众号模块。默认注释，保证编译速度 -->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.boot</groupId>-->
-<!--            <artifactId>yudao-module-mp</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-mp</artifactId>
+            <version>${revision}</version>
+        </dependency>
 
         <!-- 商城相关模块。默认注释，保证编译速度-->
 <!--        <dependency>-->
@@ -82,11 +82,11 @@
 <!--            <artifactId>yudao-module-promotion</artifactId>-->
 <!--            <version>${revision}</version>-->
 <!--        </dependency>-->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.boot</groupId>-->
-<!--            <artifactId>yudao-module-trade</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-trade</artifactId>
+            <version>${revision}</version>
+        </dependency>
 <!--        <dependency>-->
 <!--            <groupId>cn.iocoder.boot</groupId>-->
 <!--            <artifactId>yudao-module-statistics</artifactId>-->

@@ -112,7 +112,9 @@ public class AdminAuthServiceImpl implements AdminAuthService {
                     reqVO.getSocialType(), reqVO.getSocialCode(), reqVO.getSocialState()));
         }
         // 创建 Token 令牌，记录登录日志
-        return createTokenAfterLoginSuccess(user.getId(), reqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
+        AuthLoginRespVO tokenAfterLoginSuccess = createTokenAfterLoginSuccess(user.getId(), reqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
+        tokenAfterLoginSuccess.setUser(user);
+        return tokenAfterLoginSuccess;
     }
 
     @Override

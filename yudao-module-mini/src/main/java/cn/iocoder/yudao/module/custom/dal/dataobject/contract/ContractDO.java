@@ -1,13 +1,16 @@
 package cn.iocoder.yudao.module.custom.dal.dataobject.contract;
 
-import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
-import com.baomidou.mybatisplus.annotation.KeySequence;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
+import java.util.*;
+import java.time.LocalDateTime;
+import java.time.LocalDateTime;
+import java.time.LocalDateTime;
+import java.time.LocalDateTime;
+import com.baomidou.mybatisplus.annotation.*;
+import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 
 /**
- * 客户端 DO
+ * 合同 DO
  *
  * @author 芋道源码
  */
@@ -50,6 +53,38 @@ public class ContractDO extends BaseDO {
      * 合同状态
      */
     private Integer status;
+    /**
+     * 开始时间
+     */
+    private LocalDateTime startDate;
+    /**
+     * 结束时间
+     */
+    private LocalDateTime endDate;
+    /**
+     * 还款方式
+     */
+    private String returnType;
+    /**
+     * 理由
+     */
+    private String reasonType;
+    /**
+     * 详细理由
+     */
+    private String detailReason;
+    /**
+     * 金额
+     */
+    private Long salary;
+    /**
+     * 费率
+     */
+    private Long tariff;
+    /**
+     * 借条附件
+     */
+    private String file;
 
 
 }
