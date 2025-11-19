@@ -82,7 +82,7 @@ public class WechatLoginController {
         // redisTemplate.opsForValue().set("token:" + token, openid, Duration.ofDays(7));
 
         // 5. 返回 token 和用户信息给前端
-        WechatLoginResponse wechatLoginResponse = new WechatLoginResponse(token, user,combineUser.isRegisted());
+        WechatLoginResponse wechatLoginResponse = new WechatLoginResponse(token, user,combineUser.isRegisted(),openid);
         return ApiResponse.success(wechatLoginResponse);
     }
 
@@ -107,5 +107,6 @@ public class WechatLoginController {
         private String accessToken;
         private AdminUserDO user;
         private boolean registed;
+        private String openid;
     }
 }

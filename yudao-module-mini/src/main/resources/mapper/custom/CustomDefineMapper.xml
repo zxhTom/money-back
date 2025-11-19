@@ -54,19 +54,26 @@
     </select>
     <select id="rencentContractList"
             resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.RecentContractVO">
-        select
-            indebted_name as name,
-            indebted_id as id_no,
-            su.avatar
-        from custom_contract cc
-        left join system_users su on su.id_no =cc.creditor_id
-        <where>
-            <if test="idNo!=null and idNo!=''">
-                and cc.creditor_id =#{idNo}
-            </if>
-        </where>
-        order by cc.create_time desc
-        limit 10
+        WITH t AS (
+            SELECT
+            indebted_name AS name,
+            indebted_id AS id_no,
+            su.avatar,
+            cc.create_time,
+            ROW_NUMBER() OVER (PARTITION BY indebted_id ORDER BY cc.create_time DESC) AS rn
+            FROM custom_contract cc
+            LEFT JOIN system_users su ON su.id_no = cc.creditor_id
+            <where>
+                <if test="idNo!=null and idNo!=''">
+                    and cc.creditor_id =#{idNo}
+                </if>
+            </where>
+        )
+        SELECT name, id_no, avatar
+        FROM t
+        WHERE rn = 1
+        ORDER BY create_time DESC
+        LIMIT 10;
     </select>
     <select id="creditSearch"
             resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.CreditSearchVO">
@@ -84,5 +91,13 @@
         WHERE t.type = 'contract_status'
         GROUP BY c.status, d.label, d.value, t.type, t.name
         ORDER BY c.status
+    </select>
+    <select id="getPayOrder" resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.PayOrderVO">
+        select * from pay_demo_order
+        <where>
+            <if test="query.id!=null and query.id!=null">
+                and id=#{query.id}
+            </if>
+        </where>
     </select>
 </mapper>

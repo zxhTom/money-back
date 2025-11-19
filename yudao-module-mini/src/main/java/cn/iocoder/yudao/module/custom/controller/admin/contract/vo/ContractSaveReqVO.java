@@ -7,6 +7,8 @@ import javax.validation.constraints.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.time.LocalDateTime;
 
+import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
+
 @Schema(description = "管理后台 - 合同新增/修改 Request VO")
 @Data
 public class ContractSaveReqVO {
@@ -38,9 +40,11 @@ public class ContractSaveReqVO {
     private Integer status;
 
     @Schema(description = "开始时间")
+    @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime startDate;
 
     @Schema(description = "结束时间")
+    @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime endDate;
 
     @Schema(description = "还款方式", example = "2")

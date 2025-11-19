@@ -66,4 +66,7 @@ public class ContractPageReqVO extends PageParam {
     private String file;
     private List<SortingField> sortFields;
 
+    @Schema(description = "借款查询类型")
+    private String loanType;
+
 }

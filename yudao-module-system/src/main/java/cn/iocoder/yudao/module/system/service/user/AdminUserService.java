@@ -217,4 +217,6 @@ public interface AdminUserService {
     Integer insertUserSimply(AdminUserDO user);
 
     AdminUserDO getUserSimple(Long userId);
+
+    List<AdminUserDO> getUserListByRealname(String realname);
 }

@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants;
 import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
@@ -78,8 +79,9 @@ public class ContractServiceImpl implements ContractService {
     }
 
     @Override
-    public PageResult<ContractDO> getContractPage(ContractPageReqVO pageReqVO) {
-        return contractMapper.selectPage(pageReqVO);
+    public PageResult<ContractDO> getContractPage(ContractPageReqVO reqVO) {
+        PageResult<ContractDO> contractDOPageResult = contractMapper.selectPage(reqVO);
+        return contractDOPageResult;
     }
 
 }

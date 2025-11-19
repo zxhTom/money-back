@@ -536,6 +536,11 @@ public class AdminUserServiceImpl implements AdminUserService {
         return userMapper.selectById(userId);
     }
 
+    @Override
+    public List<AdminUserDO> getUserListByRealname(String realname) {
+        return userMapper.selectByRealname(realname);
+    }
+
     /**
      * 对密码进行加密
      *
