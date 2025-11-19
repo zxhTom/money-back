@@ -13,13 +13,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import me.chanjar.weixin.mp.api.WxMpService;
+import me.chanjar.weixin.mp.bean.template.WxMpTemplateData;
+import me.chanjar.weixin.mp.bean.template.WxMpTemplateMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.security.PermitAll;
 import java.util.UUID;
@@ -44,6 +44,23 @@ public class WechatLoginController {
     @Lazy
     PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private WxMpService wxMpService;
+
+    @GetMapping("/send")
+    public String send() throws Exception {
+
+        WxMpTemplateMessage message = WxMpTemplateMessage.builder()
+                .toUser("openid")
+                .templateId("templateId")
+                .build();
+
+        message.addData(new WxMpTemplateData("first", "测试模板消息"));
+        message.addData(new WxMpTemplateData("keyword1", "内容1"));
+        message.addData(new WxMpTemplateData("remark", "结束"));
+
+        return wxMpService.getTemplateMsgService().sendTemplateMsg(message);
+    }
     @PostMapping("/auto")
     public ApiResponse auto(@RequestBody WechatLoginRequest request) {
 
