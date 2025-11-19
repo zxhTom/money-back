@@ -1,25 +1,19 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
-import cn.hutool.core.collection.CollUtil;
-import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
-import cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants;
-import org.springframework.stereotype.Service;
-import javax.annotation.Resource;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
-import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
-import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
-
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
+import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
+
+import javax.annotation.Resource;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
-import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.diffList;
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS;
 
 /**
  * 合同 Service 实现类
@@ -69,7 +63,7 @@ public class ContractServiceImpl implements ContractService {
 
     private void validateContractExists(Long id) {
         if (contractMapper.selectById(id) == null) {
-            throw exception(CustomErrorCodeConstants.CONTRACT_NOT_EXISTS);
+            throw exception(CONTRACT_NOT_EXISTS);
         }
     }
 
@@ -79,9 +73,8 @@ public class ContractServiceImpl implements ContractService {
     }
 
     @Override
-    public PageResult<ContractDO> getContractPage(ContractPageReqVO reqVO) {
-        PageResult<ContractDO> contractDOPageResult = contractMapper.selectPage(reqVO);
-        return contractDOPageResult;
+    public PageResult<ContractDO> getContractPage(ContractPageReqVO pageReqVO) {
+        return contractMapper.selectPage(pageReqVO);
     }
 
 }

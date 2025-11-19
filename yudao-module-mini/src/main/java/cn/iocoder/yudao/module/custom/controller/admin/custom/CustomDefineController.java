@@ -1,10 +1,7 @@
 package cn.iocoder.yudao.module.custom.controller.admin.custom;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
-import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
-import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
@@ -75,7 +72,7 @@ public class CustomDefineController {
     @GetMapping("/page")
     @Operation(summary = "不分页数据")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
-    public CommonResult<List<ContractDO>> page(@Valid ContractPageReqVO pageReqVO) {
+    public CommonResult<List<ContractDO>> page(@Valid ContractPageReqDtoVO pageReqVO) {
         List<ContractDO> respVO = customDefineService.page(pageReqVO);
         return success(respVO);
     }

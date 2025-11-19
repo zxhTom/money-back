@@ -1,13 +1,11 @@
 package cn.iocoder.yudao.module.custom.controller.admin.contract.vo;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
-import cn.iocoder.yudao.framework.common.pojo.SortingField;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
 
@@ -15,25 +13,23 @@ import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_
 @Data
 public class ContractPageReqVO extends PageParam {
 
-    @Schema(description = "欠款人姓名", example = "王五")
+    @Schema(description = "欠款人姓名", example = "李四")
     private String indebtedName;
 
-    @Schema(description = "欠款人身份证", example = "12399")
+    @Schema(description = "欠款人身份证", example = "28340")
     private String indebtedId;
 
     @Schema(description = "被欠款人姓名", example = "王五")
     private String creditorName;
 
-    @Schema(description = "被欠款人身份证", example = "7287")
+    @Schema(description = "被欠款人身份证", example = "23897")
     private String creditorId;
 
-    @Schema(description = "应用描述", example = "随便")
+    @Schema(description = "应用描述", example = "你猜")
     private String description;
 
-    @Schema(description = "合同状态", example = "1")
+    @Schema(description = "合同状态", example = "2")
     private Integer status;
-    private List<Integer> statusList;
-
 
     @Schema(description = "创建时间")
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
@@ -47,13 +43,13 @@ public class ContractPageReqVO extends PageParam {
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] endDate;
 
-    @Schema(description = "还款方式", example = "2")
+    @Schema(description = "还款方式", example = "1")
     private String returnType;
 
-    @Schema(description = "理由", example = "1")
+    @Schema(description = "理由", example = "2")
     private String reasonType;
 
-    @Schema(description = "详细理由", example = "不喜欢")
+    @Schema(description = "详细理由", example = "不对")
     private String detailReason;
 
     @Schema(description = "金额")
@@ -64,9 +60,11 @@ public class ContractPageReqVO extends PageParam {
 
     @Schema(description = "借条附件")
     private String file;
-    private List<SortingField> sortFields;
 
-    @Schema(description = "借款查询类型")
-    private String loanType;
+    @Schema(description = "利息")
+    private Long interest;
+
+    @Schema(description = "已还金额")
+    private Long refund;
 
 }

@@ -51,6 +51,8 @@ public class ContractDO extends BaseDO {
     private String description;
     /**
      * 合同状态
+     *
+     * 枚举 {@link TODO contract_status 对应的类}
      */
     private Integer status;
     /**
@@ -63,10 +65,14 @@ public class ContractDO extends BaseDO {
     private LocalDateTime endDate;
     /**
      * 还款方式
+     *
+     * 枚举 {@link TODO return_type 对应的类}
      */
     private String returnType;
     /**
      * 理由
+     *
+     * 枚举 {@link TODO reason_type 对应的类}
      */
     private String reasonType;
     /**
@@ -85,6 +91,14 @@ public class ContractDO extends BaseDO {
      * 借条附件
      */
     private String file;
+    /**
+     * 利息
+     */
+    private Long interest;
+    /**
+     * 已还金额
+     */
+    private Long refund;
 
 
 }

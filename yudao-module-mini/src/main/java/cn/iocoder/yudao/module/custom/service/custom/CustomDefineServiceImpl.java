@@ -118,7 +118,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     }
 
     @Override
-    public List<ContractDO> page(ContractPageReqVO reqVO) {
+    public List<ContractDO> page(ContractPageReqDtoVO reqVO) {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         AdminUserDO user = adminUserService.getUser(loginUser.getId());
         if ("borrow".equals(reqVO.getLoanType())) {

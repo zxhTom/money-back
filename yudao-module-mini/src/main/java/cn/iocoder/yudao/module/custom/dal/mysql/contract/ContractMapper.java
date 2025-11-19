@@ -7,7 +7,6 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 
 /**
@@ -18,9 +17,8 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 @Mapper
 public interface ContractMapper extends BaseMapperX<ContractDO> {
 
-    PageResult<ContractDO> selectPageCustom(@Param("query") ContractPageReqVO reqVO) ;
     default PageResult<ContractDO> selectPage(ContractPageReqVO reqVO) {
-        return selectPage(reqVO, reqVO.getSortFields(),new LambdaQueryWrapperX<ContractDO>()
+        return selectPage(reqVO, new LambdaQueryWrapperX<ContractDO>()
                 .likeIfPresent(ContractDO::getIndebtedName, reqVO.getIndebtedName())
                 .eqIfPresent(ContractDO::getIndebtedId, reqVO.getIndebtedId())
                 .likeIfPresent(ContractDO::getCreditorName, reqVO.getCreditorName())
@@ -36,6 +34,8 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
                 .eqIfPresent(ContractDO::getSalary, reqVO.getSalary())
                 .eqIfPresent(ContractDO::getTariff, reqVO.getTariff())
                 .eqIfPresent(ContractDO::getFile, reqVO.getFile())
+                .eqIfPresent(ContractDO::getInterest, reqVO.getInterest())
+                .eqIfPresent(ContractDO::getRefund, reqVO.getRefund())
                 .orderByDesc(ContractDO::getId));
     }
 

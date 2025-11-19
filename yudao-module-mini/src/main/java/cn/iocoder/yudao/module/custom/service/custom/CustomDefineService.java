@@ -23,7 +23,7 @@ public interface CustomDefineService {
 
     TotalInfosRespVO totalInfos(ContractPageReqVO pageReqVO);
 
-    List<ContractDO> page(ContractPageReqVO pageReqVO);
+    List<ContractDO> page(ContractPageReqDtoVO pageReqVO);
 
     Boolean checkUserInfo(UserReqVO userReqVO);
 
