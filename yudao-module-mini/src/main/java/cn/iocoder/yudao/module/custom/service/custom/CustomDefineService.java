@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageR
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
+import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import java.util.List;
@@ -30,4 +31,6 @@ public interface CustomDefineService {
     PayOrderVO getPayOrder(PayOrderVO payOrderVO);
 
     Long createDemoOrder(Long loginUserId, ContractPayOrderCreateReqVO createReqVO);
+
+    Integer updateContractConfirmedStatus(PayOrderNotifyReqDTO notifyReqDTO);
 }

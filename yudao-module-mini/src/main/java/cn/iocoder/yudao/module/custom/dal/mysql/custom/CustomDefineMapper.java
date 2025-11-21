@@ -19,4 +19,8 @@ public interface CustomDefineMapper {
     Page<CreditSearchVO> creditSearch(Page<Object> objectPage);
 
     PayOrderVO getPayOrder(@Param("query") PayOrderVO payOrderVO);
+
+    Integer insertContractPayOrder(@Param("id") Long id, @Param("payOrderId") Long payOrderId);
+
+    Long selectContractByPayOrderId(Long payOrderId);
 }

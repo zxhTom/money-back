@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
 import cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper;
 import cn.iocoder.yudao.module.fee.controller.admin.strategy.vo.FeeCalculationResult;
 import cn.iocoder.yudao.module.fee.service.strategy.FeeCalculationService;
+import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.dal.dataobject.demo.PayDemoOrderDO;
@@ -210,7 +211,17 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         // 2.2 更新支付单到 demo 订单
         payDemoOrderMapper.updateById(new PayDemoOrderDO().setId(demoOrder.getId())
                 .setPayOrderId(payOrderId));
+        customDefineMapper.insertContractPayOrder(contractDO.getId(), payOrderId);
         return demoOrder.getId();
+    }
+
+    @Override
+    public Integer updateContractConfirmedStatus(PayOrderNotifyReqDTO notifyReqDTO) {
+        Long contractId = customDefineMapper.selectContractByPayOrderId(notifyReqDTO.getPayOrderId());
+        ContractDO contractDO = contractMapper.selectById(contractId);
+        contractDO.setStatus(2);
+        contractMapper.updateById(contractDO);
+        return 1;
     }
 
 }

@@ -106,7 +106,7 @@ public class CustomDefineController {
     @Operation(summary = "将合同状态更新为已确认")
     @PermitAll
     public CommonResult<Boolean> updateContractHadConfirm(@RequestBody PayOrderNotifyReqDTO notifyReqDTO) {
-
+        customDefineService.updateContractConfirmedStatus(notifyReqDTO);
         return success(true);
     }
 }

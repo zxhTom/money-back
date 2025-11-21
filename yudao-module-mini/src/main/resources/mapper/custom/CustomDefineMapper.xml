@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper">
+    <insert id="insertContractPayOrder">
+        insert into contract_pay_relation(contract_id,pay_order_id)
+        values(#{id},#{payOrderId})
+        ON DUPLICATE KEY UPDATE
+         pay_order_id = VALUES(pay_order_id)
+    </insert>
     <select id="staticsContractByTimePeriod"
             resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.StaticsContractPeriodRespVO">
         SELECT
@@ -99,5 +105,9 @@
                 and id=#{query.id}
             </if>
         </where>
+    </select>
+    <select id="selectContractByPayOrderId" resultType="java.lang.Long">
+        select contract_id from contract_pay_relation
+        where pay_order_id=#{payOrderId}
     </select>
 </mapper>
