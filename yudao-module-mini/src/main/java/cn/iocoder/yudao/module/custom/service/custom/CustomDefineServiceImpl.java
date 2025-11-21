@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.custom.service.custom;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.lang.Assert;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
@@ -12,18 +14,31 @@ import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
 import cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper;
+import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
+import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
+import cn.iocoder.yudao.module.pay.dal.dataobject.demo.PayDemoOrderDO;
+import cn.iocoder.yudao.module.pay.dal.mysql.demo.PayDemoOrderMapper;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.addTime;
+import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
+
 @Service
 public class CustomDefineServiceImpl implements CustomDefineService{
+    @Autowired
+    PayDemoOrderMapper payDemoOrderMapper;
+    @Resource
+    private PayOrderApi payOrderApi;
     @Autowired
     AdminUserService adminUserService;
     @Autowired
@@ -164,6 +179,32 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public PayOrderVO getPayOrder(PayOrderVO payOrderVO) {
         return customDefineMapper.getPayOrder(payOrderVO);
+    }
+
+    @Override
+    public Long createDemoOrder(Long userId, ContractPayOrderCreateReqVO createReqVO ) {
+        // 1.1 获得商品
+        ContractDO contractDO = contractMapper.selectById(createReqVO.getContractId());
+        Assert.notNull(contractDO, "合同({}) 不存在", createReqVO.getContractId());
+        String spuName = String.format("%s->%s", contractDO.getCreditorName(),contractDO.getIndebtedName());
+        Integer price = contractDO.getSalary().intValue();
+        // 1.2 插入 demo 订单
+        PayDemoOrderDO demoOrder = new PayDemoOrderDO().setUserId(userId)
+                .setSpuId(createReqVO.getContractId()).setSpuName(spuName)
+                .setPrice(price).setPayStatus(false).setRefundPrice(0);
+        payDemoOrderMapper.insert(demoOrder);
+
+        // 2.1 创建支付单
+        Long payOrderId = payOrderApi.createOrder(new PayOrderCreateReqDTO()
+                .setAppKey("demo").setUserIp(getClientIP()) // 支付应用
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()) // 用户信息
+                .setMerchantOrderId(demoOrder.getId().toString()) // 业务的订单编号
+                .setSubject(spuName).setBody("").setPrice(price) // 价格信息
+                .setExpireTime(addTime(Duration.ofHours(2L)))); // 支付的过期时间
+        // 2.2 更新支付单到 demo 订单
+        payDemoOrderMapper.updateById(new PayDemoOrderDO().setId(demoOrder.getId())
+                .setPayOrderId(payOrderId));
+        return demoOrder.getId();
     }
 
 }

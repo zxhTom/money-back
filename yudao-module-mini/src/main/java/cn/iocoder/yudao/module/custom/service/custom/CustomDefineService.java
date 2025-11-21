@@ -28,4 +28,6 @@ public interface CustomDefineService {
     Boolean checkUserInfo(UserReqVO userReqVO);
 
     PayOrderVO getPayOrder(PayOrderVO payOrderVO);
+
+    Long createDemoOrder(Long loginUserId, ContractPayOrderCreateReqVO createReqVO);
 }

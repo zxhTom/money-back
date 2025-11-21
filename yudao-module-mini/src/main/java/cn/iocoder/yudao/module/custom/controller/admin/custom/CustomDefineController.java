@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveR
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.service.custom.CustomDefineService;
+import cn.iocoder.yudao.module.pay.controller.admin.demo.vo.order.PayDemoOrderCreateReqVO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +19,7 @@ import javax.validation.Valid;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 
 @Tag(name = "管理后台 - 自定义客户端")
 @RestController
@@ -90,5 +92,11 @@ public class CustomDefineController {
     public CommonResult<PayOrderVO> getPayOrder(@Valid @RequestBody PayOrderVO payOrderVO) {
         PayOrderVO res = customDefineService.getPayOrder(payOrderVO);
         return success(res);
+    }
+
+    @PostMapping("/create")
+    @Operation(summary = "创建示例订单")
+    public CommonResult<Long> createDemoOrder(@Valid @RequestBody ContractPayOrderCreateReqVO createReqVO) {
+        return success(customDefineService.createDemoOrder(getLoginUserId(), createReqVO));
     }
 }
