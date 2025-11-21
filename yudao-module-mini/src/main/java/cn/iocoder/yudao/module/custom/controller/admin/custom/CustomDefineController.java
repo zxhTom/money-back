@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveR
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.service.custom.CustomDefineService;
+import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.pay.controller.admin.demo.vo.order.PayDemoOrderCreateReqVO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +16,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.annotation.security.PermitAll;
 import javax.validation.Valid;
 import java.util.List;
 
@@ -94,9 +96,17 @@ public class CustomDefineController {
         return success(res);
     }
 
-    @PostMapping("/create")
-    @Operation(summary = "创建示例订单")
+    @PostMapping("/createOrder")
+    @Operation(summary = "创建合同订单")
     public CommonResult<Long> createDemoOrder(@Valid @RequestBody ContractPayOrderCreateReqVO createReqVO) {
         return success(customDefineService.createDemoOrder(getLoginUserId(), createReqVO));
+    }
+
+    @PostMapping("/updateContractHadConfirm")
+    @Operation(summary = "将合同状态更新为已确认")
+    @PermitAll
+    public CommonResult<Boolean> updateContractHadConfirm(@RequestBody PayOrderNotifyReqDTO notifyReqDTO) {
+
+        return success(true);
     }
 }

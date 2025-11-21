@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.controller.admin.wechat;
 
+import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.TemplateVO;
 import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
 import cn.iocoder.yudao.module.custom.service.wechat.MiniUserService;
@@ -47,12 +48,12 @@ public class WechatLoginController {
     @Autowired
     private WxMpService wxMpService;
 
-    @GetMapping("/send")
-    public String send() throws Exception {
+    @PostMapping("/send")
+    public String send(@RequestBody TemplateVO templateVO) throws Exception {
 
         WxMpTemplateMessage message = WxMpTemplateMessage.builder()
-                .toUser("openid")
-                .templateId("templateId")
+                .toUser(templateVO.getOpenId())
+                .templateId(templateVO.getTemplateId())
                 .build();
 
         message.addData(new WxMpTemplateData("first", "测试模板消息"));
