@@ -14,6 +14,8 @@ import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
 import cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper;
+import cn.iocoder.yudao.module.fee.controller.admin.strategy.vo.FeeCalculationResult;
+import cn.iocoder.yudao.module.fee.service.strategy.FeeCalculationService;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.dal.dataobject.demo.PayDemoOrderDO;
@@ -25,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,6 +38,8 @@ import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getCli
 
 @Service
 public class CustomDefineServiceImpl implements CustomDefineService{
+    @Autowired
+    FeeCalculationService feeCalculationService;
     @Autowired
     PayDemoOrderMapper payDemoOrderMapper;
     @Resource
@@ -187,7 +192,8 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         ContractDO contractDO = contractMapper.selectById(createReqVO.getContractId());
         Assert.notNull(contractDO, "合同({}) 不存在", createReqVO.getContractId());
         String spuName = String.format("%s->%s", contractDO.getCreditorName(),contractDO.getIndebtedName());
-        Integer price = contractDO.getSalary().intValue();
+        FeeCalculationResult feeCalculationResult = feeCalculationService.calculateFeeFromDB(BigDecimal.valueOf(contractDO.getSalary()));
+        Integer price = feeCalculationResult.getFee().intValue();
         // 1.2 插入 demo 订单
         PayDemoOrderDO demoOrder = new PayDemoOrderDO().setUserId(userId)
                 .setSpuId(createReqVO.getContractId()).setSpuName(spuName)
