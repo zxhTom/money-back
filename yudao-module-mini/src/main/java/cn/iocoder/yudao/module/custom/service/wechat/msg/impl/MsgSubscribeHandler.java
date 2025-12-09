@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 
 @Service
-public class SubscribeHandler implements MessageHandler {
+public class MsgSubscribeHandler implements MessageHandler {
     @Override
     public boolean canHandle(String msgType) {
         return "event".equals(msgType);
