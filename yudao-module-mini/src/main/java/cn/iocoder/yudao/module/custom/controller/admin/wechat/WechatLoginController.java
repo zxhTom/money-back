@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.custom.controller.admin.wechat;
 
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.MiniAppPath;
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.TemplateVO;
+import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
 import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
 import cn.iocoder.yudao.module.custom.service.wechat.MiniUserService;
@@ -17,12 +18,13 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.mp.api.WxMpService;
-import me.chanjar.weixin.mp.bean.template.WxMpTemplateData;
-import me.chanjar.weixin.mp.bean.template.WxMpTemplateMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.security.PermitAll;
 import java.util.UUID;
@@ -76,6 +78,15 @@ public class WechatLoginController {
             e.printStackTrace();
         }
         return ApiResponse.error("error");
+    }
+    @PostMapping("/bindMiniApp")
+    public ApiResponse bind(@RequestBody WechatLoginRequest request) {
+        // 1. 通过 code 获取 openid
+        Code2SessionResponse sessionResponse = wechatService.code2Session(request.getCode());
+        String openid = sessionResponse.getOpenid();
+        String unionid = sessionResponse.getUnionid();
+        MiniUserDo combineUser = miniUserService.bindMinUser(openid, unionid);
+        return ApiResponse.success(true);
     }
     @PostMapping("/login")
     public ApiResponse login(@RequestBody WechatLoginRequest request) {

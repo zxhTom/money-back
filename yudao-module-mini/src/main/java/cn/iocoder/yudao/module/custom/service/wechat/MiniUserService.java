@@ -18,4 +18,6 @@ public interface MiniUserService {
     public CombineUser initMini2Maltcloud(String prefix);
 
     Integer finishMiniUser(MiniUserDo miniUser);
+
+    MiniUserDo bindMinUser(String openid, String unionid);
 }

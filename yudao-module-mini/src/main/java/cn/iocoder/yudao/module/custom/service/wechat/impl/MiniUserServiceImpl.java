@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.custom.service.wechat.impl;
 
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.custom.config.WechatConfig;
 import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
 import cn.iocoder.yudao.module.custom.dal.mysql.wechat.MiniUserMapper;
 import cn.iocoder.yudao.module.custom.service.wechat.MiniUserService;
@@ -15,10 +17,13 @@ import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import com.anji.captcha.util.MD5Util;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * TODO
@@ -29,6 +34,8 @@ import org.springframework.stereotype.Service;
 @Service
 @Slf4j
 public class MiniUserServiceImpl implements MiniUserService {
+    @Autowired
+    WechatConfig wechatConfig;
     @Value("${zxhtom.security.user.password:123456}")
     String password;
     @Autowired
@@ -117,5 +124,32 @@ public class MiniUserServiceImpl implements MiniUserService {
     @Override
     public Integer finishMiniUser(MiniUserDo miniUser) {
         return miniUserMapper.finishMiniUser(miniUser);
+    }
+
+    @Override
+    public MiniUserDo bindMinUser(String openid, String unionid) {
+        QueryWrapper<MiniUserDo> miniUserDoQueryWrapper = new QueryWrapper<>();
+        miniUserDoQueryWrapper.eq("openid", openid);
+        miniUserDoQueryWrapper.eq("unionid", unionid);
+        List<MiniUserDo> list = miniUserMapper.selectList(miniUserDoQueryWrapper);
+        if (CollectionUtils.isEmpty(list)) {
+            //init miniuser
+            MiniUserDo miniUser = new MiniUserDo();
+            miniUser.setId(System.currentTimeMillis());
+            miniUser.setAppId(wechatConfig.getAppid());
+            miniUser.setUnionId(unionid);
+            miniUser.setOpenId(openid);
+            miniUser.setUserId(SecurityFrameworkUtils.getLoginUserId());
+            miniUserMapper.insert(miniUser);
+            return miniUser;
+        } else if (list.size() > 1) {
+            throw new RuntimeException("该账号存在异常，请联系后台管理员修复");
+        } else {
+            MiniUserDo miniUserDo = list.get(0);
+            miniUserDo.setUnionId(unionid);
+            miniUserDo.setOpenId(openid);
+            miniUserMapper.updateById(miniUserDo);
+        }
+        return new MiniUserDo();
     }
 }
