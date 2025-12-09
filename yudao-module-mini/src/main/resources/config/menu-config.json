@@ -1,0 +1,16 @@
+{
+  "button": [
+    {
+      "type": "miniprogram",
+      "name": "打开小程序",
+      "url": "https://org.zxhtom.store",
+      "appid": "您的小程序AppId",
+      "pagepath": "pages/index/index"
+    },
+    {
+      "type": "view",
+      "name": "在线客服",
+      "url": "https://work.weixin.qq.com/kfid/kfc1234567890abcdef"
+    }
+  ]
+}
