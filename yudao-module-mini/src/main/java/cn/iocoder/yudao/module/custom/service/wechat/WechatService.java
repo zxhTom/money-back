@@ -10,4 +10,8 @@ import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
 public interface WechatService {
 
     public Code2SessionResponse code2Session(String code);
+
+    public String generateUrlLink(String pagePath, String query) throws Exception;
+
+    Integer updateVerify(String idCard, int verified);
 }

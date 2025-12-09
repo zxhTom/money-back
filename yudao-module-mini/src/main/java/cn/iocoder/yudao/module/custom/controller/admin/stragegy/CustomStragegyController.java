@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.custom.controller.stragegy;
+package cn.iocoder.yudao.module.custom.controller.admin.stragegy;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.fee.controller.admin.strategy.vo.FeeCalculateRequest;
@@ -23,7 +23,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/custom/strategy")
 @Validated
 @Slf4j
-public class StragegyController {
+public class CustomStragegyController {
 
     @Autowired
     private FeeCalculationService feeCalculationService;

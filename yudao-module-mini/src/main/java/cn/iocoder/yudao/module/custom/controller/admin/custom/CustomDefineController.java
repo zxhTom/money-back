@@ -1,16 +1,27 @@
 package cn.iocoder.yudao.module.custom.controller.admin.custom;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.service.custom.CustomDefineService;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.pay.controller.admin.demo.vo.order.PayDemoOrderCreateReqVO;
+import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderRespVO;
+import cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderDO;
+import cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum;
+import cn.iocoder.yudao.module.pay.service.order.PayOrderService;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.apache.poi.ss.formula.functions.T;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +40,8 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @Validated
 public class CustomDefineController {
 
+    @Resource
+    private PayOrderService orderService;
     @Resource
     private CustomDefineService customDefineService;
 
@@ -83,7 +96,7 @@ public class CustomDefineController {
     @PostMapping("/checkUserInfo")
     @Operation(summary = "校验用户是否匹配")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
-    public CommonResult<Boolean> checkUserInfo(@Valid UserReqVO userReqVO) {
+    public CommonResult<Boolean> checkUserInfo(@Valid @RequestBody UserReqVO userReqVO) {
         Boolean valid = customDefineService.checkUserInfo(userReqVO);
         return success(valid);
     }
@@ -108,5 +121,105 @@ public class CustomDefineController {
     public CommonResult<Boolean> updateContractHadConfirm(@RequestBody PayOrderNotifyReqDTO notifyReqDTO) {
         customDefineService.updateContractConfirmedStatus(notifyReqDTO);
         return success(true);
+    }
+
+    @PostMapping("/register")
+    @Operation(summary = "注册")
+    @PermitAll
+    public CommonResult<Boolean> register(@RequestBody AdminUserDO adminUserDO) {
+        customDefineService.register(adminUserDO);
+        return success(true);
+    }
+    @PutMapping("/update")
+    @Operation(summary = "有效更新")
+    @PermitAll
+    public CommonResult<Boolean> update(@RequestBody ContractSaveReqVO contractSaveReqVO) {
+        customDefineService.update(contractSaveReqVO);
+        return success(true);
+    }
+    @PutMapping("/debt")
+    @Operation(summary = "销账")
+    @PermitAll
+    public CommonResult<Boolean> debt(@RequestBody DebtVO debtVO) {
+        customDefineService.debt(debtVO);
+        return success(true);
+    }
+    @PutMapping("/extension")
+    @Operation(summary = "展期")
+    @PermitAll
+    public CommonResult<Boolean> extension(@RequestBody ContractSaveReqVO contractSaveReqVO) {
+        customDefineService.extension(contractSaveReqVO);
+        return success(true);
+    }
+    @GetMapping("/get")
+    @Operation(summary = "获得支付订单")
+    @Parameters({
+            @Parameter(name = "id", description = "编号", required = true, example = "1024"),
+            @Parameter(name = "sync", description = "是否同步", example = "true")
+    })
+    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    public CommonResult<PayOrderRespVO> getOrder(@RequestParam("id") Long id,
+                                                 @RequestParam(value = "sync", required = false) Boolean sync) {
+        PayOrderDO order = orderService.getOrder(id);
+        // sync 仅在等待支付
+        if (Boolean.TRUE.equals(sync) && PayOrderStatusEnum.isWaiting(order.getStatus())) {
+            orderService.syncOrderQuietly(order.getId());
+            // 重新查询，因为同步后，可能会有变化
+            order = orderService.getOrder(id);
+        }
+        return success(BeanUtils.toBean(order, PayOrderRespVO.class));
+    }
+    @PutMapping("/bindQrcode")
+    @Operation(summary = "绑定订单支付码")
+    @Parameters({
+            @Parameter(name = "contractId", description = "编号", required = true, example = "1024"),
+            @Parameter(name = "codeUrl", description = "二维码地址", example = "https://org.zxhtom.store.index")
+    })
+    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    public CommonResult<String> bindQrcode(@RequestBody ContractRespVoDto contractRespVoDto) {
+        Long contractId = contractRespVoDto.getId();
+        String codeUrl = contractRespVoDto.getCodeUrl();
+        return success(customDefineService.bingQrcode(contractId,codeUrl));
+    }
+    @DeleteMapping("/deleteQrcode")
+    @Operation(summary = "删除订单支付码")
+    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    public CommonResult<String> deleteQrcode(@RequestBody ContractRespVoDto contractRespVoDto) {
+        Long contractId = contractRespVoDto.getId();
+        String codeUrl = contractRespVoDto.getCodeUrl();
+        return success(customDefineService.deleteQrcode(contractId,codeUrl));
+    }
+
+    @DeleteMapping("/delete24HourContract")
+    @Operation(summary = "解除合同")
+    public CommonResult<String> delete24HourContract() {
+        CommonResult<String> success = success(customDefineService.delete24HourContract());
+        return success;
+    }
+    @GetMapping("/getContract")
+    @Operation(summary = "获得合同")
+    @Parameter(name = "id", description = "编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    public CommonResult<ContractRespVoDto> getContract(@RequestParam("id") Long id) {
+        return success(customDefineService.getContract(id));
+    }
+
+    @GetMapping("/business-dimension")
+    @Operation(summary = "demo")
+    public CommonResult<StaticsContractPeriodRespVO> dimension() {
+        return success(customDefineService.staticsContractByTimePeriod());
+    }
+
+    @GetMapping("/latest-data")
+    @Operation(summary = "demo")
+    public CommonResult<Integer> latest() {
+        return success(1);
+    }
+
+    @GetMapping("/model")
+    @Operation(summary = "小程序显示model")
+    @PermitAll
+    public CommonResult<String> model() {
+        return success(customDefineService.selectModel());
     }
 }

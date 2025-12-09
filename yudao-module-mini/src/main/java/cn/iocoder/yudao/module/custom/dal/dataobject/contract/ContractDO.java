@@ -94,11 +94,11 @@ public class ContractDO extends BaseDO {
     /**
      * 利息
      */
-    private Long interest;
+    private Double interest;
     /**
      * 已还金额
      */
-    private Long refund;
+    private Double refund;
 
 
 }

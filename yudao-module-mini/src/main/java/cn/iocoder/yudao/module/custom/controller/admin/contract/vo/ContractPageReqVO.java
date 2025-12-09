@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
@@ -53,18 +54,18 @@ public class ContractPageReqVO extends PageParam {
     private String detailReason;
 
     @Schema(description = "金额")
-    private Long salary;
+    private BigDecimal salary;
 
     @Schema(description = "费率")
-    private Long tariff;
+    private BigDecimal tariff;
 
     @Schema(description = "借条附件")
     private String file;
 
     @Schema(description = "利息")
-    private Long interest;
+    private BigDecimal interest;
 
     @Schema(description = "已还金额")
-    private Long refund;
+    private BigDecimal refund;
 
 }

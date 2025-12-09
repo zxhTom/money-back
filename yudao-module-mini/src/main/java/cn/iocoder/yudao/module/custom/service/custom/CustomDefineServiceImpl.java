@@ -9,11 +9,13 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
 import cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper;
+import cn.iocoder.yudao.module.custom.service.contract.ContractService;
 import cn.iocoder.yudao.module.fee.controller.admin.strategy.vo.FeeCalculationResult;
 import cn.iocoder.yudao.module.fee.service.strategy.FeeCalculationService;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
@@ -21,8 +23,16 @@ import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.dal.dataobject.demo.PayDemoOrderDO;
 import cn.iocoder.yudao.module.pay.dal.mysql.demo.PayDemoOrderMapper;
+import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
+import cn.iocoder.yudao.module.system.service.dept.DeptService;
+import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import com.anji.captcha.util.MD5Util;
+import com.anji.captcha.util.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -39,6 +49,16 @@ import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getCli
 
 @Service
 public class CustomDefineServiceImpl implements CustomDefineService{
+    @Autowired
+    AdminUserService userService;
+    @Autowired
+    UserRoleMapper userRoleMapper;
+    @Autowired
+    DeptService deptService;
+    @Autowired
+    RoleService roleService;
+    @Autowired
+    ContractService contractService;
     @Autowired
     FeeCalculationService feeCalculationService;
     @Autowired
@@ -222,6 +242,98 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         contractDO.setStatus(2);
         contractMapper.updateById(contractDO);
         return 1;
+    }
+
+    @Override
+    public String bingQrcode(Long contractId, String codeUrl) {
+        customDefineMapper.updatePayRelation(contractId, codeUrl);
+        return customDefineMapper.selectLatestCodeUrlBaseContractId(contractId);
+    }
+
+    @Override
+    public ContractRespVoDto getContract(Long id) {
+        ContractDO contract = contractService.getContract(id);
+        ContractRespVoDto contractRespVoDto = BeanUtils.toBean(contract, ContractRespVoDto.class);
+        String codeUrl =customDefineMapper.selectLatestCodeUrlBaseContractId(id);
+        contractRespVoDto.setCodeUrl(codeUrl);
+        return contractRespVoDto;
+    }
+
+    @Override
+    public String deleteQrcode(Long contractId, String codeUrl) {
+        customDefineMapper.updatePayRelation(contractId,"");
+        return "";
+    }
+
+    @Override
+    public Integer update(ContractSaveReqVO contractSaveReqVO) {
+        ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
+        contractMapper.updateById(updateObj);
+        return 1;
+    }
+
+    @Override
+    public Integer debt(DebtVO debtVO) {
+        ContractDO contractDO = contractMapper.selectById(debtVO.getId());
+        if (contractDO.getInterest() == null) {
+            contractDO.setInterest(0D);
+        }
+        BigDecimal add = BigDecimal.valueOf(contractDO.getSalary()).add(BigDecimal.valueOf(contractDO.getInterest()));
+        if (contractDO.getRefund() == null) {
+            contractDO.setRefund(0D);
+        }
+        BigDecimal refund = BigDecimal.valueOf(contractDO.getRefund()).add(BigDecimal.valueOf(debtVO.getSettlementAmount()));
+        contractDO.setRefund(refund.doubleValue());
+        if (refund.compareTo(add) >= 0) {
+           //该状态
+            contractDO.setStatus(3);
+        }
+        contractMapper.updateById(contractDO);
+        return 1;
+    }
+
+    @Override
+    public Integer extension(ContractSaveReqVO contractSaveReqVO) {
+        ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
+        return contractMapper.updateById(updateObj);
+    }
+
+    @Override
+    public Integer register(AdminUserDO adminUserDO) {
+
+        AdminUserDO user = BeanUtils.toBean(adminUserDO, AdminUserDO.class);
+
+        user.setId(System.currentTimeMillis());
+        user.setNickname(MD5Util.md5(user.getUsername()));
+        if (StringUtils.isEmpty(user.getUsername())) {
+            user.setUsername(user.getNickname());
+        }
+//            user.setUserCode(openId.hashCode());
+        DeptDO deptDO = deptService.getDeptByName("合同管理部");
+        if (deptDO != null) {
+            user.setDeptId(deptDO.getId());
+        }
+        RoleDO roleDO = roleService.getRoleByName("contract");
+        if (roleDO != null) {
+            UserRoleDO userRoleDO = new UserRoleDO();
+            userRoleDO.setUserId(user.getId());
+            userRoleDO.setRoleId(roleDO.getId());
+            userRoleMapper.insert(userRoleDO);
+        }
+        userService.insertUserSimply(user);
+        return 1;
+    }
+
+    @Override
+    public String selectModel() {
+        return customDefineMapper.selectModel();
+    }
+
+    @Override
+    public String delete24HourContract() {
+        LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
+        AdminUserDO user = adminUserService.getUser(loginUser.getId());
+        return customDefineMapper.delete24HourContract(user.getRealname());
     }
 
 }

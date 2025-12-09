@@ -27,6 +27,8 @@ public class UserProfileRespVO {
     private Integer occupation;
     @Schema(description = "学历", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
     private Integer education;
+    @Schema(description = "认证", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    private Integer verified;
     @Schema(description = "真实姓名", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
     private String realname;
     @Schema(description = "用户账号", requiredMode = Schema.RequiredMode.REQUIRED, example = "yudao")

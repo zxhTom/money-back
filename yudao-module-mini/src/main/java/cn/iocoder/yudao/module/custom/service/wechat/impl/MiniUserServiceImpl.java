@@ -83,6 +83,11 @@ public class MiniUserServiceImpl implements MiniUserService {
         } else {
             combineUser.setRegisted(true);
             AdminUserDO user = userService.getUserSimple(miniUser.getUserId());
+//            if (user.getVerified() == 0) {
+//                combineUser.setRegisted(false);
+//            } else {
+//                combineUser.setRegisted(true);
+//            }
             if (user == null) {
                 user = new AdminUserDO();
                 user.setId(System.currentTimeMillis());

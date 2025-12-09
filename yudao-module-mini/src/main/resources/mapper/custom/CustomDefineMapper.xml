@@ -7,6 +7,23 @@
         ON DUPLICATE KEY UPDATE
          pay_order_id = VALUES(pay_order_id)
     </insert>
+    <update id="updatePayRelation">
+        update  contract_pay_relation
+        set pay_url=#{codeUrl}
+        where contract_id=#{contractId}
+    </update>
+    <update id="updateVerify">
+        update system_users set verified=#{verified} where id_no=#{idCard}
+    </update>
+    <delete id="deleteQrcode">
+        delete from contract_pay_relation  where contract_id=#{contractId}
+    </delete>
+    <delete id="delete24HourContract">
+        update custom_contract
+        set deleted =1
+        where (indebted_name =#{realname} or creditor_name =#{realname} )
+        and update_time >= DATE_SUB(NOW(), INTERVAL 24 HOUR);
+    </delete>
     <select id="staticsContractByTimePeriod"
             resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.StaticsContractPeriodRespVO">
         SELECT
@@ -109,5 +126,14 @@
     <select id="selectContractByPayOrderId" resultType="java.lang.Long">
         select contract_id from contract_pay_relation
         where pay_order_id=#{payOrderId}
+    </select>
+    <select id="selectLatestCodeUrlBaseContractId" resultType="java.lang.String">
+        select cpr.pay_url from contract_pay_relation cpr
+      left join pay_demo_order pdo on cpr.pay_order_id =pdo.pay_order_id
+        where pdo.pay_status =0
+          and cpr.contract_id =#{contractId} and cpr.pay_url is not null order by pdo.pay_order_id desc limit 1;
+    </select>
+    <select id="selectModel" resultType="java.lang.String">
+        select model from contract_model
     </select>
 </mapper>

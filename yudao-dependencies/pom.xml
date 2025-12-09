@@ -80,6 +80,7 @@
         <weixin-java.version>4.7.7-20250808.182223</weixin-java.version>
         <!-- 专属于 JDK8 安全漏洞升级 -->
         <logback.version>1.2.13</logback.version> <!-- 无法使用 1.3.X 版本，启动会报错 -->
+        <google_zxing.version>3.5.1</google_zxing.version>
     </properties>
 
     <dependencyManagement>
@@ -682,6 +683,16 @@
                 <groupId>ch.qos.logback</groupId>
                 <artifactId>logback-classic</artifactId>
                 <version>${logback.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>core</artifactId>
+                <version>${google_zxing.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.zxing</groupId>
+                <artifactId>javase</artifactId>
+                <version>${google_zxing.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

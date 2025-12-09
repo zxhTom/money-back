@@ -36,6 +36,8 @@ public class AdminUserDO extends TenantBaseDO {
     @TableId
     private Long id;
 
+    private int verified;
+
     /**
      * 身份证号码
      */

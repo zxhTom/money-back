@@ -15,8 +15,9 @@ import java.util.Date;
 public class UserProfileUpdateReqVO {
 
     @Schema(description = "用户昵称", example = "芋艿")
-    @Size(max = 30, message = "用户昵称长度不能超过 30 个字符")
+    @Size(max = 300, message = "用户昵称长度不能超过 300 个字符")
     private String nickname;
+    private String username;
 
     @Schema(description = "用户邮箱", example = "yudao@iocoder.cn")
     @Email(message = "邮箱格式不正确")

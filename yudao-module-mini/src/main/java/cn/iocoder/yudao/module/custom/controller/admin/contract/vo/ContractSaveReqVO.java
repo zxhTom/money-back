@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.custom.controller.admin.contract.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
+
+import java.math.BigDecimal;
 import java.util.*;
 import javax.validation.constraints.*;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -53,18 +55,19 @@ public class ContractSaveReqVO {
     private String detailReason;
 
     @Schema(description = "金额")
-    private Long salary;
+    private BigDecimal salary;
 
     @Schema(description = "费率")
-    private Long tariff;
+    private BigDecimal tariff;
 
     @Schema(description = "借条附件")
     private String file;
 
     @Schema(description = "利息")
-    private Long interest;
+    private BigDecimal interest;
 
     @Schema(description = "已还金额")
-    private Long refund;
+    private BigDecimal refund;
+    private String password;
 
 }

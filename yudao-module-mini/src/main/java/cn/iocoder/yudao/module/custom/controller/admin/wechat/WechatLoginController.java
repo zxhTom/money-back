@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.controller.admin.wechat;
 
+import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.MiniAppPath;
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.TemplateVO;
 import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
@@ -10,6 +11,7 @@ import cn.iocoder.yudao.module.system.controller.admin.auth.vo.AuthLoginReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.auth.vo.AuthLoginRespVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.auth.AdminAuthService;
+import com.alibaba.fastjson.JSON;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -74,6 +76,17 @@ public class WechatLoginController {
 
         return ApiResponse.success(loginResponse);
     }
+
+    @PostMapping("/generator")
+    public ApiResponse generator(@RequestBody MiniAppPath miniAppPath) {
+        try {
+            String res = wechatService.generateUrlLink(miniAppPath.getPath(), miniAppPath.getQuery());
+            return ApiResponse.success(res);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ApiResponse.error("error");
+    }
     @PostMapping("/login")
     public ApiResponse login(@RequestBody WechatLoginRequest request) {
 
@@ -83,7 +96,7 @@ public class WechatLoginController {
         if (!sessionResponse.isSuccess()) {
             return ApiResponse.error("微信登录失败: " + sessionResponse.getErrmsg());
         }
-
+        log.info(JSON.toJSONString(sessionResponse));
         String openid = sessionResponse.getOpenid();
         CombineUser combineUser = miniUserService.selectMiniUserOrInitUserWithPrefix(request.getAppId(), openid, "wechat");
         // 2. 业务逻辑：根据 openid 查找或创建用户

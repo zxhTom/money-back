@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">嵌入页面</title>
+    <!-- 使用Thymeleaf th: 语法动态设置内容和样式 -->
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: sans-serif;
+            background-color: #f5f5f5;
+        }
+        .header {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .iframe-container {
+            width: 100%;
+            height: auto; /* 高度由动态传入的iframeHeight控制 */
+            min-height: 300px;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+        .footer {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h2 th:text="${pageTitle}">页面预览</h2>
+    <p>当前嵌入的地址：<code th:text="${embeddedUrl}"></code></p>
+</div>
+
+<!-- 核心：动态设置src和height的iframe -->
+<div class="iframe-container">
+    <iframe
+            th:src="${embeddedUrl}"
+            th:height="${iframeHeight} + 'px'"
+            title="嵌入内容"
+            allow="fullscreen" <!-- 允许全屏等特性 -->
+    loading="lazy"> <!-- 延迟加载提升性能 -->
+    </iframe>
+</div>
+
+<div class="footer">
+    <p>本页面由Spring Boot驱动 | <a th:href="${embeddedUrl}" target="_blank">在新窗口打开此页面</a></p>
+</div>
+
+<!-- 可选的简单脚本，用于处理iframe加载状态 -->
+<script>
+    document.querySelector('iframe').addEventListener('load', function() {
+        console.log('嵌入的页面加载完成:', this.src);
+    });
+    document.querySelector('iframe').addEventListener('error', function() {
+        console.error('嵌入的页面加载失败:', this.src);
+        alert('抱歉，页面加载失败，请检查地址或网络。');
+    });
+</script>
+</body>
+</html>

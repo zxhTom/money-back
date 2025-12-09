@@ -23,4 +23,16 @@ public interface CustomDefineMapper {
     Integer insertContractPayOrder(@Param("id") Long id, @Param("payOrderId") Long payOrderId);
 
     Long selectContractByPayOrderId(Long payOrderId);
+
+    Integer updatePayRelation(@Param("contractId") Long contractId, @Param("codeUrl") String codeUrl);
+
+    String selectLatestCodeUrlBaseContractId(@Param("contractId") Long id);
+
+    Integer deleteQrcode(@Param("contractId") Long contractId);
+
+    String selectModel();
+
+    Integer updateVerify(@Param("idCard") String idCard, @Param("verified") int verified);
+
+    String delete24HourContract(@Param("realname") String realname);
 }
