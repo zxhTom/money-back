@@ -253,7 +253,7 @@ CREATE TABLE `mp_user` (
   `remark` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
 
   -- 标签信息
-  `tag_ids` json DEFAULT NULL COMMENT '标签编号数组，存储用户所属的标签ID列表',
+  `tag_ids` text DEFAULT '' COMMENT '标签编号数组，存储用户所属的标签ID列表',
 
   -- 关联信息
   `account_id` bigint NOT NULL COMMENT '公众号账号的编号，关联mp_account表id',

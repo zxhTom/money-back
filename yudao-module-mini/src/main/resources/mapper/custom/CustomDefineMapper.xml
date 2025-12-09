@@ -136,4 +136,15 @@
     <select id="selectModel" resultType="java.lang.String">
         select model from contract_model
     </select>
+    <select id="selectOffcialOpenIdByUserId" resultType="java.lang.String">
+        select mpu.openid from mp_user mpu
+        left join mini_user mnu
+        on mpu.union_id =mnu.union_id
+        and mpu.deleted =0 and mnu.deleted =0
+        <where>
+            <if test="id!=null and id!=''">
+                and mnu.user_id =#{id}
+            </if>
+        </where>
+    </select>
 </mapper>

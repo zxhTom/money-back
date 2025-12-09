@@ -8,6 +8,6 @@ import lombok.Data;
  */
 @Data
 public class TemplateVO {
-    private String openId;
+    private String realname;
     private String templateId;
 }

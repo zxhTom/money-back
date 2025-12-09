@@ -52,17 +52,7 @@ public class WechatLoginController {
 
     @PostMapping("/send")
     public String send(@RequestBody TemplateVO templateVO) throws Exception {
-
-        WxMpTemplateMessage message = WxMpTemplateMessage.builder()
-                .toUser(templateVO.getOpenId())
-                .templateId(templateVO.getTemplateId())
-                .build();
-
-        message.addData(new WxMpTemplateData("first", "测试模板消息"));
-        message.addData(new WxMpTemplateData("keyword1", "内容1"));
-        message.addData(new WxMpTemplateData("remark", "结束"));
-
-        return wxMpService.getTemplateMsgService().sendTemplateMsg(message);
+        return wechatService.send(templateVO);
     }
     @PostMapping("/auto")
     public ApiResponse auto(@RequestBody WechatLoginRequest request) {
@@ -98,7 +88,8 @@ public class WechatLoginController {
         }
         log.info(JSON.toJSONString(sessionResponse));
         String openid = sessionResponse.getOpenid();
-        CombineUser combineUser = miniUserService.selectMiniUserOrInitUserWithPrefix(request.getAppId(), openid, "wechat");
+        String unionid = sessionResponse.getUnionid();
+        CombineUser combineUser = miniUserService.selectMiniUserOrInitUserWithPrefix(request.getAppId(), openid,unionid, "wechat");
         // 2. 业务逻辑：根据 openid 查找或创建用户
         AdminUserDO user = combineUser.getMaltcloud();
         AuthLoginReqVO loginRequest = new AuthLoginReqVO();

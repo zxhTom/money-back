@@ -23,6 +23,7 @@ public class MiniUserDo extends BaseDO {
     private Long id;
     private String appId;
     private String openId;
+    private String unionId;
     private Long userId;
     private boolean isFinished;
 }

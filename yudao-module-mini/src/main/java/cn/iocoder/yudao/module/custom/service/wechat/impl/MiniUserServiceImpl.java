@@ -15,6 +15,7 @@ import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import com.anji.captcha.util.MD5Util;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -49,7 +50,7 @@ public class MiniUserServiceImpl implements MiniUserService {
     }
 
     @Override
-    public CombineUser selectMiniUserOrInitUserWithPrefix(String appId, String openId, String prefix) {
+    public CombineUser selectMiniUserOrInitUserWithPrefix(String appId, String openId,String unionId, String prefix) {
         CombineUser combineUser = new CombineUser();
         MiniUserDo miniUser = selectMiniUser(appId, openId);
         if (null == miniUser) {
@@ -76,11 +77,16 @@ public class MiniUserServiceImpl implements MiniUserService {
             miniUser = new MiniUserDo();
             miniUser.setId(System.currentTimeMillis());
             miniUser.setAppId(appId);
+            miniUser.setUnionId(unionId);
             miniUser.setOpenId(openId);
             miniUser.setUserId(user.getId());
             miniUserMapper.insert(miniUser);
             combineUser.setRegisted(false);
         } else {
+            if (StringUtils.isEmpty(miniUser.getUnionId()) || !miniUser.getUnionId().equals(unionId)) {
+                miniUser.setUnionId(unionId);
+                miniUserMapper.updateById(miniUser);
+            }
             combineUser.setRegisted(true);
             AdminUserDO user = userService.getUserSimple(miniUser.getUserId());
 //            if (user.getVerified() == 0) {

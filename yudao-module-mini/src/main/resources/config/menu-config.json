@@ -4,13 +4,13 @@
       "type": "miniprogram",
       "name": "打开小程序",
       "url": "https://org.zxhtom.store",
-      "appid": "您的小程序AppId",
+      "appid": "wx7641cb883b4fa670",
       "pagepath": "pages/index/index"
     },
     {
       "type": "view",
       "name": "在线客服",
-      "url": "https://work.weixin.qq.com/kfid/kfc1234567890abcdef"
+      "url": "https://work.weixin.qq.com/kfid/kfcd8090303121c856f"
     }
   ]
 }

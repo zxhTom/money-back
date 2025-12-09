@@ -13,7 +13,7 @@ public interface MiniUserService {
 
     public MiniUserDo selectMiniUser(String appId, String openId);
 
-    public CombineUser selectMiniUserOrInitUserWithPrefix(String appId, String openId,String prefix);
+    public CombineUser selectMiniUserOrInitUserWithPrefix(String appId, String openId,String unionId,String prefix);
 
     public CombineUser initMini2Maltcloud(String prefix);
 
