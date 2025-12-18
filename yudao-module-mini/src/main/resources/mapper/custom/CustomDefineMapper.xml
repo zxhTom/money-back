@@ -91,11 +91,24 @@
                     and cc.creditor_id =#{idNo}
                 </if>
             </where>
+            union all
+        SELECT
+        creditor_name AS name,
+        creditor_id AS id_no,
+        su.avatar,
+        cc.create_time,
+        ROW_NUMBER() OVER (PARTITION BY creditor_id ORDER BY cc.create_time DESC) AS rn
+        FROM custom_contract cc
+        LEFT JOIN system_users su ON su.id_no = cc.creditor_id
+        <where>
+            <if test="idNo!=null and idNo!=''">
+                and cc.indebted_id =#{idNo}
+            </if>
+        </where>
         )
-        SELECT name, id_no, avatar
+        SELECT distinct name, id_no, avatar
         FROM t
-        WHERE rn = 1
-        ORDER BY create_time DESC
+        WHERE rn = 1 and id_no!=#{idNo}
         LIMIT 10;
     </select>
     <select id="creditSearch"

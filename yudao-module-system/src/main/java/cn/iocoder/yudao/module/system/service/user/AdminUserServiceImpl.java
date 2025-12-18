@@ -29,6 +29,7 @@ import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.dept.PostService;
 import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.system.service.tenant.TenantService;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.service.impl.DiffParseFunction;
@@ -41,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.validation.ConstraintViolationException;
+import java.sql.Wrapper;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -539,6 +541,14 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     public List<AdminUserDO> getUserListByRealname(String realname) {
         return userMapper.selectByRealname(realname);
+    }
+
+    @Override
+    public List<AdminUserDO> getUserByIdNo(String idNo) {
+        QueryWrapper<AdminUserDO> adminUserDOQueryWrapper = new QueryWrapper<>();
+        adminUserDOQueryWrapper.eq("id_no", idNo);
+        adminUserDOQueryWrapper.last("limit 1");
+        return userMapper.selectList(adminUserDOQueryWrapper);
     }
 
     /**

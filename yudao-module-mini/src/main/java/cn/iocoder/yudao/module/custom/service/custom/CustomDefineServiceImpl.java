@@ -162,6 +162,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     public List<ContractDO> page(ContractPageReqDtoVO reqVO) {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         AdminUserDO user = adminUserService.getUser(loginUser.getId());
+        if (StringUtils.isEmpty(user.getRealname()) || StringUtils.isEmpty(user.getIdNo())) {
+            throw new RuntimeException("请完善个人信息");
+        }
         if ("borrow".equals(reqVO.getLoanType())) {
             //借入
             reqVO.setIndebtedName(user.getRealname());
@@ -304,7 +307,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         AdminUserDO user = BeanUtils.toBean(adminUserDO, AdminUserDO.class);
 
         user.setId(System.currentTimeMillis());
-        user.setNickname(MD5Util.md5(user.getUsername()));
+        if (org.apache.commons.lang3.StringUtils.isEmpty(user.getNickname())) {
+            user.setNickname(MD5Util.md5(user.getUsername()));
+        }
         if (StringUtils.isEmpty(user.getUsername())) {
             user.setUsername(user.getNickname());
         }

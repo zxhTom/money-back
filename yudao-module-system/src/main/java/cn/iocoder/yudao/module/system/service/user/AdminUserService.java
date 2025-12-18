@@ -219,4 +219,7 @@ public interface AdminUserService {
     AdminUserDO getUserSimple(Long userId);
 
     List<AdminUserDO> getUserListByRealname(String realname);
+
+    List<AdminUserDO> getUserByIdNo(String idNo);
+
 }

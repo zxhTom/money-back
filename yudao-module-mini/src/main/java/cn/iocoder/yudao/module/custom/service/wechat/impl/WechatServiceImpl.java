@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author zxhtom
@@ -96,7 +97,7 @@ public class WechatServiceImpl implements WechatService {
 
     @Override
     public String send(TemplateVO templateVO) throws WxErrorException {
-        List<AdminUserDO> userListByRealname = adminUserService.getUserListByRealname(templateVO.getRealname());
+        List<AdminUserDO> userListByRealname = adminUserService.getUserByIdNo(templateVO.getIdNo());
         if (CollectionUtil.isEmpty(userListByRealname)) {
             throw new RuntimeException("user empty");
         }
@@ -105,7 +106,11 @@ public class WechatServiceImpl implements WechatService {
                 .toUser(openId)
                 .templateId(templateVO.getTemplateId())
                 .build();
-
+        if (CollectionUtil.isNotEmpty(templateVO.getDatas())) {
+            for (Map.Entry<String, Object> entry : templateVO.getDatas().entrySet()) {
+                message.addData(new WxMpTemplateData(entry.getKey(), entry.getValue().toString()));
+            }
+        }
         message.addData(new WxMpTemplateData("first", "测试模板消息"));
         message.addData(new WxMpTemplateData("keyword1", "内容1"));
         message.addData(new WxMpTemplateData("remark", "结束"));

@@ -43,7 +43,7 @@ public class FaceAuthController {
     public CommonResult<Map<String, Object>> startFaceAuth(@RequestParam String idCard) throws Exception {
         // 你的小程序回调页面路径，用于接收核身完成后的跳转
         String successUrl = serverDomain + "/api/faceAuth/callback?status=success&idCard="+idCard;
-        String failUrl = serverDomain + "/pages/authResult?status=fail&idCard="+idCard;
+        String failUrl = serverDomain + "/api/faceAuth/callback?status=failed&idCard="+idCard;
 //        successUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=success");
 //        failUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=fail");
         // 1. 获取 verify_token
