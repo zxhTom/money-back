@@ -323,7 +323,7 @@ public class GlobalExceptionHandler {
         // 插入异常日志
         createExceptionLog(req, ex);
         // 返回 ERROR CommonResult
-        return CommonResult.error(INTERNAL_SERVER_ERROR.getCode(), ex.getMessage());
+        return CommonResult.error(INTERNAL_SERVER_ERROR.getCode(), INTERNAL_SERVER_ERROR.getMsg());
     }
 
     private void createExceptionLog(HttpServletRequest req, Throwable e) {
