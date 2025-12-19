@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.controller.admin.contract.vo;
 
+import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -14,7 +15,7 @@ import cn.iocoder.yudao.framework.excel.core.convert.DictConvert;
 @Schema(description = "管理后台 - 合同 Response VO")
 @Data
 @ExcelIgnoreUnannotated
-public class ContractRespVO {
+public class ContractRespVO extends BaseDO {
 
     @Schema(description = "主键ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "8477")
     @ExcelProperty("主键ID")

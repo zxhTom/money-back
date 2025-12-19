@@ -4,8 +4,6 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.custom.controller.admin.baidu.vo.BaiduUserInfo;
 import cn.iocoder.yudao.module.custom.service.face.baidu.BaiduFaceAuthService;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
 import com.anji.captcha.util.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,9 +29,18 @@ public class FaceAuthController {
 
     @Autowired
     WechatService wechatService;
-    // 你的小程序服务器域名，用于构造回调地址
+    /**
+     * 管理后台域名（例如：https://xxx.com/admin-api）
+     */
     @Value("${server.domain}")
     private String serverDomain;
+
+    /**
+     * 人脸核身服务的基础域名（例如：https://brain.zxhtom.store）
+     * 已在配置文件中通过 custom.domain.brain 进行集中配置
+     */
+    @Value("${custom.domain.brain}")
+    private String faceServiceDomain;
 
     /**
      * 第一步：小程序调用此接口，开启一个核身流程
@@ -41,17 +48,18 @@ public class FaceAuthController {
      */
     @GetMapping("/start")
     public CommonResult<Map<String, Object>> startFaceAuth(@RequestParam String idCard) throws Exception {
-        // 你的小程序回调页面路径，用于接收核身完成后的跳转
-        String successUrl = serverDomain + "/api/faceAuth/callback?status=success&idCard="+idCard;
-        String failUrl = serverDomain + "/api/faceAuth/callback?status=failed&idCard="+idCard;
+        // 你的小程序回调页面路径，用于接收核身完成后的跳转（域名从配置文件中读取）
+        String successUrl = serverDomain + "/api/mini/callback?status=success&idCard=" + idCard;
+        String failUrl = serverDomain + "/api/mini/callback?status=failed&idCard=" + idCard;
 //        successUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=success");
 //        failUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=fail");
         // 1. 获取 verify_token
         String verifyToken = baiduFaceAuthService.getVerifyToken(successUrl, failUrl);
 
-        // 2. 根据 token 构造H5核身页面URL[citation:6]
-        String authUrl = String.format("https://brain.zxhtom.store/face/print/?token=%s&successUrl=%s&failedUrl=%s",
-                verifyToken, successUrl, failUrl);
+        // 2. 根据 token 构造 H5 核身页面 URL
+        // 人脸服务域名从配置文件 custom.domain.brain 读取，避免代码中硬编码
+        String authUrl = String.format("%s/face/print/?token=%s&successUrl=%s&failedUrl=%s",
+                faceServiceDomain, verifyToken, successUrl, failUrl);
 
         Map<String, Object> result = new HashMap<>();
         result.put("verify_token", verifyToken);
