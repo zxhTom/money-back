@@ -5,7 +5,9 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageR
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
+import cn.iocoder.yudao.module.custom.controller.admin.wechat.WechatLoginController;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
+import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -52,7 +54,9 @@ public interface CustomDefineService {
 
     Integer register(AdminUserDO adminUserDO);
 
-    String selectModel();
+    String selectModel(String appVersion);
 
     String delete24HourContract();
+
+    ApiResponse bindmini2user(WechatLoginController.WechatLoginRequest wechatLoginRequest);
 }

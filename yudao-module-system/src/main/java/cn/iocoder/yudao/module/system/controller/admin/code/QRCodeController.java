@@ -50,19 +50,23 @@ public class QRCodeController {
             @RequestParam(defaultValue = "300") int height) {
 
         try {
-            int i = content.indexOf("?");
-            // 1. 构建请求参数[citation:1]
-            GenerateUrlLinkRequest request = GenerateUrlLinkRequest.builder()
-                    .path(content.substring(0,i)) // 要跳转的小程序页面路径[citation:5]
-                    .query(content.substring(i+1))   // 页面参数，最大1024字符[citation:5]
-                    .envVersion(WxMaConstants.DEFAULT_ENV_VERSION) // 默认"release"正式版[citation:1]
-                    .expireType(1) // 失效类型：1-按间隔天数失效[citation:5]
-                    .expireInterval(7) // 7天后链接失效，最长30天[citation:5]
-                    .build();
+            try {
+                int i = content.indexOf("?");
+                // 1. 构建请求参数[citation:1]
+                GenerateUrlLinkRequest request = GenerateUrlLinkRequest.builder()
+                        .path(content.substring(0, i)) // 要跳转的小程序页面路径[citation:5]
+                        .query(content.substring(i + 1))   // 页面参数，最大1024字符[citation:5]
+                        .envVersion(WxMaConstants.DEFAULT_ENV_VERSION) // 默认"release"正式版[citation:1]
+                        .expireType(1) // 失效类型：1-按间隔天数失效[citation:5]
+                        .expireInterval(7) // 7天后链接失效，最长30天[citation:5]
+                        .build();
 
-            // 2. 调用SDK生成链接[citation:1]
-            String s = wxMaService.getLinkService().generateUrlLink(request);
-            byte[] qrCodeImage = qrCodeGenerator.generateQRCodeImage(s, width, height);
+                // 2. 调用SDK生成链接[citation:1]
+                content = wxMaService.getLinkService().generateUrlLink(request);
+            } catch (Exception e) {
+
+            }
+            byte[] qrCodeImage = qrCodeGenerator.generateQRCodeImage(content, width, height);
             String file = fileService.createFile(qrCodeImage, UUID.randomUUID().toString(),
                     "demo", "png");
 

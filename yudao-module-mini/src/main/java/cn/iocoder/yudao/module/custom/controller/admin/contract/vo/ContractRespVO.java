@@ -15,8 +15,9 @@ import cn.iocoder.yudao.framework.excel.core.convert.DictConvert;
 @Schema(description = "管理后台 - 合同 Response VO")
 @Data
 @ExcelIgnoreUnannotated
-public class ContractRespVO extends BaseDO {
+public class ContractRespVO {
 
+    private Long creator;
     @Schema(description = "主键ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "8477")
     @ExcelProperty("主键ID")
     private Long id;

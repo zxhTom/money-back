@@ -5,4 +5,5 @@ import lombok.Data;
 
 @Data
 public class CreditPageReqVO extends PageParam {
+    private String idNo;
 }

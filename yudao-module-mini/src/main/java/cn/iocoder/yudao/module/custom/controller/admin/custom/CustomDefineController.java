@@ -6,7 +6,10 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageR
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
+import cn.iocoder.yudao.module.custom.controller.admin.wechat.WechatLoginController;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
+import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
+import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.custom.service.custom.CustomDefineService;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.pay.controller.admin.demo.vo.order.PayDemoOrderCreateReqVO;
@@ -31,6 +34,7 @@ import javax.annotation.security.PermitAll;
 import javax.validation.Valid;
 import java.util.List;
 
+import static cn.iocoder.yudao.framework.common.pojo.CommonResult.error;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 
@@ -123,6 +127,18 @@ public class CustomDefineController {
         return success(true);
     }
 
+    @PostMapping("/bindmini2user")
+    @Operation(summary = "绑定")
+    @PermitAll
+    public CommonResult<MiniUserDo> bindmini2user(@RequestBody WechatLoginController.WechatLoginRequest wechatLoginRequest) {
+        ApiResponse apiResponse = customDefineService.bindmini2user(wechatLoginRequest);
+        if (apiResponse.isSuccess()) {
+            MiniUserDo miniUserDo = (MiniUserDo) apiResponse.getData();
+            return success(miniUserDo);
+        } else {
+            return error(500, apiResponse.getMessage());
+        }
+    }
     @PostMapping("/register")
     @Operation(summary = "注册")
     @PermitAll
@@ -219,7 +235,7 @@ public class CustomDefineController {
     @GetMapping("/model")
     @Operation(summary = "小程序显示model")
     @PermitAll
-    public CommonResult<String> model() {
-        return success(customDefineService.selectModel());
+    public CommonResult<String> model(@RequestParam(required = false,defaultValue = "dev") String appVersion ) {
+        return success(customDefineService.selectModel(appVersion));
     }
 }

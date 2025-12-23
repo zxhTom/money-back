@@ -12,10 +12,16 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageR
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
+import cn.iocoder.yudao.module.custom.controller.admin.wechat.WechatLoginController;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
+import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
 import cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper;
+import cn.iocoder.yudao.module.custom.dal.mysql.wechat.MiniUserMapper;
+import cn.iocoder.yudao.module.custom.dto.ApiResponse;
+import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
+import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
 import cn.iocoder.yudao.module.fee.controller.admin.strategy.vo.FeeCalculationResult;
 import cn.iocoder.yudao.module.fee.service.strategy.FeeCalculationService;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
@@ -31,9 +37,11 @@ import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import com.alibaba.fastjson.JSON;
 import com.anji.captcha.util.MD5Util;
 import com.anji.captcha.util.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -48,7 +56,12 @@ import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.add
 import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
 
 @Service
+@Slf4j
 public class CustomDefineServiceImpl implements CustomDefineService{
+    @Autowired
+    MiniUserMapper miniUserMapper;
+    @Autowired
+    WechatService wechatService;
     @Autowired
     AdminUserService userService;
     @Autowired
@@ -112,8 +125,8 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Page<CreditSearchVO> creditSearch(CreditPageReqVO pageReqVO) {
-        Page<Object> objectPage = new Page<>(pageReqVO.getPageNo(), pageReqVO.getPageSize());
-        Page<CreditSearchVO> pageList = customDefineMapper.creditSearch(objectPage);
+        Page<CreditPageReqVO> objectPage = new Page<>(pageReqVO.getPageNo(), pageReqVO.getPageSize());
+        Page<CreditSearchVO> pageList = customDefineMapper.creditSearch(objectPage,pageReqVO);
          return pageList;
     }
 
@@ -330,8 +343,15 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     }
 
     @Override
-    public String selectModel() {
-        return customDefineMapper.selectModel();
+    public String selectModel(String appVersion) {
+        if ("dev".equals(appVersion)) {
+            return "offcial";
+        }
+        String version = customDefineMapper.selectModel(appVersion);
+        if (org.apache.commons.lang3.StringUtils.isEmpty(version)) {
+            return "safe";
+        }
+        return version;
     }
 
     @Override
@@ -339,6 +359,29 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         AdminUserDO user = adminUserService.getUser(loginUser.getId());
         return customDefineMapper.delete24HourContract(user.getRealname());
+    }
+
+    @Override
+    public ApiResponse bindmini2user(WechatLoginController.WechatLoginRequest request) {
+
+        Code2SessionResponse sessionResponse = wechatService.code2Session(request.getCode());
+
+        if (!sessionResponse.isSuccess()) {
+            return ApiResponse.error("绑定微信失败" + sessionResponse.getErrmsg());
+        }
+        log.info(JSON.toJSONString(sessionResponse));
+        String openid = sessionResponse.getOpenid();
+        String unionid = sessionResponse.getUnionid();
+
+        MiniUserDo miniUser = new MiniUserDo();
+        miniUser.setId(System.currentTimeMillis());
+        miniUser.setAppId(request.getAppId());
+        miniUser.setUnionId(unionid);
+        miniUser.setOpenId(openid);
+        miniUser.setUserId(SecurityFrameworkUtils.getLoginUserId());
+        miniUser.setDeleted(false);
+        miniUserMapper.insertWithConflictReplace(miniUser);
+        return ApiResponse.success(miniUser);
     }
 
 }

@@ -3,6 +3,7 @@ package cn.iocoder.yudao.framework.mybatis.core.handler;
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.reflection.MetaObject;
 
 import java.time.LocalDateTime;
@@ -15,6 +16,7 @@ import java.util.Objects;
  *
  * @author hexiaowu
  */
+@Slf4j
 public class DefaultDBFieldHandler implements MetaObjectHandler {
 
     @Override
@@ -57,7 +59,8 @@ public class DefaultDBFieldHandler implements MetaObjectHandler {
         Object modifier = getFieldValByName("updater", metaObject);
         Long userId = SecurityFrameworkUtils.getLoginUserId();
         if (Objects.nonNull(userId) && Objects.isNull(modifier)) {
-            setFieldValByName("updater", userId.toString(), metaObject);
+            log.info(String.format("will auto set updater filed , %s , %s", userId, userId.toString()));
+            setFieldValByName("updater", String.valueOf(userId), metaObject);
         }
     }
 }

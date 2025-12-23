@@ -16,7 +16,7 @@ public interface CustomDefineMapper {
 
     List<RecentContractVO> rencentContractList(@Param("idNo") String idNo);
 
-    Page<CreditSearchVO> creditSearch(Page<Object> objectPage);
+    Page<CreditSearchVO> creditSearch(@Param("ipage") Page<CreditPageReqVO> ipage, @Param("page") CreditPageReqVO page);
 
     PayOrderVO getPayOrder(@Param("query") PayOrderVO payOrderVO);
 
@@ -30,7 +30,7 @@ public interface CustomDefineMapper {
 
     Integer deleteQrcode(@Param("contractId") Long contractId);
 
-    String selectModel();
+    String selectModel(@Param("appVersion") String appVersion);
 
     Integer updateVerify(@Param("idCard") String idCard, @Param("verified") int verified);
 

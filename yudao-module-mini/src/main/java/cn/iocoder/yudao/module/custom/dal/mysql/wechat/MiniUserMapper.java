@@ -8,4 +8,6 @@ import org.apache.ibatis.annotations.Param;
 @Mapper
 public interface MiniUserMapper extends BaseMapperX<MiniUserDo> {
     Integer finishMiniUser(@Param("miniUser") MiniUserDo miniUser);
+
+    Integer insertWithConflictReplace(MiniUserDo miniUser);
 }

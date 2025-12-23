@@ -124,7 +124,7 @@
         FROM custom_contract c
         LEFT JOIN system_dict_data d ON d.value = c.status
         LEFT JOIN system_dict_type t ON t.type = d.dict_type
-        WHERE t.type = 'contract_status'
+        WHERE t.type = 'contract_status' and c.creditor_id=#{page.idNo}
         GROUP BY c.status, d.label, d.value, t.type, t.name
         ORDER BY c.status
     </select>
@@ -148,6 +148,12 @@
     </select>
     <select id="selectModel" resultType="java.lang.String">
         select model from contract_model
+        <where>
+            <if test="appVersion!=null and appVersion!=''">
+                and app_version=#{appVersion}
+            </if>
+        </where>
+        order by create_time desc limit 1
     </select>
     <select id="selectOffcialOpenIdByUserId" resultType="java.lang.String">
         select mpu.openid from mp_user mpu
