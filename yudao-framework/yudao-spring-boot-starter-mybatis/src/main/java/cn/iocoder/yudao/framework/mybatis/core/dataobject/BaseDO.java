@@ -37,15 +37,19 @@ public abstract class BaseDO implements Serializable, TransPojo {
      * 创建者，目前使用 SysUser 的 id 编号
      *
      * 使用 String 类型的原因是，未来可能会存在非数值的情况，留好拓展性。
+     * 
+     * 注意：明确指定不使用 TypeHandler，避免被错误地使用 JacksonTypeHandler 导致值被 JSON 序列化
      */
-    @TableField(fill = FieldFill.INSERT, jdbcType = JdbcType.VARCHAR)
+    @TableField(fill = FieldFill.INSERT, jdbcType = JdbcType.VARCHAR, typeHandler = org.apache.ibatis.type.StringTypeHandler.class)
     private String creator;
     /**
      * 更新者，目前使用 SysUser 的 id 编号
      *
      * 使用 String 类型的原因是，未来可能会存在非数值的情况，留好拓展性。
+     * 
+     * 注意：明确指定不使用 TypeHandler，避免被错误地使用 JacksonTypeHandler 导致值被 JSON 序列化
      */
-    @TableField(fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.VARCHAR)
+    @TableField(fill = FieldFill.INSERT_UPDATE, jdbcType = JdbcType.VARCHAR, typeHandler = org.apache.ibatis.type.StringTypeHandler.class)
     private String updater;
     /**
      * 是否删除

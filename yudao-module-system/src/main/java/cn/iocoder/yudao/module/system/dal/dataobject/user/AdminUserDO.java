@@ -124,4 +124,9 @@ public class AdminUserDO extends TenantBaseDO {
      */
     private LocalDateTime loginDate;
 
+    /**
+     * 支付密码（加密存储），与登录密码区分
+     */
+    private String payPassword;
+
 }

@@ -59,4 +59,12 @@ public interface ContractService {
      */
     PageResult<ContractDO> getContractPage(ContractPageReqVO pageReqVO);
 
+    /**
+     * 根据合同 ID 导出合同协议 PDF
+     *
+     * @param id       合同编号
+     * @param response HTTP 响应
+     */
+    void exportContractProtocolPdf(Long id, javax.servlet.http.HttpServletResponse response) throws java.io.IOException;
+
 }

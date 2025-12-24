@@ -1,33 +1,35 @@
 package cn.iocoder.yudao.module.custom.controller.admin.contract;
 
-import org.springframework.web.bind.annotation.*;
-import javax.annotation.Resource;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.security.access.prepost.PreAuthorize;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Operation;
-
-import javax.validation.constraints.*;
-import javax.validation.*;
-import javax.servlet.http.*;
-import java.util.*;
-import java.io.IOException;
-
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
+import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
-import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
-
 import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
-
-import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
-import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.*;
-
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
+import cn.iocoder.yudao.module.custom.service.contract.ConfirmPdfService;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
+import javax.validation.constraints.*;
+import java.io.IOException;
+import java.util.List;
+
+import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
+import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 合同")
 @RestController
@@ -35,6 +37,8 @@ import cn.iocoder.yudao.module.custom.service.contract.ContractService;
 @Validated
 public class ContractController {
 
+    @Resource
+    private ConfirmPdfService confirmPdfService;
     @Resource
     private ContractService contractService;
 
@@ -101,4 +105,40 @@ public class ContractController {
                         BeanUtils.toBean(list, ContractRespVO.class));
     }
 
+    @GetMapping("/export-protocol-pdf")
+    @Operation(summary = "导出合同协议 PDF")
+    @Parameter(name = "id", description = "合同编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('custom:contract:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportContractProtocolPdf(@RequestParam("id") Long id,
+                                          HttpServletResponse response) throws IOException {
+        contractService.exportContractProtocolPdf(id, response);
+    }
+
+    @GetMapping("/export-confirm-pdf")
+    @Operation(summary = "导出确认合同 PDF")
+    @Parameter(name = "id", description = "合同编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('custom:contract:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public ResponseEntity<byte[]> exportPdf() {
+        try {
+            byte[] pdfBytes = confirmPdfService.generateAuthorizationConfirmationPdf();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            // 设置文件名，让浏览器下载
+            String filename = "借款协议_可编辑.pdf";
+            // 为了兼容性，建议使用 ASCII 编码的文件名，或者对中文进行编码
+            // 这里使用简单的中文文件名，现代浏览器通常支持
+            headers.setContentDispositionFormData(filename, filename);
+            headers.setContentLength(pdfBytes.length);
+
+            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            // 实际应用中应该返回更友好的错误信息
+            return new ResponseEntity<>(("PDF生成失败: " + e.getMessage()).getBytes(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }

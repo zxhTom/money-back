@@ -46,6 +46,14 @@ public interface ErrorCodeConstants {
     ErrorCode USER_IMPORT_INIT_PASSWORD = new ErrorCode(1_002_003_009, "初始密码不能为空");
     ErrorCode USER_MOBILE_NOT_EXISTS = new ErrorCode(1_002_003_010, "该手机号尚未注册");
     ErrorCode USER_REGISTER_DISABLED = new ErrorCode(1_002_003_011, "注册功能已关闭");
+    /**
+     * 身份证号已存在
+     */
+    ErrorCode USER_ID_NO_EXISTS = new ErrorCode(1_002_003_012, "身份证号已经存在");
+    /**
+     * 真实姓名已存在
+     */
+    ErrorCode USER_REALNAME_EXISTS = new ErrorCode(1_002_003_013, "真实姓名已经存在");
 
     // ========== 部门模块 1-002-004-000 ==========
     ErrorCode DEPT_NAME_DUPLICATE = new ErrorCode(1_002_004_000, "已经存在该名字的部门");

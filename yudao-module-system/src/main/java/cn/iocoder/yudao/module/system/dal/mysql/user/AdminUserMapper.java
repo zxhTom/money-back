@@ -26,6 +26,20 @@ public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
         return selectOne(AdminUserDO::getMobile, mobile);
     }
 
+    /**
+     * 根据身份证号精确查询（仅未删除的用户）
+     */
+    default AdminUserDO selectByIdNo(String idNo) {
+        return selectOne(AdminUserDO::getIdNo, idNo);
+    }
+
+    /**
+     * 根据真实姓名精确查询（仅未删除的用户）
+     */
+    default AdminUserDO selectByRealnameEqual(String realname) {
+        return selectOne(AdminUserDO::getRealname, realname);
+    }
+
     default PageResult<AdminUserDO> selectPage(UserPageReqVO reqVO, Collection<Long> deptIds, Collection<Long> userIds) {
         return selectPage(reqVO, new LambdaQueryWrapperX<AdminUserDO>()
                 .likeIfPresent(AdminUserDO::getUsername, reqVO.getUsername())

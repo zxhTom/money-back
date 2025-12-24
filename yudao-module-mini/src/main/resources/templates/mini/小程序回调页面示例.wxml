@@ -1,0 +1,28 @@
+<!-- pages/callback/callback.wxml -->
+<!-- 小程序回调页面 - webview 容器 -->
+
+<view class="container">
+  <!-- 加载提示 -->
+  <view class="loading-container" wx:if="{{loading && !error}}">
+    <view class="loading-text">正在加载...</view>
+  </view>
+
+  <!-- 错误提示 -->
+  <view class="error-container" wx:if="{{error}}">
+    <view class="error-icon">⚠️</view>
+    <view class="error-text">页面加载失败</view>
+    <button class="retry-button" bindtap="reloadPage">重试</button>
+    <button class="back-button" bindtap="handleManualBack">返回</button>
+  </view>
+
+  <!-- webview 组件 -->
+  <!-- 关键：bindmessage 绑定消息接收方法 -->
+  <web-view 
+    wx:if="{{webviewUrl && !error}}"
+    src="{{webviewUrl}}" 
+    bindmessage="handleWebViewMessage"
+    binderror="handleWebViewError"
+    bindload="handleWebViewLoad">
+  </web-view>
+</view>
+

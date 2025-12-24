@@ -23,6 +23,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.formula.functions.T;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -42,6 +43,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RestController
 @RequestMapping("/custom/contract/dashboard")
 @Validated
+@Slf4j
 public class CustomDefineController {
 
     @Resource
@@ -96,6 +98,19 @@ public class CustomDefineController {
     public CommonResult<List<ContractDO>> page(@Valid ContractPageReqDtoVO pageReqVO) {
         List<ContractDO> respVO = customDefineService.page(pageReqVO);
         return success(respVO);
+    }
+    @PutMapping("/update-pay-password")
+    @Operation(summary = "修改支付密码")
+    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    public CommonResult<Boolean> updatePayPassword(@Valid @RequestBody PayPasswordVO passwordVO) {
+        try {
+            Boolean valid = customDefineService.updatePayPassword(passwordVO);
+            return success(valid);
+        } catch (Exception e) {
+            log.error("修改支付密码失败", e);
+            // 1506：自定义错误码，用于支付密码相关错误
+            return error(1506, e.getMessage());
+        }
     }
     @PostMapping("/checkUserInfo")
     @Operation(summary = "校验用户是否匹配")

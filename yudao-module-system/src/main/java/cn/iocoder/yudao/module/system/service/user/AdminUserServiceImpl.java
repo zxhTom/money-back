@@ -189,6 +189,9 @@ public class AdminUserServiceImpl implements AdminUserService {
         validateUserExists(id);
         validateEmailUnique(id, reqVO.getEmail());
         validateMobileUnique(id, reqVO.getMobile());
+        // 校验真实姓名、身份证号唯一（仅未删除的用户）
+        validateRealnameUnique(id, reqVO.getRealname());
+        validateIdNoUnique(id, reqVO.getIdNo());
         // 执行更新
         userMapper.updateById(BeanUtils.toBean(reqVO, AdminUserDO.class).setId(id));
     }
@@ -444,6 +447,53 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     /**
+     * 校验身份证号唯一（仅未删除的用户）
+     *
+     * @param id   当前用户 ID，可为空（创建时）
+     * @param idNo 身份证号
+     */
+    @VisibleForTesting
+    void validateIdNoUnique(Long id, String idNo) {
+        if (StrUtil.isBlank(idNo)) {
+            return;
+        }
+        AdminUserDO user = userMapper.selectByIdNo(idNo);
+        if (user == null) {
+            return;
+        }
+        // 如果 id 为空，说明是创建场景，直接判重
+        if (id == null) {
+            throw exception(USER_ID_NO_EXISTS);
+        }
+        if (!user.getId().equals(id)) {
+            throw exception(USER_ID_NO_EXISTS);
+        }
+    }
+
+    /**
+     * 校验真实姓名唯一（仅未删除的用户）
+     *
+     * @param id       当前用户 ID，可为空（创建时）
+     * @param realname 真实姓名
+     */
+    @VisibleForTesting
+    void validateRealnameUnique(Long id, String realname) {
+        if (StrUtil.isBlank(realname)) {
+            return;
+        }
+        AdminUserDO user = userMapper.selectByRealnameEqual(realname);
+        if (user == null) {
+            return;
+        }
+        if (id == null) {
+            throw exception(USER_REALNAME_EXISTS);
+        }
+        if (!user.getId().equals(id)) {
+            throw exception(USER_REALNAME_EXISTS);
+        }
+    }
+
+    /**
      * 校验旧密码
      * @param id          用户 id
      * @param oldPassword 旧密码
@@ -528,6 +578,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         // 2.1 插入用户
         user.setStatus(CommonStatusEnum.ENABLE.getStatus()); // 默认开启
         user.setPassword(encodePassword(user.getPassword())); // 加密密码
+        user.setPayPassword(encodePassword(user.getPayPassword())); // 加密密码
         userMapper.insert(user);
         return 1;
     }

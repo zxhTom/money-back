@@ -34,6 +34,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
+import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
@@ -44,6 +45,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -52,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.addTime;
 import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
 
@@ -84,6 +87,10 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     CustomDefineMapper customDefineMapper;
     @Autowired
     ContractMapper contractMapper;
+    @Autowired
+    private AdminUserMapper adminUserMapper;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
     @Override
     public StaticsContractPeriodRespVO staticsContractByTimePeriod() {
         return customDefineMapper.staticsContractByTimePeriod();
@@ -319,6 +326,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
         AdminUserDO user = BeanUtils.toBean(adminUserDO, AdminUserDO.class);
 
+        // 新增用户前校验：手机号、身份证号、真实姓名在未删除用户中唯一
+        validateRegisterUserUnique(user);
+
         user.setId(System.currentTimeMillis());
         if (org.apache.commons.lang3.StringUtils.isEmpty(user.getNickname())) {
             user.setNickname(MD5Util.md5(user.getUsername()));
@@ -340,6 +350,33 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         }
         userService.insertUserSimply(user);
         return 1;
+    }
+
+    /**
+     * 注册前校验：mobile、idNo、realname 在 deleted = 0 的用户中唯一
+     */
+    private void validateRegisterUserUnique(AdminUserDO user) {
+        // 校验手机号唯一
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(user.getMobile())) {
+            AdminUserDO mobileUser = adminUserMapper.selectByMobile(user.getMobile());
+            if (mobileUser != null) {
+                throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_MOBILE_EXISTS);
+            }
+        }
+        // 校验身份证号唯一
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(user.getIdNo())) {
+            AdminUserDO idNoUser = adminUserMapper.selectByIdNo(user.getIdNo());
+            if (idNoUser != null) {
+                throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_ID_NO_EXISTS);
+            }
+        }
+        // 校验真实姓名唯一
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(user.getRealname())) {
+            AdminUserDO realnameUser = adminUserMapper.selectByRealnameEqual(user.getRealname());
+            if (realnameUser != null) {
+                throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_REALNAME_EXISTS);
+            }
+        }
     }
 
     @Override
@@ -382,6 +419,41 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         miniUser.setDeleted(false);
         miniUserMapper.insertWithConflictReplace(miniUser);
         return ApiResponse.success(miniUser);
+    }
+
+    @Override
+    public Boolean updatePayPassword(PayPasswordVO passwordVO) {
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        Assert.notNull(loginUserId, "当前未登录，无法修改支付密码");
+
+        // 查询当前用户
+        AdminUserDO user = adminUserService.getUser(loginUserId);
+        Assert.notNull(user, "用户不存在");
+
+        String oldEncodedPayPassword = user.getPayPassword();
+        String oldPayPassword = passwordVO.getOldPayPassword();
+        String newPayPassword = passwordVO.getNewPayPassword();
+
+        // 如果已经设置过支付密码，则需要校验旧支付密码
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(oldEncodedPayPassword)) {
+            // 旧密码必填
+            Assert.isTrue(org.apache.commons.lang3.StringUtils.isNotBlank(oldPayPassword),
+                    "原支付密码不能为空");
+            // 校验旧支付密码是否正确
+            boolean matches = passwordEncoder.matches(oldPayPassword, oldEncodedPayPassword);
+            Assert.isTrue(matches, "原支付密码不正确");
+        }
+
+        // 新密码必填
+        Assert.isTrue(org.apache.commons.lang3.StringUtils.isNotBlank(newPayPassword),
+                "新支付密码不能为空");
+
+        // 加密新的支付密码并更新
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(loginUserId);
+        updateObj.setPayPassword(passwordEncoder.encode(newPayPassword));
+        adminUserMapper.updateById(updateObj);
+        return true;
     }
 
 }

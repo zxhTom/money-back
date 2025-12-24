@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>处理结果</title>
+    <!-- 
+        引入 jweixin.js 以支持 wx 对象
+        场景：小程序 webview 中，a 页面跳转到 b 页面（回调页面）时，b 页面可能没有 wx 对象
+        所以需要引入 jweixin.js 来确保 wx 对象可用
+    -->
+    <script src="https://res.wx.qq.com/open/js/jweixin-1.6.0.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 40px 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .icon {
+            font-size: 80px;
+            margin-bottom: 25px;
+            line-height: 1;
+        }
+
+        .icon.success {
+            color: #52c41a;
+        }
+
+        .icon.failed {
+            color: #ff4d4f;
+        }
+
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            font-size: 16px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            word-break: break-all;
+        }
+
+        .info {
+            font-size: 14px;
+            color: #999;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 12px;
+            margin-top: 25px;
+            text-align: left;
+        }
+
+        .info-item {
+            margin-bottom: 10px;
+        }
+
+        .info-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .loading {
+            display: block;
+            font-size: 16px;
+            color: #1890ff;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+
+        .countdown {
+            font-size: 24px;
+            color: #667eea;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .debug-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            font-size: 12px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .debug-title {
+            font-weight: 700;
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .debug-item {
+            margin: 5px 0;
+            color: #856404;
+            word-break: break-all;
+        }
+
+        .debug-error {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .debug-success {
+            color: #28a745;
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .back-button:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <!-- 根据状态显示不同的图标 -->
+    <div class="icon" th:classappend="${status == 'success'} ? 'success' : 'failed'"
+         th:text="${status == 'success'} ? '✅' : '❌'">✅</div>
+    <h1 class="title" th:text="${status == 'success'} ? '处理成功！' : '处理失败'">处理结果</h1>
+    <p class="message" th:text="${status == 'success'} ? '操作已完成，正在返回小程序...' : '操作未完成，请返回小程序查看详情。'">
+        正在处理...
+    </p>
+    <div class="loading" id="loading">正在准备返回小程序...</div>
+    <div class="countdown" id="countdown"></div>
+    <button class="back-button" id="backButton" onclick="goBackToMiniProgram()" style="display: none;">立即返回</button>
+    
+    <!-- 调试信息面板 -->
+    <div class="debug-panel" id="debugPanel" style="display: block;">
+        <div class="debug-title">🔍 调试信息</div>
+        <div id="debugContent"></div>
+    </div>
+    <div class="info">
+        <div class="info-item">
+            <span class="info-label">状态：</span>
+            <span th:text="${status}">-</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">标识：</span>
+            <span th:text="${idNo}">-</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">验证令牌：</span>
+            <span th:text="${verifyToken}">-</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        // 获取页面参数
+        const status = /*[[${status}]]*/ 'success';
+        const idNo = /*[[${idNo}]]*/ '';
+        const verifyToken = /*[[${verifyToken}]]*/ '';
+
+        // 准备发送给小程序的数据
+        const messageData = {
+            status: status,
+            idNo: idNo,
+            verifyToken: verifyToken || ''
+        };
+
+        console.log('准备发送消息给小程序:', messageData);
+
+        // 检测是否在微信小程序环境中
+        let isInMiniProgram = false;
+        let messageSent = false;
+        let countdownTimer = null;
+        let returnTimer = null;
+        let countdown = 3; // 倒计时3秒
+        let debugLogs = []; // 调试日志
+
+        // 添加调试日志
+        function addDebugLog(message, type = 'info') {
+            try {
+                const timestamp = new Date().toLocaleTimeString();
+                const log = `[${timestamp}] ${message}`;
+                debugLogs.push({ message: log, type: type });
+                console.log(log);
+                
+                // 立即更新调试面板
+                updateDebugPanel();
+            } catch (e) {
+                console.error('添加调试日志失败:', e);
+            }
+        }
+
+        // 更新调试面板
+        function updateDebugPanel() {
+            try {
+                const debugPanel = document.getElementById('debugPanel');
+                const debugContent = document.getElementById('debugContent');
+                
+                if (!debugPanel || !debugContent) {
+                    console.warn('调试面板元素不存在');
+                    return;
+                }
+                
+                // 强制显示调试面板
+                debugPanel.style.display = 'block';
+                
+                if (debugLogs.length > 0) {
+                    debugContent.innerHTML = debugLogs.map(log => {
+                        const className = log.type === 'error' ? 'debug-error' : 
+                                        log.type === 'success' ? 'debug-success' : '';
+                        return `<div class="debug-item ${className}">${log.message}</div>`;
+                    }).join('');
+                    // 滚动到底部
+                    setTimeout(() => {
+                        debugPanel.scrollTop = debugPanel.scrollHeight;
+                    }, 10);
+                } else {
+                    debugContent.innerHTML = '<div class="debug-item">等待日志输出...</div>';
+                }
+            } catch (e) {
+                console.error('更新调试面板失败:', e);
+            }
+        }
+
+        // 检查 jweixin.js 是否已加载
+        function checkJweixinLoaded() {
+            const script = document.querySelector('script[src*="jweixin"]');
+            if (script) {
+                addDebugLog('✓ jweixin.js 已在页面中引入', 'success');
+                return true;
+            }
+            addDebugLog('jweixin.js 未在页面中找到，尝试动态加载...', 'info');
+            return false;
+        }
+
+        // 动态加载 jweixin.js（仅在必要时）
+        function loadJweixinScript(callback) {
+            addDebugLog('尝试动态加载 jweixin.js...', 'info');
+            
+            // 检查是否已经加载
+            if (checkJweixinLoaded()) {
+                waitForWxObject(callback, 3000);
+                return;
+            }
+            
+            const script = document.createElement('script');
+            script.src = 'https://res.wx.qq.com/open/js/jweixin-1.6.0.js';
+            script.onload = function() {
+                addDebugLog('✓ jweixin.js 动态加载完成', 'success');
+                // 加载完成后等待 wx 对象
+                waitForWxObject(callback, 2000);
+            };
+            script.onerror = function() {
+                addDebugLog('✗ jweixin.js 动态加载失败', 'error');
+                callback(false);
+            };
+            document.head.appendChild(script);
+        }
+
+        // 等待 wx 对象加载（最多等待指定时间）
+        function waitForWxObject(callback, maxWait = 2000) {
+            let waited = 0;
+            const checkInterval = 100;
+            
+            const checkWx = setInterval(function() {
+                waited += checkInterval;
+                
+                if (typeof wx !== 'undefined') {
+                    clearInterval(checkWx);
+                    if (wx.miniProgram) {
+                        addDebugLog('✓ wx 对象已加载，wx.miniProgram 存在 (等待了 ' + waited + 'ms)', 'success');
+                        callback(true);
+                    } else {
+                        addDebugLog('✓ wx 对象已加载，但 wx.miniProgram 不存在 (等待了 ' + waited + 'ms)', 'error');
+                        addDebugLog('提示：jweixin.js 提供的是公众号网页的 wx 对象，不是小程序 webview 的', 'error');
+                        callback(false);
+                    }
+                } else if (waited >= maxWait) {
+                    clearInterval(checkWx);
+                    addDebugLog('✗ 等待 wx 对象超时 (' + maxWait + 'ms)', 'error');
+                    callback(false);
+                } else {
+                    if (waited % 500 === 0) { // 每 500ms 输出一次日志，避免刷屏
+                        addDebugLog('等待 wx 对象加载... (' + waited + 'ms)', 'info');
+                    }
+                }
+            }, checkInterval);
+        }
+
+        // 检测小程序环境
+        function checkMiniProgramEnv() {
+            addDebugLog('开始检测小程序环境...', 'info');
+            addDebugLog('User Agent: ' + navigator.userAgent, 'info');
+            addDebugLog('当前 URL: ' + window.location.href, 'info');
+            
+            // 立即检查 wx 对象
+            addDebugLog('立即检查 wx 对象: ' + (typeof wx !== 'undefined' ? '存在' : '不存在'), 'info');
+            
+            if (typeof wx !== 'undefined') {
+                addDebugLog('wx 对象类型: ' + typeof wx, 'info');
+                addDebugLog('wx.miniProgram: ' + (wx.miniProgram ? '存在' : '不存在'), 'info');
+                
+                if (wx.miniProgram) {
+                    addDebugLog('✓ 检测到小程序环境 (通过 wx.miniProgram)', 'success');
+                    isInMiniProgram = true;
+                    return true;
+                }
+            }
+            
+            // 检查其他方式
+            addDebugLog('检查 window.__wxjs_environment: ' + (window.__wxjs_environment || 'undefined'), 'info');
+            
+            // 检查是否在微信环境中
+            const isWechat = /MicroMessenger/i.test(navigator.userAgent);
+            addDebugLog('是否在微信中: ' + isWechat, 'info');
+            
+            if (window.__wxjs_environment === 'miniprogram') {
+                addDebugLog('✓ 检测到小程序环境 (通过 __wxjs_environment)', 'success');
+                isInMiniProgram = true;
+                return true;
+            }
+            
+            if (navigator.userAgent.indexOf('miniProgram') !== -1 || 
+                navigator.userAgent.indexOf('miniProgram') !== -1) {
+                addDebugLog('✓ 检测到小程序环境 (通过 userAgent)', 'success');
+                isInMiniProgram = true;
+                return true;
+            }
+            
+            // 如果在微信中但 wx 对象不存在，可能是加载延迟
+            if (isWechat) {
+                addDebugLog('在微信环境中，但 wx 对象未加载', 'info');
+                addDebugLog('说明：在小程序 webview 中，wx 对象应该由环境自动注入', 'info');
+                addDebugLog('如果确实不存在，可能是：1. 业务域名未配置 2. 不在 webview 中', 'info');
+                return 'wait'; // 返回特殊值表示需要等待
+            }
+            
+            addDebugLog('✗ 未检测到小程序环境', 'error');
+            addDebugLog('可能原因：', 'error');
+            addDebugLog('1. 不在小程序 webview 中打开', 'error');
+            addDebugLog('2. 业务域名未在微信公众平台配置', 'error');
+            addDebugLog('3. 微信版本过低（需要 6.5.3+）', 'error');
+            addDebugLog('4. webview 组件未正确配置', 'error');
+            return false;
+        }
+
+        // 发送消息给小程序
+        function sendMessageToMiniProgram() {
+            addDebugLog('尝试发送消息...', 'info');
+            
+            if (!isInMiniProgram) {
+                addDebugLog('✗ 发送失败：不在小程序环境中', 'error');
+                return false;
+            }
+            
+            if (typeof wx === 'undefined') {
+                addDebugLog('✗ 发送失败：wx 对象不存在', 'error');
+                return false;
+            }
+            
+            if (!wx.miniProgram) {
+                addDebugLog('✗ 发送失败：wx.miniProgram 不存在', 'error');
+                addDebugLog('提示：请确保在小程序 webview 中打开此页面', 'error');
+                return false;
+            }
+            
+            try {
+                addDebugLog('调用 wx.miniProgram.postMessage...', 'info');
+                addDebugLog('消息内容: ' + JSON.stringify(messageData), 'info');
+                
+                // 发送消息给小程序（消息会被缓存，在用户返回小程序时触发）
+                wx.miniProgram.postMessage({
+                    data: messageData
+                });
+                
+                messageSent = true;
+                addDebugLog('✓ 消息已发送成功，将在返回小程序时触发', 'success');
+                return true;
+            } catch (e) {
+                addDebugLog('✗ 发送消息异常: ' + e.message, 'error');
+                addDebugLog('异常详情: ' + JSON.stringify(e), 'error');
+                console.error('发送消息异常:', e);
+                return false;
+            }
+        }
+
+        // 返回小程序的函数
+        function goBackToMiniProgram() {
+            addDebugLog('=== 开始返回小程序 ===', 'info');
+            addDebugLog('isInMiniProgram: ' + isInMiniProgram, 'info');
+            addDebugLog('typeof wx: ' + typeof wx, 'info');
+            addDebugLog('wx.miniProgram: ' + (typeof wx !== 'undefined' && wx.miniProgram ? '存在' : '不存在'), 'info');
+            
+            if (!isInMiniProgram) {
+                addDebugLog('✗ 返回失败：不在小程序环境中', 'error');
+                document.getElementById('loading').textContent = '错误：不在小程序环境中（查看调试信息）';
+                document.getElementById('backButton').style.display = 'inline-block';
+                return;
+            }
+
+            if (typeof wx === 'undefined') {
+                addDebugLog('✗ 返回失败：wx 对象不存在', 'error');
+                document.getElementById('loading').textContent = '错误：wx 对象不存在（查看调试信息）';
+                document.getElementById('backButton').style.display = 'inline-block';
+                return;
+            }
+
+            if (!wx.miniProgram) {
+                addDebugLog('✗ 返回失败：wx.miniProgram 不存在', 'error');
+                addDebugLog('wx 对象内容: ' + JSON.stringify(Object.keys(wx)), 'error');
+                document.getElementById('loading').textContent = '错误：wx.miniProgram 不存在（查看调试信息）';
+                document.getElementById('backButton').style.display = 'inline-block';
+                return;
+            }
+
+            // 确保消息已发送
+            if (!messageSent) {
+                addDebugLog('消息未发送，先发送消息...', 'info');
+                sendMessageToMiniProgram();
+            }
+
+            // 再次发送消息确保送达
+            addDebugLog('再次发送消息确保送达...', 'info');
+            sendMessageToMiniProgram();
+
+            try {
+                addDebugLog('调用 wx.miniProgram.navigateBack({ delta: 1 })...', 'info');
+                
+                // 返回小程序
+                wx.miniProgram.navigateBack({
+                    delta: 1,
+                    success: function(res) {
+                        addDebugLog('✓✓✓ navigateBack 成功: ' + JSON.stringify(res), 'success');
+                        document.getElementById('loading').textContent = '返回成功！';
+                        console.log('✓ navigateBack 成功:', res);
+                    },
+                    fail: function(err) {
+                        addDebugLog('✗✗✗ navigateBack 失败: ' + JSON.stringify(err), 'error');
+                        addDebugLog('错误信息: ' + (err.errMsg || '未知错误'), 'error');
+                        addDebugLog('错误代码: ' + (err.errCode || '无'), 'error');
+                        console.error('✗ navigateBack 失败:', err);
+                        // 如果 navigateBack 失败，尝试其他方式
+                        tryNavigateBackAlternative();
+                    }
+                });
+            } catch (e) {
+                addDebugLog('✗✗✗ navigateBack 异常: ' + e.message, 'error');
+                addDebugLog('异常堆栈: ' + (e.stack || '无'), 'error');
+                console.error('✗ navigateBack 异常:', e);
+                tryNavigateBackAlternative();
+            }
+        }
+
+        // 备用返回方式
+        function tryNavigateBackAlternative() {
+            addDebugLog('尝试备用返回方式...', 'info');
+            try {
+                // 方式1: 使用 reLaunch
+                if (wx.miniProgram && wx.miniProgram.reLaunch) {
+                    addDebugLog('尝试 reLaunch...', 'info');
+                    wx.miniProgram.reLaunch({
+                        url: '/pages/index/index',
+                        success: function(res) {
+                            addDebugLog('✓ reLaunch 成功', 'success');
+                            console.log('✓ reLaunch 成功');
+                        },
+                        fail: function(err) {
+                            addDebugLog('✗ reLaunch 失败: ' + JSON.stringify(err), 'error');
+                            console.error('✗ reLaunch 失败:', err);
+                            showManualBackButton();
+                        }
+                    });
+                } else {
+                    addDebugLog('✗ reLaunch 方法不存在', 'error');
+                    showManualBackButton();
+                }
+            } catch (e) {
+                addDebugLog('✗ 备用返回方式异常: ' + e.message, 'error');
+                console.error('✗ 备用返回方式失败:', e);
+                showManualBackButton();
+            }
+        }
+
+        // 显示手动返回按钮
+        function showManualBackButton() {
+            addDebugLog('显示手动返回按钮', 'info');
+            document.getElementById('loading').textContent = '自动返回失败，请查看调试信息或点击按钮手动返回';
+            document.getElementById('backButton').style.display = 'inline-block';
+            document.getElementById('countdown').textContent = '';
+        }
+
+        // 倒计时显示
+        function updateCountdown() {
+            const countdownEl = document.getElementById('countdown');
+            if (countdown > 0) {
+                countdownEl.textContent = countdown + ' 秒后自动返回';
+                addDebugLog('倒计时: ' + countdown + ' 秒', 'info');
+                countdown--;
+            } else {
+                countdownEl.textContent = '正在返回...';
+                addDebugLog('倒计时结束，准备返回', 'info');
+                if (countdownTimer) {
+                    clearInterval(countdownTimer);
+                    countdownTimer = null;
+                }
+                // 注意：这里不执行返回，因为 setTimeout 会处理
+            }
+        }
+
+        // 初始化
+        function init() {
+            addDebugLog('页面初始化开始...', 'info');
+            addDebugLog('User Agent: ' + navigator.userAgent, 'info');
+            addDebugLog('当前 URL: ' + window.location.href, 'info');
+            
+            // 检查 jweixin.js 是否已加载
+            checkJweixinLoaded();
+            
+            // 检测小程序环境
+            const envCheck = checkMiniProgramEnv();
+            
+            if (envCheck === 'wait') {
+                // 需要等待 wx 对象加载
+                addDebugLog('等待 wx 对象加载（小程序环境应该自动注入）...', 'info');
+                document.getElementById('loading').textContent = '正在检测小程序环境...';
+                
+                // 先等待原生 wx 对象（小程序环境注入的）
+                waitForWxObject(function(success) {
+                    if (success) {
+                        isInMiniProgram = true;
+                        addDebugLog('✓ 小程序环境检测成功（使用原生 wx 对象）', 'success');
+                        startMessageFlow();
+                    } else {
+                        // 如果原生 wx 不存在，尝试加载 jweixin.js（不推荐，但作为备选）
+                        addDebugLog('原生 wx 对象不存在，尝试加载 jweixin.js...', 'info');
+                        addDebugLog('注意：jweixin.js 是公众号网页用的，小程序 webview 通常不需要', 'info');
+                        
+                        loadJweixinScript(function(loaded) {
+                            if (loaded && typeof wx !== 'undefined' && wx.miniProgram) {
+                                isInMiniProgram = true;
+                                addDebugLog('✓ 通过 jweixin.js 检测到小程序环境', 'success');
+                                startMessageFlow();
+                            } else {
+                                document.getElementById('loading').textContent = 'wx 对象加载失败（查看下方调试信息）';
+                                document.getElementById('countdown').textContent = '';
+                                document.getElementById('backButton').style.display = 'inline-block';
+                                addDebugLog('✗ 所有方式都失败，请检查：', 'error');
+                                addDebugLog('1. 是否在小程序 webview 中打开', 'error');
+                                addDebugLog('2. 业务域名是否已配置', 'error');
+                                addDebugLog('3. webview 组件是否正确配置', 'error');
+                            }
+                        });
+                    }
+                });
+                return;
+            }
+            
+            if (!envCheck) {
+                document.getElementById('loading').textContent = '请在小程序 webview 中打开此页面（查看下方调试信息）';
+                document.getElementById('countdown').textContent = '';
+                document.getElementById('backButton').style.display = 'inline-block';
+                return;
+            }
+
+            // 环境检测成功，开始消息流程
+            startMessageFlow();
+        }
+
+        // 开始消息流程
+        function startMessageFlow() {
+            addDebugLog('=== 开始消息流程 ===', 'info');
+            
+            // 立即发送消息
+            addDebugLog('准备发送消息...', 'info');
+            const messageResult = sendMessageToMiniProgram();
+            
+            if (messageResult) {
+                document.getElementById('loading').textContent = '消息已发送，准备返回小程序';
+                addDebugLog('✓ 消息发送成功', 'success');
+            } else {
+                document.getElementById('loading').textContent = '发送消息失败（查看下方调试信息）';
+                document.getElementById('backButton').style.display = 'inline-block';
+                addDebugLog('✗ 消息发送失败，但继续执行返回流程', 'error');
+            }
+
+            // 重置倒计时
+            countdown = 3;
+            
+            // 开始倒计时
+            addDebugLog('开始 3 秒倒计时...', 'info');
+            updateCountdown(); // 立即执行一次，显示初始倒计时
+            countdownTimer = setInterval(function() {
+                updateCountdown();
+            }, 1000);
+
+            // 3秒后执行返回（双重保险）
+            returnTimer = setTimeout(function() {
+                addDebugLog('=== 倒计时结束，执行自动返回 ===', 'info');
+                if (countdownTimer) {
+                    clearInterval(countdownTimer);
+                    addDebugLog('已清除倒计时定时器', 'info');
+                }
+                
+                // 确保消息已发送
+                if (!messageSent) {
+                    addDebugLog('消息未发送，立即发送...', 'info');
+                    sendMessageToMiniProgram();
+                }
+                
+                // 执行返回
+                goBackToMiniProgram();
+            }, 3000);
+            
+            addDebugLog('已设置 3 秒后自动返回的定时器', 'info');
+        }
+
+        // 暴露给全局，供按钮调用
+        window.goBackToMiniProgram = function() {
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            if (returnTimer) {
+                clearTimeout(returnTimer);
+            }
+            document.getElementById('countdown').textContent = '立即返回...';
+            goBackToMiniProgram();
+        };
+
+        // 立即初始化调试面板
+        function initDebugPanel() {
+            try {
+                const debugPanel = document.getElementById('debugPanel');
+                const debugContent = document.getElementById('debugContent');
+                if (debugPanel) {
+                    debugPanel.style.display = 'block';
+                    if (debugContent) {
+                        debugContent.innerHTML = '<div class="debug-item">正在初始化调试面板...</div>';
+                    }
+                }
+            } catch (e) {
+                console.error('初始化调试面板失败:', e);
+            }
+        }
+
+        // 页面加载完成后初始化（简化版：不再等待 jweixin 事件，直接调用 init）
+        function startInit() {
+            initDebugPanel();
+            addDebugLog('=== 脚本开始执行 ===', 'info');
+            addDebugLog('页面 URL: ' + window.location.href, 'info');
+            addDebugLog('User Agent: ' + navigator.userAgent, 'info');
+
+            // 统一从这里进入 init，所有异常都打印出来
+            try {
+                init();
+            } catch (e) {
+                addDebugLog('✗ init 执行异常: ' + e.message, 'error');
+                addDebugLog('异常堆栈: ' + (e.stack || '无'), 'error');
+                console.error('init 执行异常:', e);
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startInit);
+        } else {
+            startInit();
+        }
+
+        // 监听页面可见性变化，当页面即将隐藏时再次发送消息（确保消息能够送达）
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden' && isInMiniProgram) {
+                sendMessageToMiniProgram();
+            }
+        });
+
+        // 监听页面卸载事件，在页面关闭前再次发送消息
+        window.addEventListener('beforeunload', function() {
+            if (isInMiniProgram) {
+                sendMessageToMiniProgram();
+            }
+        });
+    })();
+</script>
+</body>
+</html>
+

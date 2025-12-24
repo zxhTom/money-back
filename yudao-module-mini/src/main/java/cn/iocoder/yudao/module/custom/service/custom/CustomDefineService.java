@@ -59,4 +59,6 @@ public interface CustomDefineService {
     String delete24HourContract();
 
     ApiResponse bindmini2user(WechatLoginController.WechatLoginRequest wechatLoginRequest);
+
+    Boolean updatePayPassword(PayPasswordVO passwordVO);
 }

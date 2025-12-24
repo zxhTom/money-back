@@ -1,4 +1,4 @@
-package com.example.demo.controller;
+package cn.iocoder.yudao.module.custom.controller;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
