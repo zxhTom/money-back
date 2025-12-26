@@ -166,4 +166,18 @@
             </if>
         </where>
     </select>
+    <select id="contackMp">
+        select
+               mini_user.user_id,
+               system_users.realname,
+               mp_user.subscribe_status
+        from mini_user
+        left join system_users on system_users.id=mini_user.user_id
+        left join mp_user on mp_user.union_id=mini_user.union_id
+        <where>
+            <if test="userId!=null and userId!=''">
+                and system_users.id=#{userId}
+            </if>
+        </where>
+    </select>
 </mapper>

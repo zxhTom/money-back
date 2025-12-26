@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.custom.dal.mysql.custom;
 
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
+import cn.iocoder.yudao.module.custom.dto.MpVO;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -37,4 +38,6 @@ public interface CustomDefineMapper {
     String delete24HourContract(@Param("realname") String realname);
 
     String selectOffcialOpenIdByUserId(@Param("id") Long id);
+
+    List<MpVO> contackMp(@Param("userId") Long userId);
 }

@@ -3,14 +3,14 @@
     {
       "type": "miniprogram",
       "name": "打开小程序",
-      "url": "${custom.domain.org}",      // 公众号菜单跳转的小程序首页域名，已在配置文件中配置
+      "url": "https://org.zxhtom.store",
       "appid": "wx7641cb883b4fa670",
       "pagepath": "pages/index/index"
     },
     {
       "type": "view",
       "name": "在线客服",
-      "url": "${custom.domain.wecom-kf}"  // 企业微信客服链接，已在配置文件中配置
+      "url": "https://work.weixin.qq.com/kfid/kfcd8090303121c856f"
     }
   ]
 }

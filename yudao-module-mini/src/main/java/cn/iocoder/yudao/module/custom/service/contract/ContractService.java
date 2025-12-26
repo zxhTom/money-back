@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
+import java.io.IOException;
 import java.util.*;
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.*;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
@@ -67,4 +69,5 @@ public interface ContractService {
      */
     void exportContractProtocolPdf(Long id, javax.servlet.http.HttpServletResponse response) throws java.io.IOException;
 
+    void exportContractProtocolContractPdf(ContractDO contractDO, HttpServletResponse response) throws IOException;
 }

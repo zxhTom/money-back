@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS;
@@ -135,6 +136,10 @@ public class ContractServiceImpl implements ContractService {
     public void exportContractProtocolPdf(Long id, HttpServletResponse response) throws IOException {
         // 1. 校验合同是否存在
         ContractDO contract = contractMapper.selectById(id);
+        extracted(response, contract);
+    }
+
+    private void extracted( HttpServletResponse response, ContractDO contract) throws IOException {
         if (contract == null) {
             throw exception(CONTRACT_NOT_EXISTS);
         }
@@ -255,7 +260,7 @@ public class ContractServiceImpl implements ContractService {
             }
 
             // 5. 设置响应头并输出
-            String fileName = ("contract-" + id + ".pdf");
+            String fileName = ("contract-" + new Random().nextInt() + ".pdf");
             response.setContentType("application/pdf");
             response.setCharacterEncoding(StandardCharsets.UTF_8.name());
             response.setHeader("Content-Disposition",
@@ -264,12 +269,17 @@ public class ContractServiceImpl implements ContractService {
 //            document.save(response.getOutputStream());
 //            response.flushBuffer();
             // 3. 获取输出流并写入字节
-            byte[] bytes = contractPdfService.generateLoanAgreementPdf();
+            byte[] bytes = contractPdfService.generateLoanAgreementPdf(contract);
             try (OutputStream os = response.getOutputStream()) {
                 os.write(bytes); // 写入全部字节
                 os.flush(); // 刷新流（确保数据发送）
             }
         }
+    }
+
+    @Override
+    public void exportContractProtocolContractPdf(ContractDO contractDO, HttpServletResponse response) throws IOException {
+        extracted(response, contractDO);
     }
 
     private String safe(Object value) {

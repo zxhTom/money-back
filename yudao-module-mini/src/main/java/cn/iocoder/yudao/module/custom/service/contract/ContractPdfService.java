@@ -1,5 +1,8 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
+import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
+import com.alipay.api.domain.Contract;
+
 import java.io.IOException;
 
 /**
@@ -10,5 +13,5 @@ import java.io.IOException;
  */
 public interface ContractPdfService {
 
-    public byte[] generateLoanAgreementPdf() throws IOException ;
+    public byte[] generateLoanAgreementPdf(ContractDO contractDO) throws IOException ;
 }

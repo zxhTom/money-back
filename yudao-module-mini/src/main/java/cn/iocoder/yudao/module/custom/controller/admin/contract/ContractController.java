@@ -114,6 +114,15 @@ public class ContractController {
                                           HttpServletResponse response) throws IOException {
         contractService.exportContractProtocolPdf(id, response);
     }
+    @PostMapping("/export-protocol-contract-pdf")
+    @Operation(summary = "导出合同协议 PDF")
+    @Parameter(name = "id", description = "合同编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('custom:contract:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportContractProtocolContractPdf(@RequestBody ContractDO contractDO,
+                                          HttpServletResponse response) throws IOException {
+        contractService.exportContractProtocolContractPdf(contractDO, response);
+    }
 
     @GetMapping("/export-confirm-pdf")
     @Operation(summary = "导出确认合同 PDF")

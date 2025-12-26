@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
+import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -22,19 +24,46 @@ import java.util.List;
  */
 @Service
 public class ContractPdfServiceImpl implements ContractPdfService{
-    // 完整的借款协议文本内容，按行分割
-    private final List<String> agreementContent = Arrays.asList(
+    
+    /**
+     * 生成完整的借款协议文本内容，使用 ContractDO 的字段动态替换
+     */
+    private List<String> buildAgreementContent(ContractDO contract) {
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+        
+        // 格式化日期
+        String startDate = contract.getStartDate() != null ? contract.getStartDate().format(dateFormatter) : "";
+        String endDate = contract.getEndDate() != null ? contract.getEndDate().format(dateFormatter) : "";
+        String createDate = contract.getCreateTime() != null ? contract.getCreateTime().format(dateTimeFormatter) : "";
+        
+        // 格式化金额（分转元）
+        String salaryYuan = contract.getSalary() != null ? String.format("%.2f", contract.getSalary() / 100.0) : "0.00";
+        String interestYuan = contract.getInterest() != null ? String.format("%.2f", contract.getInterest()) : "0.00";
+        
+        // 计算本息合计和待还金额
+        double salaryAmount = contract.getSalary() != null ? contract.getSalary() / 100.0 : 0;
+        double interestAmount = contract.getInterest() != null ? contract.getInterest() : 0;
+        double refundAmount = contract.getRefund() != null ? contract.getRefund() : 0;
+        double totalAmount = salaryAmount + interestAmount;
+        double remainingAmount = totalAmount - refundAmount;
+        
+        // 格式化费率（tariff 可能是百分比，需要确认单位，这里假设是百分比）
+        String tariffPercent = contract.getTariff() != null ? String.valueOf(contract.getTariff()) : "0";
+        
+        // 完整的借款协议文本内容，按行分割，使用 ContractDO 字段动态替换
+        return Arrays.asList(
             "借款协议",
             "",
-            "协议编号：",
+            "协议编号：" + safeStr(String.valueOf(contract.getId())),
             "请您认真阅读并充分理解《借款协议》（以下简称\"本协议\"），您一经点击已阅读并同意本协议，即视为对本协议条款的理解和接受，您同意本协议对您具有法律约束力。如果您不同意本协议的任一内容或无法准确理解相关条款，请不要进行后续操作。",
             "",
             "本协议项下各方均已在\"极速合约\"平台注册，同意遵守\"极速合约\"平台的各项交易规则，各方在充分阅读理解本协议条款情形下，本着诚信自愿的原则签订本协议。",
             "",
-            "甲方（借款人）：赵前程",
-            "身份证号：320***********6915",
-            "乙方（出借人）：沈毅",
-            "身份证号：320***********4417",
+            "甲方（借款人）：" + safeStr(contract.getIndebtedName()),
+            "身份证号：" + safeStr(contract.getIndebtedId()),
+            "乙方（出借人）：" + safeStr(contract.getCreditorName()),
+            "身份证号：" + safeStr(contract.getCreditorId()),
             "",
             "鉴于：",
             "1.甲方与乙方自愿使用\"极速合约\"平台登记确认双方基于借款形成的债权债务法律关系；",
@@ -43,15 +72,15 @@ public class ContractPdfServiceImpl implements ContractPdfService{
             "",
             "一、借款主要内容",
             "",
-            "借款金额 5000 元",
-            "年化利率 0 %",
-            "应收利息 5000 元",
-            "本息合计 5000 元",
-            "待还金额 5000 元",
-            "还款方式 一次性还本付息",
-            "借款日期 2025/12/22",
-            "还款日期 2025/12/28",
-            "借款用途 周转",
+            "借款金额 " + salaryYuan + " 元",
+            "年化利率 " + tariffPercent + " %",
+            "应收利息 " + interestYuan + " 元",
+            "本息合计 " + String.format("%.2f", totalAmount) + " 元",
+            "待还金额 " + String.format("%.2f", remainingAmount) + " 元",
+            "还款方式 " + safeStr(contract.getReturnType()),
+            "借款日期 " + startDate,
+            "还款日期 " + endDate,
+            "借款用途 " + safeStr(contract.getReasonType()) + (contract.getDetailReason() != null && !contract.getDetailReason().isEmpty() ? "，" + contract.getDetailReason() : ""),
             "注：1.还款总额=借款金额×（1+借款时长/365×年化利率），其中借款时长为借款日期和还款日期间的自然日天数；此处的\"借款日期\"是指乙方向甲方实际提供借款且借款已到账的日期。甲方可多次还款直至待还本息全部还清，但提前还款并不减少待还本息。",
             "2.如无特别约定，本协议所指\"日\"均为日历日。",
             "",
@@ -128,10 +157,18 @@ public class ContractPdfServiceImpl implements ContractPdfService{
             "3.本协议任何条款的无效或不可强制执行并不影响本协议其它条款的效力及可强制执行性。",
             "4.本协议及补充协议的任何修改、补充均以电子文本形式作出。本协议双方确认并同意由\"极速合约\"平台或其指定的业务运营方提供的与本协议有关的书面文件或电子信息在无明显错误的情况下应作为本协议有关事项的终局证明。",
             "",
-            "甲方（借款人）：赵前程",
-            "乙方（出借人）：沈毅",
-            "日期：2025/12/22"
-    );
+            "甲方（借款人）：" + safeStr(contract.getIndebtedName()),
+            "乙方（出借人）：" + safeStr(contract.getCreditorName()),
+            "日期：" + createDate
+        );
+    }
+    
+    /**
+     * 安全获取字符串，避免 null
+     */
+    private String safeStr(String value) {
+        return value != null ? value : "";
+    }
 
     /**
      * 使用 Apache PDFBox 和 PDType0Font 生成 PDF
@@ -139,7 +176,7 @@ public class ContractPdfServiceImpl implements ContractPdfService{
      * @throws IOException 如果字体加载或 PDF 写入失败
      */
     @Override
-    public byte[] generateLoanAgreementPdf() throws IOException {
+    public byte[] generateLoanAgreementPdf(ContractDO contractDO) throws IOException {
         try (PDDocument document = new PDDocument();
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
@@ -167,7 +204,10 @@ public class ContractPdfServiceImpl implements ContractPdfService{
             contentStream.setFont(font, fontSize);
             contentStream.setLeading(leading);
 
-            // 2. 写入内容
+            // 2. 构建动态内容
+            List<String> agreementContent = buildAgreementContent(contractDO);
+
+            // 3. 写入内容
             for (String line : agreementContent) {
                 // 优化：根据内容长度动态调整字体大小或行高，这里保持一致
 
@@ -239,7 +279,6 @@ public class ContractPdfServiceImpl implements ContractPdfService{
      */
     private List<String> splitTextToFit(String text, PDFont font, float fontSize, float width) throws IOException {
         List<String> lines = new ArrayList<>();
-        int lastSpace = -1;
         while (text.length() > 0) {
             int startIndex = 0;
             int endIndex = text.length();

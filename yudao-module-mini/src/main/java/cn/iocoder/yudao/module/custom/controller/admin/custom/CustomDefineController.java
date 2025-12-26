@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.custom.controller.admin.wechat.WechatLoginControl
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
 import cn.iocoder.yudao.module.custom.dto.ApiResponse;
+import cn.iocoder.yudao.module.custom.dto.MpVO;
 import cn.iocoder.yudao.module.custom.service.custom.CustomDefineService;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.pay.controller.admin.demo.vo.order.PayDemoOrderCreateReqVO;
@@ -253,4 +254,15 @@ public class CustomDefineController {
     public CommonResult<String> model(@RequestParam(required = false,defaultValue = "dev") String appVersion ) {
         return success(customDefineService.selectModel(appVersion));
     }
+
+    @GetMapping("/contactMp")
+    @Operation(summary = "是否关注mp")
+    public CommonResult<MpVO> contackMp() {
+        try {
+            return success(customDefineService.contackMp());
+        } catch (Exception e) {
+            return error(1506, e.getMessage());
+        }
+    }
 }
+

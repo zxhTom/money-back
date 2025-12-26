@@ -11,10 +11,12 @@ import cn.iocoder.yudao.module.mp.service.handler.other.StoreCheckNotifyHandler;
 import cn.iocoder.yudao.module.mp.service.handler.user.LocationHandler;
 import cn.iocoder.yudao.module.mp.service.handler.user.SubscribeHandler;
 import cn.iocoder.yudao.module.mp.service.handler.user.UnsubscribeHandler;
+import me.chanjar.weixin.mp.api.WxMpMessageHandler;
 import com.binarywang.spring.starter.wxjava.mp.properties.WxMpProperties;
 import com.google.common.collect.Maps;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import me.chanjar.weixin.common.api.WxConsts;
 import me.chanjar.weixin.common.redis.RedisTemplateWxRedisOps;
 import me.chanjar.weixin.mp.api.WxMpMessageRouter;
@@ -56,6 +58,13 @@ public class DefaultMpServiceFactory implements MpServiceFactory {
     private final MessageReceiveHandler messageReceiveHandler;
     private final KfSessionHandler kfSessionHandler;
     private final StoreCheckNotifyHandler storeCheckNotifyHandler;
+    /**
+     * 小程序发布成功事件处理器（可选，由 mini 模块提供）
+     * 使用 WxMpMessageHandler 接口类型，避免 mp 模块直接依赖 mini 模块
+     * 使用 @Autowired(required = false) 实现可选注入
+     */
+    @Autowired(required = false)
+    private WxMpMessageHandler miniProgramPublishHandler;
     private final MenuHandler menuHandler;
     private final NullHandler nullHandler;
     private final SubscribeHandler subscribeHandler;
@@ -168,6 +177,12 @@ public class DefaultMpServiceFactory implements MpServiceFactory {
         // 扫码事件
         router.rule().async(false).msgType(WxConsts.XmlMsgType.EVENT)
                 .event(WxConsts.EventType.SCAN).handler(scanHandler).end();
+
+        // 小程序发布成功事件（如果 mini 模块提供了处理器）
+        if (miniProgramPublishHandler != null) {
+            router.rule().async(false).msgType(WxConsts.XmlMsgType.EVENT)
+                    .event("weapp_audit_success").handler(miniProgramPublishHandler).end();
+        }
 
         // 默认
         router.rule().async(false).handler(messageAutoReplyHandler).end();

@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
@@ -20,6 +21,7 @@ import cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper;
 import cn.iocoder.yudao.module.custom.dal.mysql.wechat.MiniUserMapper;
 import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
+import cn.iocoder.yudao.module.custom.dto.MpVO;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
 import cn.iocoder.yudao.module.fee.controller.admin.strategy.vo.FeeCalculationResult;
@@ -43,6 +45,7 @@ import com.anji.captcha.util.MD5Util;
 import com.anji.captcha.util.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -454,6 +457,27 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         updateObj.setPayPassword(passwordEncoder.encode(newPayPassword));
         adminUserMapper.updateById(updateObj);
         return true;
+    }
+
+    @Override
+    public MpVO contackMp() {
+        MpVO mpVO = new MpVO();
+        mpVO.setCode(200);
+        List<MpVO> list = customDefineMapper.contackMp(SecurityFrameworkUtils.getLoginUserId());
+        if (CollectionUtils.isNotEmpty(list)) {
+            if (null == list.get(0).getSubscribeStatus() || 1 == list.get(0).getSubscribeStatus()) {
+
+                mpVO.setCode(1500);
+                mpVO.setMsg("请您先关注公众号");
+            } else if (1 == list.get(0).getSubscribeStatus()) {
+                mpVO.setCode(1500);
+                mpVO.setMsg("您之前取消过公众号，请您重新关注公众号");
+            }
+        } else {
+            mpVO.setCode(1500);
+            mpVO.setMsg("请您先关注公众号");
+        }
+        return mpVO;
     }
 
 }
