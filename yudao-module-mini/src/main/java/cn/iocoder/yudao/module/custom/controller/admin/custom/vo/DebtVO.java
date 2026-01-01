@@ -10,4 +10,5 @@ import lombok.Data;
 public class DebtVO {
     private Long id;
     private Double settlementAmount;
+    private String password;
 }

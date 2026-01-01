@@ -67,6 +67,7 @@ public class MiniUserServiceImpl implements MiniUserService {
             user.setNickname(MD5Util.md5(user.getUsername()));
 //            user.setUserCode(openId.hashCode());
             user.setPassword(password);
+            user.setPayPassword(password);
             DeptDO deptDO = deptService.getDeptByName("合同管理部");
             if (deptDO != null) {
                 user.setDeptId(deptDO.getId());

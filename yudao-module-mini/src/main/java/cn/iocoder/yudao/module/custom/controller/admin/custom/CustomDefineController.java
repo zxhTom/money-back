@@ -169,16 +169,21 @@ public class CustomDefineController {
         customDefineService.update(contractSaveReqVO);
         return success(true);
     }
+    @PutMapping("/updateStatus")
+    @Operation(summary = "更新状态")
+    @PermitAll
+    public CommonResult<Boolean> updateStatus(@RequestBody ContractSaveReqVO contractSaveReqVO) {
+        customDefineService.updateStatus(contractSaveReqVO);
+        return success(true);
+    }
     @PutMapping("/debt")
     @Operation(summary = "销账")
-    @PermitAll
     public CommonResult<Boolean> debt(@RequestBody DebtVO debtVO) {
         customDefineService.debt(debtVO);
         return success(true);
     }
     @PutMapping("/extension")
     @Operation(summary = "展期")
-    @PermitAll
     public CommonResult<Boolean> extension(@RequestBody ContractSaveReqVO contractSaveReqVO) {
         customDefineService.extension(contractSaveReqVO);
         return success(true);
@@ -253,6 +258,12 @@ public class CustomDefineController {
     @PermitAll
     public CommonResult<String> model(@RequestParam(required = false,defaultValue = "dev") String appVersion ) {
         return success(customDefineService.selectModel(appVersion));
+    }
+    @GetMapping("/price")
+    @Operation(summary = "小程序显示model")
+    @PermitAll
+    public CommonResult<String> price(@RequestParam(required = false,defaultValue = "dev") String appVersion ) {
+        return success(customDefineService.price(appVersion));
     }
 
     @GetMapping("/contactMp")

@@ -38,7 +38,7 @@ public class ContractPdfServiceImpl implements ContractPdfService{
         String createDate = contract.getCreateTime() != null ? contract.getCreateTime().format(dateTimeFormatter) : "";
         
         // 格式化金额（分转元）
-        String salaryYuan = contract.getSalary() != null ? String.format("%.2f", contract.getSalary() / 100.0) : "0.00";
+        String salaryYuan = contract.getSalary() != null ? String.format("%.2f", contract.getSalary() / 1.0) : "0.00";
         String interestYuan = contract.getInterest() != null ? String.format("%.2f", contract.getInterest()) : "0.00";
         
         // 计算本息合计和待还金额

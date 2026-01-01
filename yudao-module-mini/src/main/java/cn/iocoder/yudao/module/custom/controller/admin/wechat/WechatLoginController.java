@@ -1,10 +1,12 @@
 package cn.iocoder.yudao.module.custom.controller.admin.wechat;
 
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.MiniAppPath;
+import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.MiniProgramVersionRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.TemplateVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
 import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
+import cn.iocoder.yudao.module.custom.config.WechatConfig;
 import cn.iocoder.yudao.module.custom.service.wechat.MiniUserService;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
 import cn.iocoder.yudao.module.custom.service.wechat.model.CombineUser;
@@ -21,6 +23,7 @@ import me.chanjar.weixin.mp.api.WxMpService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,6 +54,8 @@ public class WechatLoginController {
 
     @Autowired
     private WxMpService wxMpService;
+    @Autowired
+    private WechatConfig wechatConfig;
 
     @PostMapping("/send")
     public String send(@RequestBody TemplateVO templateVO) throws Exception {
@@ -119,6 +124,24 @@ public class WechatLoginController {
         return ApiResponse.success(wechatLoginResponse);
     }
 
+    /**
+     * 查询小程序线上版本号
+     * 
+     * @return 小程序版本信息
+     */
+    @GetMapping("/version")
+    public ApiResponse getMiniProgramVersion() {
+        try {
+            String version = wechatService.getMiniProgramVersion();
+            MiniProgramVersionRespVO respVO = new MiniProgramVersionRespVO();
+            respVO.setVersion(version);
+            respVO.setAppId(wechatConfig.getAppid());
+            return ApiResponse.success(respVO);
+        } catch (Exception e) {
+            log.error("查询小程序版本号失败", e);
+            return ApiResponse.error("查询小程序版本号失败: " + e.getMessage());
+        }
+    }
 
     private String generateToken(AdminUserDO user) {
         // 生成一个随机的、安全的 Token

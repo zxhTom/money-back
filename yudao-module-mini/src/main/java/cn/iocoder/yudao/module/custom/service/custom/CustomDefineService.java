@@ -64,4 +64,8 @@ public interface CustomDefineService {
     Boolean updatePayPassword(PayPasswordVO passwordVO);
 
     MpVO contackMp();
+
+    Integer updateStatus(ContractSaveReqVO contractSaveReqVO);
+
+    String price(String appVersion);
 }

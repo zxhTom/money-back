@@ -18,4 +18,10 @@ public interface WechatService {
     Integer updateVerify(String idCard, int verified);
 
     String send(TemplateVO templateVO) throws WxErrorException;
+
+    /**
+     * 查询小程序线上版本号
+     * @return 小程序版本信息
+     */
+    String getMiniProgramVersion() throws Exception;
 }

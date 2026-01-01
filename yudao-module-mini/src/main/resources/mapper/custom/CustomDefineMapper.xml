@@ -85,7 +85,7 @@
             cc.create_time,
             ROW_NUMBER() OVER (PARTITION BY indebted_id ORDER BY cc.create_time DESC) AS rn
             FROM custom_contract cc
-            LEFT JOIN system_users su ON su.id_no = cc.creditor_id
+            LEFT JOIN system_users su ON su.id_no = cc.indebted_id
             <where>
                 <if test="idNo!=null and idNo!=''">
                     and cc.creditor_id =#{idNo}
@@ -124,7 +124,8 @@
         FROM custom_contract c
         LEFT JOIN system_dict_data d ON d.value = c.status
         LEFT JOIN system_dict_type t ON t.type = d.dict_type
-        WHERE t.type = 'contract_status' and c.creditor_id=#{page.idNo}
+        WHERE t.type = 'contract_status' and c.indebted_id=#{page.idNo}
+        and c.deleted=0
         GROUP BY c.status, d.label, d.value, t.type, t.name
         ORDER BY c.status
     </select>
@@ -161,6 +162,7 @@
         on mpu.union_id =mnu.union_id
         and mpu.deleted =0 and mnu.deleted =0
         <where>
+               and mnu.user_id=mnu.creator
             <if test="id!=null and id!=''">
                 and mnu.user_id =#{id}
             </if>

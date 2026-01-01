@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespV
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.WechatLoginController;
+import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.TemplateVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
@@ -45,6 +46,7 @@ import com.anji.captcha.util.MD5Util;
 import com.anji.captcha.util.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import me.chanjar.weixin.common.error.WxErrorException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -53,13 +55,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.addTime;
 import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSWORD_FAILED;
 
 @Service
 @Slf4j
@@ -293,13 +299,44 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Integer update(ContractSaveReqVO contractSaveReqVO) {
+        LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
+        AdminUserDO user = userService.getUser(loginUser.getId());
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
         contractMapper.updateById(updateObj);
+        ContractDO contractDO = contractMapper.selectById(updateObj.getId());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        TemplateVO templateVO = new TemplateVO();
+        templateVO.setIdNo(contractDO.getCreditorId());
+        templateVO.setTemplateId("yFKV3NQHSKccb4kaTnp5Sxv0VJtinn0GdjoQYb2rM4Y");
+        templateVO.setDatas(new HashMap<String, Object>() {
+            {
+                put("thing1", user.getRealname());
+                put("character_string3", contractDO.getId());
+                put("time5", contractDO.getEndDate().format(formatter));
+                put("time4", LocalDateTime.now().format(formatter));
+            }
+        });
+        try {
+            wechatService.send(templateVO);
+            templateVO.setIdNo(contractDO.getIndebtedId());
+            wechatService.send(templateVO);
+            templateVO.setIdNo(contractDO.getCreditorId());
+            wechatService.send(templateVO);
+        } catch (WxErrorException e) {
+            e.printStackTrace();
+        }
+
         return 1;
     }
 
     @Override
     public Integer debt(DebtVO debtVO) {
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        AdminUserDO user = userService.getUser(loginUserId);
+        boolean matches = passwordEncoder.matches(debtVO.getPassword(), user.getPayPassword());
+        if (!matches) {
+            throw exception(USER_PASSWORD_FAILED);
+        }
         ContractDO contractDO = contractMapper.selectById(debtVO.getId());
         if (contractDO.getInterest() == null) {
             contractDO.setInterest(0D);
@@ -315,12 +352,58 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             contractDO.setStatus(3);
         }
         contractMapper.updateById(contractDO);
+
+//        AdminUserDO user = userService.getUser(SecurityFrameworkUtils.getLoginUserId());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        TemplateVO templateVO = new TemplateVO();
+        templateVO.setIdNo(contractDO.getCreditorId());
+        templateVO.setTemplateId("yFKV3NQHSKccb4kaTnp5Sw6fmswku7mh6iA0LDI_Ux4");
+        templateVO.setDatas(new HashMap<String, Object>() {
+            {
+                put("thing1", user.getRealname());
+                put("character_string3", contractDO.getId());
+                put("amount14", String.format("销账价格:",contractDO.getRefund()));
+                put("time4", LocalDateTime.now().format(formatter));
+            }
+        });
+        try {
+            wechatService.send(templateVO);
+            templateVO.setIdNo(contractDO.getIndebtedId());
+            wechatService.send(templateVO);
+            templateVO.setIdNo(contractDO.getCreditorId());
+            wechatService.send(templateVO);
+        } catch (WxErrorException e) {
+            e.printStackTrace();
+        }
         return 1;
     }
 
     @Override
     public Integer extension(ContractSaveReqVO contractSaveReqVO) {
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
+        AdminUserDO user = userService.getUser(SecurityFrameworkUtils.getLoginUserId());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        TemplateVO templateVO = new TemplateVO();
+        ContractDO contractDO = contractMapper.selectById(contractSaveReqVO.getId());
+        templateVO.setIdNo(contractDO.getCreditorId());
+        templateVO.setTemplateId("yFKV3NQHSKccb4kaTnp5Sxv0VJtinn0GdjoQYb2rM4Y");
+        templateVO.setDatas(new HashMap<String, Object>() {
+            {
+                put("thing1", user.getRealname());
+                put("character_string3", contractSaveReqVO.getId());
+                put("time5", contractDO.getEndDate().format(formatter));
+                put("time4", LocalDateTime.now().format(formatter));
+            }
+        });
+        try {
+            wechatService.send(templateVO);
+            templateVO.setIdNo(contractDO.getIndebtedId());
+            wechatService.send(templateVO);
+            templateVO.setIdNo(contractDO.getCreditorId());
+            wechatService.send(templateVO);
+        } catch (WxErrorException e) {
+            e.printStackTrace();
+        }
         return contractMapper.updateById(updateObj);
     }
 
@@ -384,9 +467,6 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public String selectModel(String appVersion) {
-        if ("dev".equals(appVersion)) {
-            return "offcial";
-        }
         String version = customDefineMapper.selectModel(appVersion);
         if (org.apache.commons.lang3.StringUtils.isEmpty(version)) {
             return "safe";
@@ -478,6 +558,19 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             mpVO.setMsg("请您先关注公众号");
         }
         return mpVO;
+    }
+
+    @Override
+    public Integer updateStatus(ContractSaveReqVO contractSaveReqVO) {
+        ContractDO contractDO = contractMapper.selectById(contractSaveReqVO.getId());
+        contractDO.setStatus(contractSaveReqVO.getStatus());
+        contractMapper.updateById(contractDO);
+        return 1;
+    }
+
+    @Override
+    public String price(String appVersion) {
+        return "safe";
     }
 
 }
