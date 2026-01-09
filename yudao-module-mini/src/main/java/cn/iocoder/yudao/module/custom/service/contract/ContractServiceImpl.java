@@ -67,6 +67,11 @@ public class ContractServiceImpl implements ContractService {
         }
         // 插入
         ContractDO contract = BeanUtils.toBean(createReqVO, ContractDO.class);
+        // 设置部门ID，用于数据权限控制
+        Long deptId = SecurityFrameworkUtils.getLoginUserDeptId();
+        if (deptId != null) {
+            contract.setDeptId(deptId);
+        }
         contractMapper.insert(contract);
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 //        String formattedDate = now.format(formatter);

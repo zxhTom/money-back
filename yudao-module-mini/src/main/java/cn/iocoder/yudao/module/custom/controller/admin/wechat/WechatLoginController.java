@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.mp.api.WxMpService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,6 +59,7 @@ public class WechatLoginController {
     private WechatConfig wechatConfig;
 
     @PostMapping("/send")
+    @PreAuthorize("@ss.hasPermission('custom:contract:create')")
     public String send(@RequestBody TemplateVO templateVO) throws Exception {
         return wechatService.send(templateVO);
     }

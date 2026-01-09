@@ -100,5 +100,10 @@ public class ContractDO extends BaseDO {
      */
     private Double refund;
 
+    /**
+     * 部门ID
+     * 用于数据权限控制，关联 system_dept 表的 id 字段
+     */
+    private Long deptId;
 
 }
