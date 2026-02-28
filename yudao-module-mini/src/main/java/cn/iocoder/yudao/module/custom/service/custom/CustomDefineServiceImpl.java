@@ -220,6 +220,8 @@ public class CustomDefineServiceImpl implements CustomDefineService{
                 .eqIfPresent(ContractDO::getTariff, reqVO.getTariff())
                 .eqIfPresent(ContractDO::getFile, reqVO.getFile())
                 .orderByDesc(ContractDO::getId);
+        log.info("SQL: {}", contractDOLambdaQueryWrapperX.getSqlSegment());
+        log.info("参数: {}", reqVO.getIndebtedId());
         List<ContractDO> contractDOS = contractMapper.selectList(contractDOLambdaQueryWrapperX);
         return contractDOS;
     }

@@ -12,7 +12,10 @@ import cn.iocoder.yudao.module.custom.dal.dataobject.wechat.MiniUserDo;
 import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.custom.dto.MpVO;
 import cn.iocoder.yudao.module.custom.service.custom.CustomDefineService;
+import cn.iocoder.yudao.module.custom.service.email.EmailCodeService;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
+import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.pay.controller.admin.demo.vo.order.PayDemoOrderCreateReqVO;
 import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderRespVO;
 import cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderDO;
@@ -38,7 +41,9 @@ import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.error;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 
 @Tag(name = "管理后台 - 自定义客户端")
 @RestController
@@ -51,6 +56,12 @@ public class CustomDefineController {
     private PayOrderService orderService;
     @Resource
     private CustomDefineService customDefineService;
+    @Resource
+    private EmailCodeService emailCodeService;
+    @Resource
+    private AdminUserService userService;
+    @Resource
+    private AdminUserMapper userMapper;
 
     @GetMapping("/staticsContractByTimePeriod")
     @Operation(summary = "按照时间窗口统计数据")
@@ -164,7 +175,7 @@ public class CustomDefineController {
     }
     @PutMapping("/update")
     @Operation(summary = "有效更新")
-    @PermitAll
+//    @PermitAll
     public CommonResult<Boolean> update(@RequestBody ContractSaveReqVO contractSaveReqVO) {
         customDefineService.update(contractSaveReqVO);
         return success(true);
@@ -274,6 +285,66 @@ public class CustomDefineController {
         } catch (Exception e) {
             return error(1506, e.getMessage());
         }
+    }
+
+    @PostMapping("/send-email-code")
+    @Operation(summary = "发送邮箱验证码")
+    @Parameter(name = "email", description = "邮箱地址", required = true, example = "user@example.com")
+    @PermitAll // 允许未登录访问，用于找回密码场景
+    public CommonResult<Boolean> sendEmailCode(@RequestParam("email") String email) {
+        try {
+            Boolean result = emailCodeService.sendCode(email);
+            return success(result);
+        } catch (Exception e) {
+            log.error("[sendEmailCode][发送验证码失败，邮箱: {}]", email, e);
+            return error(500, "发送验证码失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/get-email-by-username")
+    @Operation(summary = "通过登录名查询邮箱")
+    @PermitAll // 允许未登录访问，用于找回密码场景
+    public CommonResult<GetEmailByUsernameRespVO> getEmailByUsername(@Valid @RequestBody GetEmailByUsernameReqVO reqVO) {
+        // 1. 根据登录名查询用户
+        AdminUserDO user = userMapper.selectByUsername(reqVO.getUsername());
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
+
+        // 2. 检查用户是否有邮箱
+        if (user.getEmail() == null || user.getEmail().trim().isEmpty()) {
+            log.warn("[getEmailByUsername][用户({})没有绑定邮箱]", reqVO.getUsername());
+            return error(400, "该用户未绑定邮箱，无法通过邮箱找回密码");
+        }
+
+        // 3. 返回邮箱（部分脱敏处理）
+        GetEmailByUsernameRespVO respVO = new GetEmailByUsernameRespVO();
+        respVO.setEmail(user.getEmail());
+        log.info("[getEmailByUsername][通过登录名({})查询邮箱成功]", reqVO.getUsername());
+        return success(respVO);
+    }
+
+    @PutMapping("/update-password-by-email")
+    @Operation(summary = "通过邮箱重置用户密码")
+    @PermitAll // 允许未登录访问，用于找回密码场景
+    public CommonResult<Boolean> updatePasswordByEmail(@Valid @RequestBody UserUpdatePasswordByEmailReqVO reqVO) {
+        // 1. 验证邮箱验证码
+        Boolean verifyResult = emailCodeService.verifyCode(reqVO.getEmail(), reqVO.getCode());
+        if (!verifyResult) {
+            log.warn("[updatePasswordByEmail][验证码验证失败，邮箱: {}]", reqVO.getEmail());
+            return error(400, "验证码错误或已过期，请重新获取");
+        }
+
+        // 2. 根据邮箱查询用户
+        AdminUserDO user = userMapper.selectByEmail(reqVO.getEmail());
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
+
+        // 3. 调用原有的更新密码方法
+        userService.updateUserPassword(user.getId(), reqVO.getPassword());
+        log.info("[updatePasswordByEmail][通过邮箱({})重置密码成功，用户ID: {}]", reqVO.getEmail(), user.getId());
+        return success(true);
     }
 }
 

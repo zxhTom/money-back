@@ -92,6 +92,14 @@ public class ContractController {
         return success(BeanUtils.toBean(pageResult, ContractRespVO.class));
     }
 
+    @GetMapping("/selfPage")
+    @Operation(summary = "获得当前登录用户创建的合同分页")
+    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    public CommonResult<PageResult<ContractRespVO>> getSelfContractPage(@Valid ContractPageReqVO pageReqVO) {
+        PageResult<ContractDO> pageResult = contractService.getSelfContractPage(pageReqVO);
+        return success(BeanUtils.toBean(pageResult, ContractRespVO.class));
+    }
+
     @GetMapping("/export-excel")
     @Operation(summary = "导出合同 Excel")
     @PreAuthorize("@ss.hasPermission('custom:contract:export')")

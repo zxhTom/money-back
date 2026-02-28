@@ -9,8 +9,13 @@ import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.TemplateVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
+import cn.iocoder.yudao.module.system.service.permission.RoleService;
+import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import me.chanjar.weixin.common.error.WxErrorException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -32,6 +37,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS;
@@ -47,6 +53,8 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSW
 public class ContractServiceImpl implements ContractService {
 
     @Resource
+    RoleService roleService;
+    @Resource
     ContractPdfService contractPdfService;
     @Resource
     private WechatService wechatService;
@@ -56,6 +64,10 @@ public class ContractServiceImpl implements ContractService {
     private ContractMapper contractMapper;
     @Autowired
     private AdminUserMapper adminUserMapper;
+    @Autowired
+    AdminUserService adminUserService;
+    @Autowired
+    UserRoleMapper userRoleMapper;
 
     @Override
     public Long createContract(ContractSaveReqVO createReqVO) {
@@ -135,6 +147,27 @@ public class ContractServiceImpl implements ContractService {
     @Override
     public PageResult<ContractDO> getContractPage(ContractPageReqVO pageReqVO) {
         return contractMapper.selectPage(pageReqVO);
+    }
+
+    @Override
+    public PageResult<ContractDO> getSelfContractPage(ContractPageReqVO pageReqVO) {
+        // 获取当前登录用户ID
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        if (loginUserId == null) {
+            throw new RuntimeException("当前未登录，无法查询自己创建的合同");
+        }
+        // 将 Long 类型转换为 String 类型（creator 字段是 String 类型）
+
+        String creator = String.valueOf(loginUserId);
+        List<UserRoleDO> userRoleDOS = userRoleMapper.selectListByUserId(loginUserId);
+        List<Long> roleIdList = userRoleDOS.stream().map(UserRoleDO::getRoleId).collect(Collectors.toList());
+        List<RoleDO> roleList = roleService.getRoleList(roleIdList);
+        List<String> roleCodeList = roleList.stream().map(RoleDO::getCode).collect(Collectors.toList());
+        boolean b = roleService.hasAnySuperAdmin(roleIdList);
+        if (b || roleCodeList.contains("contract-manager")) {
+            creator = null;
+        }
+        return contractMapper.selectSelfPage(pageReqVO, creator);
     }
 
     @Override

@@ -62,6 +62,14 @@ public interface ContractService {
     PageResult<ContractDO> getContractPage(ContractPageReqVO pageReqVO);
 
     /**
+     * 获得当前登录用户创建的合同分页
+     *
+     * @param pageReqVO 分页查询
+     * @return 合同分页
+     */
+    PageResult<ContractDO> getSelfContractPage(ContractPageReqVO pageReqVO);
+
+    /**
      * 根据合同 ID 导出合同协议 PDF
      *
      * @param id       合同编号
