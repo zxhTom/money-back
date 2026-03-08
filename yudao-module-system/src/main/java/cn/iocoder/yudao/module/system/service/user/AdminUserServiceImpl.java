@@ -225,6 +225,16 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    public void updateUserPasswordAndPayPassword(Long id, String password) {
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(id);
+        String encoded = encodePassword(password);
+        updateObj.setPassword(encoded);
+        updateObj.setPayPassword(encoded);
+        userMapper.updateById(updateObj);
+    }
+
+    @Override
     public void updateUserStatus(Long id, Integer status) {
         // 校验用户存在
         validateUserExists(id);
@@ -577,8 +587,11 @@ public class AdminUserServiceImpl implements AdminUserService {
     public Integer insertUserSimply(AdminUserDO user) {
         // 2.1 插入用户
         user.setStatus(CommonStatusEnum.ENABLE.getStatus()); // 默认开启
-        user.setPassword(encodePassword(user.getPassword())); // 加密密码
-        user.setPayPassword(encodePassword(user.getPayPassword())); // 加密密码
+        String rawPassword = user.getPassword();
+        // payPassword 为空时用 password 作为 payPassword，避免 NPE 且与注册约定一致
+        String rawPayPassword = StrUtil.isNotBlank(user.getPayPassword()) ? user.getPayPassword() : rawPassword;
+        user.setPassword(encodePassword(rawPassword)); // 加密密码
+        user.setPayPassword(encodePassword(rawPayPassword));
         userMapper.insert(user);
         return 1;
     }

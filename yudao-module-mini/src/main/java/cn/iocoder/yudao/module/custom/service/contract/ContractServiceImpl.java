@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS;
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.WECHAT_TEMPLATE_SEND_FAIL;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSWORD_FAILED;
 
 /**
@@ -103,7 +104,8 @@ public class ContractServiceImpl implements ContractService {
             templateVO.setIdNo(contract.getIndebtedId());
             wechatService.send(templateVO);
         } catch (WxErrorException e) {
-            e.printStackTrace();
+            String msg = e.getError() != null ? e.getError().getErrorMsg() : e.getMessage();
+            throw exception(WECHAT_TEMPLATE_SEND_FAIL, msg != null ? msg : "未知错误");
         }
         // 返回
         return contract.getId();

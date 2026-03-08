@@ -81,6 +81,14 @@ public interface AdminUserService {
     void updateUserPassword(Long id, String password);
 
     /**
+     * 同时修改登录密码与支付密码（如找回密码场景下将两处设为同一新密码）
+     *
+     * @param id       用户编号
+     * @param password 新密码（明文，将同时写入 password 与 pay_password）
+     */
+    void updateUserPasswordAndPayPassword(Long id, String password);
+
+    /**
      * 修改状态
      *
      * @param id     用户编号

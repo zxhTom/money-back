@@ -54,6 +54,10 @@ public interface ErrorCodeConstants {
      * 真实姓名已存在
      */
     ErrorCode USER_REALNAME_EXISTS = new ErrorCode(1_002_003_013, "真实姓名已经存在");
+    /**
+     * 姓名与身份证号不匹配（用于找回密码等身份校验）
+     */
+    ErrorCode USER_IDNO_REALNAME_MISMATCH = new ErrorCode(1_002_003_014, "姓名与身份证号不匹配");
 
     // ========== 部门模块 1-002-004-000 ==========
     ErrorCode DEPT_NAME_DUPLICATE = new ErrorCode(1_002_004_000, "已经存在该名字的部门");

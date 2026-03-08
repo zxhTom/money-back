@@ -52,7 +52,7 @@ public class FaceAuthController {
         String verifyToken = baiduFaceAuthService.getVerifyToken(successUrl, failUrl);
 
         // 2. 根据 token 构造H5核身页面URL[citation:6]
-        String authUrl = String.format("https://brain.zxhtom.store/face/print/?token=%s&successUrl=%s&failedUrl=%s",
+        String authUrl = String.format("https://brain.toms.chat/face/print/?token=%s&successUrl=%s&failedUrl=%s",
                 verifyToken, successUrl, failUrl);
 
         Map<String, Object> result = new HashMap<>();

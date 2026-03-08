@@ -324,6 +324,14 @@ public class CustomDefineController {
         return success(respVO);
     }
 
+    @PostMapping("/reset-password-by-idno")
+    @Operation(summary = "通过身份证+姓名重置密码（B 方案：未绑邮箱用户可用此方式找回）")
+    @PermitAll
+    public CommonResult<Boolean> resetPasswordByIdNo(@Valid @RequestBody ResetPasswordByIdNoReqVO reqVO) {
+        customDefineService.resetPasswordByIdNo(reqVO);
+        return success(true);
+    }
+
     @PutMapping("/update-password-by-email")
     @Operation(summary = "通过邮箱重置用户密码")
     @PermitAll // 允许未登录访问，用于找回密码场景

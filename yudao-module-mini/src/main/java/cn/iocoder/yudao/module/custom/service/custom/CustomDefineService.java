@@ -63,6 +63,13 @@ public interface CustomDefineService {
 
     Boolean updatePayPassword(PayPasswordVO passwordVO);
 
+    /**
+     * 通过身份证+姓名重置密码（B 方案：未绑邮箱用户可用此方式找回）
+     *
+     * @param reqVO 真实姓名、身份证号、新密码
+     */
+    void resetPasswordByIdNo(ResetPasswordByIdNoReqVO reqVO);
+
     MpVO contackMp();
 
     Integer updateStatus(ContractSaveReqVO contractSaveReqVO);

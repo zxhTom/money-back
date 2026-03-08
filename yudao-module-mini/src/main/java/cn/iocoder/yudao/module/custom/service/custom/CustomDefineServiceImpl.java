@@ -414,7 +414,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
         AdminUserDO user = BeanUtils.toBean(adminUserDO, AdminUserDO.class);
 
-        // 新增用户前校验：手机号、身份证号、真实姓名在未删除用户中唯一
+        // 先做不依赖最终 username 的校验：手机号、身份证号、真实姓名唯一
         validateRegisterUserUnique(user);
 
         user.setId(System.currentTimeMillis());
@@ -424,6 +424,10 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         if (StringUtils.isEmpty(user.getUsername())) {
             user.setUsername(user.getNickname());
         }
+        // 再校验最终落库的 username 唯一
+        validateUsernameUnique(user.getUsername());
+        // password 与 payPassword：两都有值则各存各的，只有一个有值则另一个取该值，都为空则用默认 123456
+        normalizePasswordAndPayPassword(user);
 //            user.setUserCode(openId.hashCode());
         DeptDO deptDO = deptService.getDeptByName("合同管理部");
         if (deptDO != null) {
@@ -441,7 +445,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     }
 
     /**
-     * 注册前校验：mobile、idNo、realname 在 deleted = 0 的用户中唯一
+     * 注册前校验：mobile、idNo、realname 在 deleted = 0 的用户中唯一（username 在落库前单独校验）
      */
     private void validateRegisterUserUnique(AdminUserDO user) {
         // 校验手机号唯一
@@ -464,6 +468,40 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             if (realnameUser != null) {
                 throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_REALNAME_EXISTS);
             }
+        }
+    }
+
+    /** 校验用户名在未删除用户中唯一，与落库的 username 一致时调用 */
+    private void validateUsernameUnique(String username) {
+        if (org.apache.commons.lang3.StringUtils.isBlank(username)) {
+            return;
+        }
+        AdminUserDO existUser = adminUserMapper.selectByUsername(username);
+        if (existUser != null) {
+            throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_USERNAME_EXISTS);
+        }
+    }
+
+    private static final String DEFAULT_PASSWORD = "123456";
+
+    /**
+     * 注册时 password 与 payPassword 规则：两都有值则各存各的，只有一个有值则另一个取该值，都为空则用默认 123456
+     */
+    private void normalizePasswordAndPayPassword(AdminUserDO user) {
+        String p = user.getPassword();
+        String pp = user.getPayPassword();
+        boolean hasP = org.apache.commons.lang3.StringUtils.isNotBlank(p);
+        boolean hasPp = org.apache.commons.lang3.StringUtils.isNotBlank(pp);
+        if (hasP && hasPp) {
+            return;
+        }
+        if (hasP) {
+            user.setPayPassword(p);
+        } else if (hasPp) {
+            user.setPassword(pp);
+        } else {
+            user.setPassword(DEFAULT_PASSWORD);
+            user.setPayPassword(DEFAULT_PASSWORD);
         }
     }
 
@@ -539,6 +577,21 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         updateObj.setPayPassword(passwordEncoder.encode(newPayPassword));
         adminUserMapper.updateById(updateObj);
         return true;
+    }
+
+    @Override
+    public void resetPasswordByIdNo(ResetPasswordByIdNoReqVO reqVO) {
+        AdminUserDO user = adminUserMapper.selectByIdNo(reqVO.getIdNo());
+        if (user == null) {
+            throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS);
+        }
+        String inputRealname = reqVO.getRealname() != null ? reqVO.getRealname().trim() : "";
+        String dbRealname = user.getRealname() != null ? user.getRealname().trim() : "";
+        if (!inputRealname.equals(dbRealname)) {
+            throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_IDNO_REALNAME_MISMATCH);
+        }
+        userService.updateUserPasswordAndPayPassword(user.getId(), reqVO.getPassword());
+        log.info("[resetPasswordByIdNo][通过身份证+姓名重置密码成功，用户ID: {}]", user.getId());
     }
 
     @Override
