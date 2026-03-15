@@ -30,6 +30,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -113,13 +116,30 @@ public class UserController {
     }
 
     @GetMapping({"/list-all-simple", "/simple-list"})
-    @Operation(summary = "获取用户精简信息列表", description = "只包含被开启的用户，主要用于前端的下拉选项")
-    public CommonResult<List<UserSimpleRespVO>> getSimpleUserList() {
-        List<AdminUserDO> list = userService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
-        // 拼接数据
-        Map<Long, DeptDO> deptMap = deptService.getDeptMap(
-                convertList(list, AdminUserDO::getDeptId));
-        return success(UserConvert.INSTANCE.convertSimpleList(list, deptMap));
+    @Operation(summary = "获取用户精简信息列表", description = "只包含被开启的用户，主要用于前端的下拉选项；传 ids 时按 id 批量查询")
+    @Parameter(name = "ids", description = "用户编号列表，不传则返回所有启用用户")
+    public CommonResult<List<UserSimpleRespVO>> getSimpleUserList(
+            @RequestParam(value = "ids", required = false) List<Long> ids) {
+        return success(buildSimpleUserList(ids));
+    }
+
+    @PostMapping({"/list-all-simple", "/simple-list"})
+    @Operation(summary = "获取用户精简信息列表（POST）", description = "与 GET simple-list 功能一致，请求体传 ids 批量查询")
+    public CommonResult<List<UserSimpleRespVO>> postSimpleUserList(
+            @RequestBody(required = false) UserSimpleListReqVO reqVO) {
+        List<Long> ids = reqVO != null ? reqVO.getIds() : null;
+        return success(buildSimpleUserList(ids));
+    }
+
+    private List<UserSimpleRespVO> buildSimpleUserList(List<Long> ids) {
+        List<AdminUserDO> list = CollUtil.isNotEmpty(ids)
+                ? userService.getUserList(ids).stream()
+                .filter(u -> CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus()))
+                .collect(Collectors.toList())
+                : userService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
+        Set<Long> deptIds = list.stream().map(AdminUserDO::getDeptId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, DeptDO> deptMap = deptService.getDeptMap(deptIds);
+        return UserConvert.INSTANCE.convertSimpleList(list, deptMap);
     }
 
     @GetMapping("/get")

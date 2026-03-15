@@ -217,6 +217,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(id);
         updateObj.setPassword(encodePassword(password)); // 加密密码
+        updateObj.setPayPassword(updateObj.getPassword());
         userMapper.updateById(updateObj);
 
         // 3. 记录操作日志上下文
