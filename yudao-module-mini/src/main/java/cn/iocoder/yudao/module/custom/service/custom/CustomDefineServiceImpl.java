@@ -57,10 +57,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.addTime;
@@ -271,6 +268,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Integer updateContractConfirmedStatus(PayOrderNotifyReqDTO notifyReqDTO) {
+        log.info(new Date() + "@@" + notifyReqDTO.getPayOrderId());
         Long contractId = customDefineMapper.selectContractByPayOrderId(notifyReqDTO.getPayOrderId());
         ContractDO contractDO = contractMapper.selectById(contractId);
         contractDO.setStatus(2);

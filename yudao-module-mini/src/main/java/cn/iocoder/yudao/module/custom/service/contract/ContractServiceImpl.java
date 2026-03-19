@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.common.error.WxErrorException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -51,6 +52,7 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSW
  */
 @Service
 @Validated
+@Slf4j
 public class ContractServiceImpl implements ContractService {
 
     @Resource
@@ -105,7 +107,8 @@ public class ContractServiceImpl implements ContractService {
             wechatService.send(templateVO);
         } catch (WxErrorException e) {
             String msg = e.getError() != null ? e.getError().getErrorMsg() : e.getMessage();
-            throw exception(WECHAT_TEMPLATE_SEND_FAIL, msg != null ? msg : "未知错误");
+            log.error(msg);
+//            throw exception(WECHAT_TEMPLATE_SEND_FAIL, msg != null ? msg : "未知错误");
         }
         // 返回
         return contract.getId();
