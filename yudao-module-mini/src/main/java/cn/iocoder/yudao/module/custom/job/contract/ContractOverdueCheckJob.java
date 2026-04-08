@@ -26,6 +26,7 @@ public class ContractOverdueCheckJob implements JobHandler {
      * TODO: 根据实际业务需求调整此值，确保与数据库字典中的"已逾期"状态值一致
      */
     private static final Integer OVERDUE_STATUS = 4;
+    private static final Integer RUNNING_STATUS = 2;
 
     @Resource
     private ContractMapper contractMapper;
@@ -41,6 +42,7 @@ public class ContractOverdueCheckJob implements JobHandler {
                 new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<ContractDO>()
                         .lt(ContractDO::getEndDate, now)  // end_date < 当前时间
                         .ne(ContractDO::getStatus, OVERDUE_STATUS)  // 状态不是已逾期
+                        .eq(ContractDO::getStatus, RUNNING_STATUS)  // 状态是待还款
                         .isNotNull(ContractDO::getEndDate)  // end_date 不为空
         );
 

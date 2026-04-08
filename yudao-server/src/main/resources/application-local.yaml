@@ -1,5 +1,6 @@
 server:
   port: 48080
+  domain: https://brain.zxhtom.store/admin-api
 
 --- #################### 数据库相关配置 ####################
 spring:
@@ -48,7 +49,7 @@ spring:
       primary: master
       datasource:
         master:
-          url: jdbc:mysql://47.121.182.177:13306/contract?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true # MySQL Connector/J 8.X 连接的示例
+          url: jdbc:mysql://8.130.191.247:3306/contract?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true # MySQL Connector/J 8.X 连接的示例
           #          url: jdbc:mysql://127.0.0.1:3306/ruoyi-vue-pro?useSSL=true&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true # MySQL Connector/J 5.X 连接的示例
           #          url: jdbc:postgresql://127.0.0.1:5432/ruoyi-vue-pro # PostgreSQL 连接的示例
           #          url: jdbc:oracle:thin:@127.0.0.1:1521:xe # Oracle 连接的示例
@@ -57,7 +58,7 @@ spring:
           #          url: jdbc:kingbase8://127.0.0.1:54321/test  # 人大金仓 KingbaseES 连接的示例
           #          url: jdbc:postgresql://127.0.0.1:5432/postgres # OpenGauss 连接的示例
           username: root
-          password: 123456
+          password: Qq_hello_021615996779085
           #          username: sa # SQL Server 连接的示例
           #          password: Yudao@2024 # SQL Server 连接的示例
           #          username: SYSDBA # DM 连接的示例
@@ -79,10 +80,10 @@ spring:
 
   # Redis 配置。Redisson 默认的配置足够使用，一般不需要进行调优
   redis:
-    host: 47.121.182.177 # 地址
-    port: 16379 # 端口
+    host: 8.130.191.247 # 地址
+    port: 6379 # 端口
     database: 0 # 数据库索引
-    password: Qq025025 # 密码，建议生产环境开启
+    password: Qq_hello_021615996779085 # 密码，建议生产环境开启
 
 --- #################### 定时任务相关配置 ####################
 
@@ -198,8 +199,10 @@ wx:
 #    secret: 5abee519483bc9f8cb37ce280e814bd0
 #    app-id: wx5b23ba7a5589ecbb # 测试号（自己的）
 #    secret: 2a7b3b20c537e52e74afd395eb85f61f
-    app-id: wxf56b1542b9e85f8a # 测试号（Kongdy 提供的）
-    secret: 496379dcef1ba869e9234de8d598cfd3
+    app-id: wx4b061e45d1b504df # 测试号（Kongdy 提供的）
+    secret: 7cbea11451f4dbefbc6f4f8ea73bb236
+    token: weixinkaifa
+    aes_key: krfjpUQdxLtJ4rFl6KprdZtSN3mi5mAtYd2XSFPKhmS
     # 存储配置，解决 AccessToken 的跨节点的共享
     config-storage:
       type: RedisTemplate # 采用 RedisTemplate 操作 Redis，会自动从 Spring 中获取
@@ -228,9 +231,9 @@ yudao:
   security:
     mock-enable: true
   pay:
-    order-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/order # 支付渠道的【支付】回调地址
-    refund-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/refund # 支付渠道的【退款】回调地址
-    transfer-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/transfer # 支付渠道的【转账】回调地址
+    order-notify-url: https://org.zxhtom.store/admin-api/pay/notify/order # 支付渠道的【支付】回调地址
+    refund-notify-url: https://org.zxhtom.store/admin-api/pay/notify/refund # 支付渠道的【退款】回调地址
+    transfer-notify-url: https://org.zxhtom.store/admin-api/pay/notify/transfer # 支付渠道的【转账】回调地址
   access-log: # 访问日志的配置项
     enable: false
   demo: false # 关闭演示模式
@@ -266,3 +269,29 @@ justauth:
     type: REDIS
     prefix: 'social_auth_state:' # 缓存前缀，目前只对 Redis 缓存生效，默认 JUSTAUTH::STATE::
     timeout: 24h # 超时时长，目前只对 Redis 缓存生效，默认 3 分钟
+
+baidu:
+  face:
+    api-key: h1yo8WF4KsOXbkCwJpFrWWNH # 从百度云控制台获取[citation:8]
+    secret-key: v9F073gG5LK4Vco4okqhNiYa7gnLAENq # 从百度云控制台获取[citation:8]
+    plan-id: 24943 # 在控制台创建的H5意愿核身方案ID[citation:4]
+
+--- #################### 自定义业务配置 ####################
+
+# 自定义业务配置项
+custom:
+  # 域名配置
+  domain:
+    brain: https://brain.zxhtom.store
+    org: https://org.zxhtom.store
+    wecom-kf: https://wecom-kf.zxhtom.store
+  # 163邮箱配置（用于发送验证码）
+  email:
+    host: smtp.163.com # 163邮箱SMTP服务器地址
+    port: 465 # 163邮箱SMTP端口（SSL端口）
+    from: zxhtom13141@163.com # 发送方邮箱地址（请替换为实际的163邮箱地址）
+    username: zxhtom13141@163.com # 163邮箱账号（通常是邮箱地址）
+    password: MKvK43eH7C8dP4qu # 163邮箱授权码（不是登录密码，需要在163邮箱设置中获取授权码）
+    ssl-enable: true # 是否启用SSL
+    starttls-enable: false # 是否启用STARTTLS
+    nickname: 系统通知 # 发送方昵称

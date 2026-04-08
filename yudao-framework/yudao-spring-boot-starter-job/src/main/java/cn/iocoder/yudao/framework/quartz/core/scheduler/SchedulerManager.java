@@ -74,17 +74,32 @@ public class SchedulerManager {
 
     /**
      * 删除 Quartz 中的 Job
+     * <p>
+     * 若 Job 或 Trigger 在 Quartz 中不存在（例如仅有孤立触发器、无 JobDetail），则忽略不抛错，
+     * 便于「同步」时先删后增，能正常重新创建该任务。
      *
      * @param jobHandlerName 任务处理器的名字
-     * @throws SchedulerException 删除异常
+     * @throws SchedulerException 删除异常（仅在校验 Scheduler 等非“不存在”场景抛出）
      */
     public void deleteJob(String jobHandlerName) throws SchedulerException {
         validateScheduler();
-        // 暂停 Trigger 对象
-        scheduler.pauseTrigger(new TriggerKey(jobHandlerName));
-        // 取消并删除 Job 调度
-        scheduler.unscheduleJob(new TriggerKey(jobHandlerName));
-        scheduler.deleteJob(new JobKey(jobHandlerName));
+        TriggerKey triggerKey = new TriggerKey(jobHandlerName);
+        JobKey jobKey = new JobKey(jobHandlerName);
+        try {
+            scheduler.pauseTrigger(triggerKey);
+        } catch (SchedulerException e) {
+            // Trigger 不存在时忽略，便于同步时能继续 addJob
+        }
+        try {
+            scheduler.unscheduleJob(triggerKey);
+        } catch (SchedulerException e) {
+            // Trigger 不存在时忽略
+        }
+        try {
+            scheduler.deleteJob(jobKey);
+        } catch (SchedulerException e) {
+            // Job 不存在时忽略（例如仅有孤立 trigger 无 job 的脏数据）
+        }
     }
 
     /**
