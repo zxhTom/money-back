@@ -39,6 +39,7 @@ public class TimeWindowServiceImpl implements TimeWindowService {
     private static final int DEFAULT_STATUS_ACTIVE = 1;
 
     private static final String TARGET_TYPE_ROLE = "role";
+    private static final String TARGET_TYPE_USER = "user";
 
     @Resource
     private TimeWindowMapper timeWindowMapper;
@@ -162,11 +163,28 @@ public class TimeWindowServiceImpl implements TimeWindowService {
         LocalDateTime now = LocalDateTime.now();
         List<TimeWindowDO> activeAtNow = timeWindowMapper.selectListActiveAtTime(now);
         for (TimeWindowDO w : activeAtNow) {
+            if (TARGET_TYPE_USER.equalsIgnoreCase(w.getTargetType()) && windowSelectsUser(w, targetUserId)) {
+                return w;
+            }
             if (TARGET_TYPE_ROLE.equalsIgnoreCase(w.getTargetType()) && windowCoversAllUserRoles(w, userRoleIds)) {
                 return w;
             }
         }
         return null;
+    }
+
+    /**
+     * 判断该时间窗口（按用户）是否命中指定用户：
+     * - selectedUserIds 必须包含该用户
+     * - excludedUserIds 不得包含该用户（排除优先）
+     */
+    private boolean windowSelectsUser(TimeWindowDO w, Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        List<Long> selectedUsers = w.getSelectedUserIds() != null ? w.getSelectedUserIds() : Collections.emptyList();
+        List<Long> excludedUsers = w.getExcludedUserIds() != null ? w.getExcludedUserIds() : Collections.emptyList();
+        return selectedUsers.contains(userId) && !excludedUsers.contains(userId);
     }
 
     /**
