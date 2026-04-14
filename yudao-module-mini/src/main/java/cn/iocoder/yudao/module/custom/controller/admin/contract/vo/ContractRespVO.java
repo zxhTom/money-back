@@ -26,17 +26,23 @@ public class ContractRespVO {
     @ExcelProperty("欠款人姓名")
     private String indebtedName;
 
-    @Schema(description = "欠款人身份证", requiredMode = Schema.RequiredMode.REQUIRED, example = "28340")
+    @Schema(description = "欠款人证件密文（与用户 idNo 同一套加密）", requiredMode = Schema.RequiredMode.REQUIRED, example = "28340")
     @ExcelProperty("欠款人身份证")
     private String indebtedId;
+
+    @Schema(description = "欠款人证件展示（前6+*+后4）")
+    private String indebtedIdDisplay;
 
     @Schema(description = "被欠款人姓名", requiredMode = Schema.RequiredMode.REQUIRED, example = "王五")
     @ExcelProperty("被欠款人姓名")
     private String creditorName;
 
-    @Schema(description = "被欠款人身份证", requiredMode = Schema.RequiredMode.REQUIRED, example = "23897")
+    @Schema(description = "出借人证件密文", requiredMode = Schema.RequiredMode.REQUIRED, example = "23897")
     @ExcelProperty("被欠款人身份证")
     private String creditorId;
+
+    @Schema(description = "出借人证件展示（前6+*+后4）")
+    private String creditorIdDisplay;
 
     @Schema(description = "应用描述", example = "你猜")
     @ExcelProperty("应用描述")

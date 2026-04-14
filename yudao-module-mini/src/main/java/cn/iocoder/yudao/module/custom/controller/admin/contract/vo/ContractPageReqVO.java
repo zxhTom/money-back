@@ -17,13 +17,13 @@ public class ContractPageReqVO extends PageParam {
     @Schema(description = "欠款人姓名", example = "李四")
     private String indebtedName;
 
-    @Schema(description = "欠款人身份证", example = "28340")
+    @Schema(description = "欠款人身份证筛选：明文或密文")
     private String indebtedId;
 
     @Schema(description = "被欠款人姓名", example = "王五")
     private String creditorName;
 
-    @Schema(description = "被欠款人身份证", example = "23897")
+    @Schema(description = "被欠款人身份证筛选：明文或密文")
     private String creditorId;
 
     @Schema(description = "应用描述", example = "你猜")

@@ -22,6 +22,7 @@ import cn.iocoder.yudao.module.system.enums.oauth2.OAuth2ClientConstants;
 import cn.iocoder.yudao.module.system.enums.sms.SmsSceneEnum;
 import cn.iocoder.yudao.module.system.service.logger.LoginLogService;
 import cn.iocoder.yudao.module.system.service.member.MemberService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
 import cn.iocoder.yudao.module.system.service.social.SocialUserService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
@@ -69,6 +70,9 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     @Resource
     private SmsCodeApi smsCodeApi;
 
+    @Resource
+    private IdCardCipherService idCardCipherService;
+
     /**
      * 验证码的开关，默认为 true
      */
@@ -113,6 +117,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         }
         // 创建 Token 令牌，记录登录日志
         AuthLoginRespVO tokenAfterLoginSuccess = createTokenAfterLoginSuccess(user.getId(), reqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
+        idCardCipherService.exposeCipherIdNoOnly(user);
         tokenAfterLoginSuccess.setUser(user);
         return tokenAfterLoginSuccess;
     }

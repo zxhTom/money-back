@@ -29,8 +29,8 @@ public class AuthRegisterReqVO extends CaptchaVerificationReqVO {
     @NotEmpty(message = "密码不能为空")
     @Length(min = 4, max = 16, message = "密码长度为 4-16 位")
     private String password;
-    @Schema(description = "身份证号码", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "123456")
-    @Length(min = 16, max = 20, message = "密码长度为 4-16 位")
+    @Schema(description = "身份证：用户手输多为明文，亦可传密文；服务端自动识别", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Length(max = 512, message = "证件参数过长")
     private String idNo;
     @Schema(description = "生日", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
     private Date birthDate;

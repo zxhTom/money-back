@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.dept.PostService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
@@ -47,6 +48,9 @@ public class UserProfileController {
     @Resource
     private RoleService roleService;
 
+    @Resource
+    private IdCardCipherService idCardCipherService;
+
     @GetMapping("/get")
     @Operation(summary = "获得登录用户信息")
     @DataPermission(enable = false) // 关闭数据权限，避免只查看自己时，查询不到部门。
@@ -59,7 +63,10 @@ public class UserProfileController {
         DeptDO dept = user.getDeptId() != null ? deptService.getDept(user.getDeptId()) : null;
         // 获得岗位信息
         List<PostDO> posts = CollUtil.isNotEmpty(user.getPostIds()) ? postService.getPostList(user.getPostIds()) : null;
-        return success(UserConvert.INSTANCE.convert(user, userRoles, dept, posts));
+        UserProfileRespVO vo = UserConvert.INSTANCE.convert(user, userRoles, dept, posts);
+        vo.setIdNo(idCardCipherService.storedToCipherForResponse(user.getIdNo()));
+        vo.setIdNoDisplay(idCardCipherService.idNoDisplayFromStored(user.getIdNo()));
+        return success(vo);
     }
 
     @PutMapping("/update")

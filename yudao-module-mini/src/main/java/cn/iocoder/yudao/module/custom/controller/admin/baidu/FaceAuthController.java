@@ -4,9 +4,9 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.custom.controller.admin.baidu.vo.BaiduUserInfo;
 import cn.iocoder.yudao.module.custom.service.face.baidu.BaiduFaceAuthService;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import com.anji.captcha.util.StringUtils;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -16,6 +16,8 @@ import javax.annotation.security.PermitAll;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,6 +33,9 @@ public class FaceAuthController {
 
     @Autowired
     WechatService wechatService;
+
+    @Autowired
+    private IdCardCipherService idCardCipherService;
     // 你的小程序服务器域名，用于构造回调地址
     @Value("${server.domain}")
     private String serverDomain;
@@ -40,12 +45,12 @@ public class FaceAuthController {
      * 返回 verify_token 和 构造好的核身URL
      */
     @GetMapping("/start")
-    public CommonResult<Map<String, Object>> startFaceAuth(@RequestParam String idCard) throws Exception {
-        // 你的小程序回调页面路径，用于接收核身完成后的跳转
-        String successUrl = serverDomain + "/api/faceAuth/callback?status=success&idCard="+idCard;
-        String failUrl = serverDomain + "/api/faceAuth/callback?status=failed&idCard="+idCard;
-        successUrl = serverDomain + "/api/mini/callback?status=success&idCard="+idCard;
-        failUrl = serverDomain + "/api/mini/callback?status=failed&idCard="+idCard;
+    public CommonResult<Map<String, Object>> startFaceAuth(
+            @Parameter(description = "身份证：明文或密文（与 profile.idNo 一致），服务端自动识别") @RequestParam String idCard) throws Exception {
+        String idCardEnc = URLEncoder.encode(idCard, StandardCharsets.UTF_8.name());
+        // 回调地址仅携带编码后的证件参数；页面与回传小程序仅展示脱敏串、业务字段用密文
+        String successUrl = serverDomain + "/api/mini/callback?status=success&idCard=" + idCardEnc;
+        String failUrl = serverDomain + "/api/mini/callback?status=failed&idCard=" + idCardEnc;
 //        successUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=success");
 //        failUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=fail");
         // 1. 获取 verify_token
@@ -73,7 +78,7 @@ public class FaceAuthController {
             verifyToken = checkedData.getOrDefault("verify_token","").toString();
         }
         String name = baiduUserInfo.getName();
-        String idCard = baiduUserInfo.getIdCard();
+        String idCard = idCardCipherService.decryptForExternalApi(baiduUserInfo.getIdCard());
         boolean success = baiduFaceAuthService.reportUserInfo(verifyToken, name, idCard);
         Map<String, Object> result = new HashMap<>();
         result.put("success", success);
@@ -105,10 +110,10 @@ public class FaceAuthController {
         // 您的业务逻辑：saveAuthResult(verify_token, status, user_id);
         wechatService.updateVerify(idCard, "success".equals(status) ? 1 : 0);
         // 2. 构建并输出一个友好的HTML引导页
-        buildHtmlResponse(response, status, idCard);
+        buildHtmlResponse(response, status, idCardCipherService.maskFromStored(idCard));
     }
 
-    private void buildHtmlResponse(HttpServletResponse response, String status, String idCard) throws IOException {
+    private void buildHtmlResponse(HttpServletResponse response, String status, String idCardMasked) throws IOException {
         // 设置响应内容类型为HTML
         response.setContentType("text/html; charset=utf-8");
         PrintWriter out = response.getWriter();
@@ -120,11 +125,11 @@ public class FaceAuthController {
 
         if ("success".equalsIgnoreCase(status)) {
             title = "验证成功！";
-            message = String.format("人脸核身流程已完成 (凭证：%s)。请返回小程序查看结果。", idCard);
+            message = String.format("人脸核身流程已完成 (凭证：%s)。请返回小程序查看结果。", idCardMasked);
             icon = "✅";
         } else {
             title = "验证未完成";
-            message = String.format("人脸核身流程中断或失败 (凭证：%s)。请返回小程序重新尝试。", idCard);
+            message = String.format("人脸核身流程中断或失败 (凭证：%s)。请返回小程序重新尝试。", idCardMasked);
             icon = "⏸️";
         }
 
@@ -152,7 +157,7 @@ public class FaceAuthController {
         out.println("        <h1 class=\"title\">" + title + "</h1>");
         out.println("        <p class=\"message\">" + message + "</p>");
         out.println("        <div class=\"tip\">💡 请手动关闭此页面，或从微信聊天列表/最近使用中重新进入您的小程序。</div>");
-        out.println("        <div class=\"token\">核验凭证：" + idCard + "</div>");
+        out.println("        <div class=\"token\">核验凭证：" + idCardMasked + "</div>");
         out.println("    </div>");
         out.println("</body>");
         out.println("</html>");

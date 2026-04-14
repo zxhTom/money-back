@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -10,6 +11,7 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,6 +26,9 @@ import java.util.List;
  */
 @Service
 public class ContractPdfServiceImpl implements ContractPdfService{
+
+    @Resource
+    private IdCardCipherService idCardCipherService;
     
     /**
      * 生成完整的借款协议文本内容，使用 ContractDO 的字段动态替换
@@ -61,9 +66,9 @@ public class ContractPdfServiceImpl implements ContractPdfService{
             "本协议项下各方均已在\"极速合约\"平台注册，同意遵守\"极速合约\"平台的各项交易规则，各方在充分阅读理解本协议条款情形下，本着诚信自愿的原则签订本协议。",
             "",
             "甲方（借款人）：" + safeStr(contract.getIndebtedName()),
-            "身份证号：" + safeStr(contract.getIndebtedId()),
+            "身份证号：" + idCardCipherService.maskFromStored(contract.getIndebtedId()),
             "乙方（出借人）：" + safeStr(contract.getCreditorName()),
-            "身份证号：" + safeStr(contract.getCreditorId()),
+            "身份证号：" + idCardCipherService.maskFromStored(contract.getCreditorId()),
             "",
             "鉴于：",
             "1.甲方与乙方自愿使用\"极速合约\"平台登记确认双方基于借款形成的债权债务法律关系；",

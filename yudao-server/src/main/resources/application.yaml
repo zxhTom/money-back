@@ -348,6 +348,29 @@ yudao:
   iot:
     message-bus:
       type: redis # 消息总线的类型
+  # 身份证：与库中密文同一密钥；生产务必修改为独立随机串（建议 32 位以上）
+  id-card:
+    cipher:
+      secret: "change-me-in-production-min-32-characters-long!!"
+    # 仅迁移历史明文时临时设为 true，执行一次成功后必须改回 false
+    migration:
+      enabled: false
+    # request.allow-plain 已废弃；服务端按 15/18 位形态识别明文，其余按密文解密
+    request:
+      allow-plain: false
+    # false：idNo 等链路透传为密文，idNoDisplay 为脱敏；true：二者均为完整明文（生产慎用）
+    display:
+      plain-for-id-no-display: false
+    # 解密接口 POST .../id-card/decrypt 限流（按「当前登录用户」维度，依赖 Redis）
+    # rate：任意两次调用间隔不受限，但在 rate-window-seconds 窗口内总次数不能超过 rate-max-requests
+    # distinct：在 distinct-window-seconds 窗口内，最多对 distinct-max-per-window 种「不同密文」解密成功（同一密文重复解密只占用 1 种）
+    decrypt-api:
+      rate-limit-enabled: true
+      rate-window-seconds: 60
+      rate-max-requests: 10
+      distinct-limit-enabled: true
+      distinct-window-seconds: 86400
+      distinct-max-per-window: 20
 
 # 时间窗口重合校验阈值（小时），见 docs/feature-time-window
 time-window:

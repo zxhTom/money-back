@@ -45,7 +45,7 @@ public class UserProfileUpdateReqVO {
     private Integer education;
     @Schema(description = "真实姓名", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
     private String realname;
-    @Schema(description = "身份证", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    @Schema(description = "身份证：用户新填多为明文；未修改可回传服务端 idNo 密文。服务端自动识别明文/密文；未修改请不要传", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String idNo;
 
 }

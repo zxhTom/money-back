@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -42,6 +43,14 @@ public class AdminUserDO extends TenantBaseDO {
      * 身份证号码
      */
     private String idNo;
+
+    /**
+     * 仅接口入参：小程序注册等场景可能与 idNo 同时传，与 idNo 等价（明文或密文）；不落库
+     */
+    @TableField(exist = false)
+    @Schema(description = "身份证（与 idNo 二选一，明文或密文；服务端自动识别）")
+    @JsonProperty("idCard")
+    private String idCard;
 
     /**
      * 真实姓名

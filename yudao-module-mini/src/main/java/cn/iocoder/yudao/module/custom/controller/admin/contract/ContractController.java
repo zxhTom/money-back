@@ -10,6 +10,8 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.service.contract.ConfirmPdfService;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
+import cn.iocoder.yudao.module.custom.util.ContractRespIdCardEnricher;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +43,9 @@ public class ContractController {
     private ConfirmPdfService confirmPdfService;
     @Resource
     private ContractService contractService;
+
+    @Resource
+    private IdCardCipherService idCardCipherService;
 
     @PostMapping("/create")
     @Operation(summary = "创建合同")
@@ -81,7 +86,9 @@ public class ContractController {
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
     public CommonResult<ContractRespVO> getContract(@RequestParam("id") Long id) {
         ContractDO contract = contractService.getContract(id);
-        return success(BeanUtils.toBean(contract, ContractRespVO.class));
+        ContractRespVO vo = BeanUtils.toBean(contract, ContractRespVO.class);
+        ContractRespIdCardEnricher.enrich(vo, contract, idCardCipherService);
+        return success(vo);
     }
 
     @GetMapping("/page")
@@ -89,7 +96,11 @@ public class ContractController {
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
     public CommonResult<PageResult<ContractRespVO>> getContractPage(@Valid ContractPageReqVO pageReqVO) {
         PageResult<ContractDO> pageResult = contractService.getContractPage(pageReqVO);
-        return success(BeanUtils.toBean(pageResult, ContractRespVO.class));
+        PageResult<ContractRespVO> voPage = BeanUtils.toBean(pageResult, ContractRespVO.class);
+        for (int i = 0; i < voPage.getList().size(); i++) {
+            ContractRespIdCardEnricher.enrich(voPage.getList().get(i), pageResult.getList().get(i), idCardCipherService);
+        }
+        return success(voPage);
     }
 
     @GetMapping("/selfPage")
@@ -97,7 +108,11 @@ public class ContractController {
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
     public CommonResult<PageResult<ContractRespVO>> getSelfContractPage(@Valid ContractPageReqVO pageReqVO) {
         PageResult<ContractDO> pageResult = contractService.getSelfContractPage(pageReqVO);
-        return success(BeanUtils.toBean(pageResult, ContractRespVO.class));
+        PageResult<ContractRespVO> voPage = BeanUtils.toBean(pageResult, ContractRespVO.class);
+        for (int i = 0; i < voPage.getList().size(); i++) {
+            ContractRespIdCardEnricher.enrich(voPage.getList().get(i), pageResult.getList().get(i), idCardCipherService);
+        }
+        return success(voPage);
     }
 
     @GetMapping("/export-excel")
@@ -108,9 +123,11 @@ public class ContractController {
               HttpServletResponse response) throws IOException {
         pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
         List<ContractDO> list = contractService.getContractPage(pageReqVO).getList();
-        // 导出 Excel
-        ExcelUtils.write(response, "合同.xls", "数据", ContractRespVO.class,
-                        BeanUtils.toBean(list, ContractRespVO.class));
+        List<ContractRespVO> voList = BeanUtils.toBean(list, ContractRespVO.class);
+        for (int i = 0; i < voList.size(); i++) {
+            ContractRespIdCardEnricher.enrich(voList.get(i), list.get(i), idCardCipherService);
+        }
+        ExcelUtils.write(response, "合同.xls", "数据", ContractRespVO.class, voList);
     }
 
     @GetMapping("/export-protocol-pdf")

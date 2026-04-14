@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
@@ -14,6 +15,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +74,9 @@ public class ContractServiceImpl implements ContractService {
     @Autowired
     UserRoleMapper userRoleMapper;
 
+    @Resource
+    private IdCardCipherService idCardCipherService;
+
     @Override
     public Long createContract(ContractSaveReqVO createReqVO) {
         Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
@@ -82,6 +87,12 @@ public class ContractServiceImpl implements ContractService {
         }
         // 插入
         ContractDO contract = BeanUtils.toBean(createReqVO, ContractDO.class);
+        if (StrUtil.isNotBlank(contract.getIndebtedId())) {
+            contract.setIndebtedId(idCardCipherService.normalizeRequestToCipher(contract.getIndebtedId()));
+        }
+        if (StrUtil.isNotBlank(contract.getCreditorId())) {
+            contract.setCreditorId(idCardCipherService.normalizeRequestToCipher(contract.getCreditorId()));
+        }
         // 设置部门ID，用于数据权限控制
         Long deptId = SecurityFrameworkUtils.getLoginUserDeptId();
         if (deptId != null) {
@@ -120,6 +131,12 @@ public class ContractServiceImpl implements ContractService {
         validateContractExists(updateReqVO.getId());
         // 更新
         ContractDO updateObj = BeanUtils.toBean(updateReqVO, ContractDO.class);
+        if (StrUtil.isNotBlank(updateObj.getIndebtedId())) {
+            updateObj.setIndebtedId(idCardCipherService.normalizeRequestToCipher(updateObj.getIndebtedId()));
+        }
+        if (StrUtil.isNotBlank(updateObj.getCreditorId())) {
+            updateObj.setCreditorId(idCardCipherService.normalizeRequestToCipher(updateObj.getCreditorId()));
+        }
         contractMapper.updateById(updateObj);
     }
 
@@ -151,11 +168,25 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     public PageResult<ContractDO> getContractPage(ContractPageReqVO pageReqVO) {
+        normalizeContractPageIds(pageReqVO);
         return contractMapper.selectPage(pageReqVO);
+    }
+
+    private void normalizeContractPageIds(ContractPageReqVO pageReqVO) {
+        if (pageReqVO == null) {
+            return;
+        }
+        if (StrUtil.isNotBlank(pageReqVO.getIndebtedId())) {
+            pageReqVO.setIndebtedId(idCardCipherService.normalizeRequestToCipher(pageReqVO.getIndebtedId()));
+        }
+        if (StrUtil.isNotBlank(pageReqVO.getCreditorId())) {
+            pageReqVO.setCreditorId(idCardCipherService.normalizeRequestToCipher(pageReqVO.getCreditorId()));
+        }
     }
 
     @Override
     public PageResult<ContractDO> getSelfContractPage(ContractPageReqVO pageReqVO) {
+        normalizeContractPageIds(pageReqVO);
         // 获取当前登录用户ID
         Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
         if (loginUserId == null) {
@@ -221,12 +252,12 @@ public class ContractServiceImpl implements ContractService {
                 y -= leading;
                 writeTextAt(contentStream,
                         "出借人（债权人）： " + safe(contract.getCreditorName()) +
-                                "    身份证号码： " + safe(contract.getCreditorId()),
+                                "    身份证号码： " + safe(idCardCipherService.maskFromStored(contract.getCreditorId())),
                         font, 12, margin, y);
                 y -= leading;
                 writeTextAt(contentStream,
                         "借款人（债务人）： " + safe(contract.getIndebtedName()) +
-                                "    身份证号码： " + safe(contract.getIndebtedId()),
+                                "    身份证号码： " + safe(idCardCipherService.maskFromStored(contract.getIndebtedId())),
                         font, 12, margin, y);
                 y -= leading;
                 writeTextAt(contentStream,

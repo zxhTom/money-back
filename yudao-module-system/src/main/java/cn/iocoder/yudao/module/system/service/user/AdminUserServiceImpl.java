@@ -26,6 +26,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.dept.UserPostMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.dept.PostService;
 import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.system.service.tenant.TenantService;
@@ -85,6 +86,9 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Resource
     private ConfigApi configApi;
 
+    @Resource
+    private IdCardCipherService idCardCipherService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     @LogRecord(type = SYSTEM_USER_TYPE, subType = SYSTEM_USER_CREATE_SUB_TYPE, bizNo = "{{#user.id}}",
@@ -136,6 +140,10 @@ public class AdminUserServiceImpl implements AdminUserService {
         AdminUserDO user = BeanUtils.toBean(registerReqVO, AdminUserDO.class);
         user.setStatus(CommonStatusEnum.ENABLE.getStatus()); // 默认开启
         user.setPassword(encodePassword(registerReqVO.getPassword())); // 加密密码
+        if (StrUtil.isNotBlank(user.getIdNo())) {
+            user.setIdNo(idCardCipherService.normalizeRequestToCipher(user.getIdNo()));
+            validateIdNoUnique(null, user.getIdNo());
+        }
         userMapper.insert(user);
         return user.getId();
     }
@@ -185,15 +193,56 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public void updateUserProfile(Long id, UserProfileUpdateReqVO reqVO) {
-        // 校验正确性
         validateUserExists(id);
         validateEmailUnique(id, reqVO.getEmail());
         validateMobileUnique(id, reqVO.getMobile());
-        // 校验真实姓名、身份证号唯一（仅未删除的用户）
         validateRealnameUnique(id, reqVO.getRealname());
-        validateIdNoUnique(id, reqVO.getIdNo());
-        // 执行更新
-        userMapper.updateById(BeanUtils.toBean(reqVO, AdminUserDO.class).setId(id));
+
+        String idNoPlain = null;
+        if (StrUtil.isNotBlank(reqVO.getIdNo())) {
+            idNoPlain = idCardCipherService.resolveToPlain(reqVO.getIdNo());
+            validateIdNoUnique(id, idNoPlain);
+        }
+
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(id);
+        if (reqVO.getNickname() != null) {
+            updateObj.setNickname(reqVO.getNickname());
+        }
+        if (reqVO.getUsername() != null) {
+            updateObj.setUsername(reqVO.getUsername());
+        }
+        if (reqVO.getEmail() != null) {
+            updateObj.setEmail(reqVO.getEmail());
+        }
+        if (reqVO.getMobile() != null) {
+            updateObj.setMobile(reqVO.getMobile());
+        }
+        if (reqVO.getSex() != null) {
+            updateObj.setSex(reqVO.getSex());
+        }
+        if (reqVO.getAvatar() != null) {
+            updateObj.setAvatar(reqVO.getAvatar());
+        }
+        if (reqVO.getBirthDate() != null) {
+            updateObj.setBirthDate(reqVO.getBirthDate());
+        }
+        if (reqVO.getAddress() != null) {
+            updateObj.setAddress(reqVO.getAddress());
+        }
+        if (reqVO.getOccupation() != null) {
+            updateObj.setOccupation(reqVO.getOccupation());
+        }
+        if (reqVO.getEducation() != null) {
+            updateObj.setEducation(reqVO.getEducation());
+        }
+        if (reqVO.getRealname() != null) {
+            updateObj.setRealname(reqVO.getRealname());
+        }
+        if (idNoPlain != null) {
+            updateObj.setIdNo(idNoPlain);
+        }
+        userMapper.updateById(updateObj);
     }
 
     @Override
@@ -290,6 +339,9 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public PageResult<AdminUserDO> getUserPage(UserPageReqVO reqVO) {
+        if (StrUtil.isNotBlank(reqVO.getIdNo())) {
+            reqVO.setIdNo(idCardCipherService.resolveToPlain(reqVO.getIdNo()));
+        }
         // 如果有角色编号，查询角色对应的用户编号
         Set<Long> userIds = reqVO.getRoleId() != null ?
                 permissionService.getUserRoleIdListByRoleId(singleton(reqVO.getRoleId())) : null;
@@ -461,7 +513,7 @@ public class AdminUserServiceImpl implements AdminUserService {
      * 校验身份证号唯一（仅未删除的用户）
      *
      * @param id   当前用户 ID，可为空（创建时）
-     * @param idNo 身份证号
+     * @param idNo 身份证号（明文，与库中 id_no 一致）
      */
     @VisibleForTesting
     void validateIdNoUnique(Long id, String idNo) {
@@ -588,6 +640,9 @@ public class AdminUserServiceImpl implements AdminUserService {
     public Integer insertUserSimply(AdminUserDO user) {
         // 2.1 插入用户
         user.setStatus(CommonStatusEnum.ENABLE.getStatus()); // 默认开启
+        if (StrUtil.isNotBlank(user.getIdNo())) {
+            user.setIdNo(idCardCipherService.normalizeRequestToCipher(user.getIdNo()));
+        }
         String rawPassword = user.getPassword();
         // payPassword 为空时用 password 作为 payPassword，避免 NPE 且与注册约定一致
         String rawPayPassword = StrUtil.isNotBlank(user.getPayPassword()) ? user.getPayPassword() : rawPassword;
@@ -610,8 +665,12 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public List<AdminUserDO> getUserByIdNo(String idNo) {
+        if (StrUtil.isBlank(idNo)) {
+            return Collections.emptyList();
+        }
+        String plain = idCardCipherService.resolveToPlain(idNo);
         QueryWrapper<AdminUserDO> adminUserDOQueryWrapper = new QueryWrapper<>();
-        adminUserDOQueryWrapper.eq("id_no", idNo);
+        adminUserDOQueryWrapper.eq("id_no", plain);
         adminUserDOQueryWrapper.last("limit 1");
         return userMapper.selectList(adminUserDOQueryWrapper);
     }

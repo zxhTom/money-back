@@ -17,8 +17,11 @@ public class UserProfileRespVO {
     @Schema(description = "用户编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Long id;
 
-    @Schema(description = "身份证号码", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
+    @Schema(description = "证件号密文（与合同当事人证件字段同一套加密，可用于 === 比较）", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String idNo;
+
+    @Schema(description = "证件号展示：前 6 位 + 中间 * + 后 4 位（由后端统一格式）")
+    private String idNoDisplay;
     @Schema(description = "生日", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
     private Date birthDate;
     @Schema(description = "居住地址", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")

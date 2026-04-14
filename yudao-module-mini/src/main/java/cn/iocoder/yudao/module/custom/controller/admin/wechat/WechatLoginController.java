@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.custom.service.wechat.model.CombineUser;
 import cn.iocoder.yudao.module.system.controller.admin.auth.vo.AuthLoginReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.auth.vo.AuthLoginRespVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.auth.AdminAuthService;
 import com.alibaba.fastjson.JSON;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -57,6 +58,9 @@ public class WechatLoginController {
     private WxMpService wxMpService;
     @Autowired
     private WechatConfig wechatConfig;
+
+    @Autowired
+    private IdCardCipherService idCardCipherService;
 
     @PostMapping("/send")
     @PreAuthorize("@ss.hasPermission('custom:contract:create')")
@@ -121,7 +125,8 @@ public class WechatLoginController {
         // 4. (可选) 将 token 和 user 的关联关系存储到 Redis 或数据库
         // redisTemplate.opsForValue().set("token:" + token, openid, Duration.ofDays(7));
 
-        // 5. 返回 token 和用户信息给前端
+        // 5. 返回 token 和用户信息给前端（身份证仅密文）
+        idCardCipherService.exposeCipherIdNoOnly(user);
         WechatLoginResponse wechatLoginResponse = new WechatLoginResponse(token, user,combineUser.isRegisted(),openid);
         return ApiResponse.success(wechatLoginResponse);
     }

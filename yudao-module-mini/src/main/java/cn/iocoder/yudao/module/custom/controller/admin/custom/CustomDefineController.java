@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
+import cn.iocoder.yudao.module.custom.util.ContractRespIdCardEnricher;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.WechatLoginController;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
@@ -14,6 +15,9 @@ import cn.iocoder.yudao.module.custom.dto.MpVO;
 import cn.iocoder.yudao.module.custom.service.custom.CustomDefineService;
 import cn.iocoder.yudao.module.custom.service.email.EmailCodeService;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
+import cn.iocoder.yudao.framework.common.util.idcard.IdCardCipherUtil;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardDecryptAccessLimiter;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.pay.controller.admin.demo.vo.order.PayDemoOrderCreateReqVO;
@@ -37,12 +41,15 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
 import javax.validation.Valid;
+import java.util.ArrayList;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.error;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_ID_CARD_DECRYPT_CIPHER_IS_PLAIN;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_ID_CARD_DECRYPT_FAIL;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 
 @Tag(name = "管理后台 - 自定义客户端")
@@ -62,6 +69,12 @@ public class CustomDefineController {
     private AdminUserService userService;
     @Resource
     private AdminUserMapper userMapper;
+
+    @Resource
+    private IdCardCipherService idCardCipherService;
+
+    @Resource
+    private IdCardDecryptAccessLimiter idCardDecryptAccessLimiter;
 
     @GetMapping("/staticsContractByTimePeriod")
     @Operation(summary = "按照时间窗口统计数据")
@@ -107,9 +120,15 @@ public class CustomDefineController {
     @GetMapping("/page")
     @Operation(summary = "不分页数据")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
-    public CommonResult<List<ContractDO>> page(@Valid ContractPageReqDtoVO pageReqVO) {
-        List<ContractDO> respVO = customDefineService.page(pageReqVO);
-        return success(respVO);
+    public CommonResult<List<ContractRespVO>> page(@Valid ContractPageReqDtoVO pageReqVO) {
+        List<ContractDO> list = customDefineService.page(pageReqVO);
+        List<ContractRespVO> vos = new ArrayList<>(list.size());
+        for (ContractDO contract : list) {
+            ContractRespVO vo = BeanUtils.toBean(contract, ContractRespVO.class);
+            ContractRespIdCardEnricher.enrich(vo, contract, idCardCipherService);
+            vos.add(vo);
+        }
+        return success(vos);
     }
     @PutMapping("/update-pay-password")
     @Operation(summary = "修改支付密码")
@@ -330,6 +349,35 @@ public class CustomDefineController {
     public CommonResult<Boolean> resetPasswordByIdNo(@Valid @RequestBody ResetPasswordByIdNoReqVO reqVO) {
         customDefineService.resetPasswordByIdNo(reqVO);
         return success(true);
+    }
+
+    @PostMapping("/id-card/decrypt")
+    @Operation(summary = "身份证密文解密（按用户限流：短时间调用次数 + 周期内不同证件种数，见 yudao.id-card.decrypt-api）")
+    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    public CommonResult<IdCardDecryptRespVO> decryptIdCard(@Valid @RequestBody IdCardDecryptReqVO reqVO) {
+        Long userId = getLoginUserId();
+        String cipher = reqVO.getCipher().trim();
+        if (IdCardCipherUtil.looksLikePlainIdCard(cipher)) {
+            log.warn("[decryptIdCard][reject_plain_shape][userId={}][scene={}]", userId, reqVO.getScene());
+            return error(USER_ID_CARD_DECRYPT_CIPHER_IS_PLAIN);
+        }
+        log.info("[decryptIdCard][userId={}][scene={}]", userId, reqVO.getScene());
+        idCardDecryptAccessLimiter.checkRequestRate(userId);
+        int reserved = idCardDecryptAccessLimiter.reserveDistinctCipherSlot(userId, cipher);
+        try {
+            String plain = idCardCipherService.decryptOrNull(cipher);
+            if (plain == null) {
+                idCardDecryptAccessLimiter.rollbackNewDistinctSlot(userId, cipher, reserved);
+                return error(USER_ID_CARD_DECRYPT_FAIL);
+            }
+            IdCardDecryptRespVO respVO = new IdCardDecryptRespVO();
+            respVO.setPlain(plain);
+            log.info("[decryptIdCard][success][userId={}][scene={}][plainLen={}]", userId, reqVO.getScene(), plain.length());
+            return success(respVO);
+        } catch (RuntimeException e) {
+            idCardDecryptAccessLimiter.rollbackNewDistinctSlot(userId, cipher, reserved);
+            throw e;
+        }
     }
 
     @PutMapping("/update-password-by-email")

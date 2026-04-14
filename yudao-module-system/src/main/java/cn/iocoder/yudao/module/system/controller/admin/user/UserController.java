@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.controller.admin.user;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
@@ -12,6 +13,7 @@ import cn.iocoder.yudao.module.system.convert.user.UserConvert;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.enums.common.SexEnum;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,6 +50,8 @@ public class UserController {
     private AdminUserService userService;
     @Resource
     private DeptService deptService;
+    @Resource
+    private IdCardCipherService idCardCipherService;
 
     @PostMapping("/create")
     @Operation(summary = "新增用户")
@@ -111,8 +115,28 @@ public class UserController {
         // 拼接数据
         Map<Long, DeptDO> deptMap = deptService.getDeptMap(
                 convertList(pageResult.getList(), AdminUserDO::getDeptId));
-        return success(new PageResult<>(UserConvert.INSTANCE.convertList(pageResult.getList(), deptMap),
-                pageResult.getTotal()));
+        List<UserRespVO> rows = UserConvert.INSTANCE.convertList(pageResult.getList(), deptMap);
+        for (int i = 0; i < rows.size(); i++) {
+            applyIdNoForApi(rows.get(i), pageResult.getList().get(i));
+        }
+        return success(new PageResult<>(rows, pageResult.getTotal()));
+    }
+
+    /**
+     * 列表/详情：idNo 为链路透传值（默认密文），idNoDisplay 为脱敏或按配置明文；覆盖 DO 转 VO 时的库内原始 idNo。
+     */
+    private void applyIdNoForApi(UserRespVO vo, AdminUserDO user) {
+        if (vo == null || user == null) {
+            return;
+        }
+        String stored = user.getIdNo();
+        if (StrUtil.isBlank(stored)) {
+            vo.setIdNo(null);
+            vo.setIdNoDisplay(null);
+            return;
+        }
+        vo.setIdNo(idCardCipherService.storedToCipherForResponse(stored));
+        vo.setIdNoDisplay(idCardCipherService.idNoDisplayFromStored(stored));
     }
 
     @GetMapping({"/list-all-simple", "/simple-list"})
@@ -153,7 +177,9 @@ public class UserController {
         }
         // 拼接数据
         DeptDO dept = deptService.getDept(user.getDeptId());
-        return success(UserConvert.INSTANCE.convert(user, dept));
+        UserRespVO vo = UserConvert.INSTANCE.convert(user, dept);
+        applyIdNoForApi(vo, user);
+        return success(vo);
     }
 
     @GetMapping("/export-excel")
@@ -167,8 +193,11 @@ public class UserController {
         // 输出 Excel
         Map<Long, DeptDO> deptMap = deptService.getDeptMap(
                 convertList(list, AdminUserDO::getDeptId));
-        ExcelUtils.write(response, "用户数据.xls", "数据", UserRespVO.class,
-                UserConvert.INSTANCE.convertList(list, deptMap));
+        List<UserRespVO> rows = UserConvert.INSTANCE.convertList(list, deptMap);
+        for (int i = 0; i < rows.size(); i++) {
+            applyIdNoForApi(rows.get(i), list.get(i));
+        }
+        ExcelUtils.write(response, "用户数据.xls", "数据", UserRespVO.class, rows);
     }
 
     @GetMapping("/get-import-template")

@@ -20,7 +20,7 @@ public class ContractSaveReqVO {
     @NotEmpty(message = "欠款人姓名不能为空")
     private String indebtedName;
 
-    @Schema(description = "欠款人身份证", requiredMode = Schema.RequiredMode.REQUIRED, example = "28340")
+    @Schema(description = "欠款人身份证：明文或密文（与 profile/合同 indebtedId 一致），服务端自动识别", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "欠款人身份证不能为空")
     private String indebtedId;
 
@@ -28,7 +28,7 @@ public class ContractSaveReqVO {
     @NotEmpty(message = "被欠款人姓名不能为空")
     private String creditorName;
 
-    @Schema(description = "被欠款人身份证", requiredMode = Schema.RequiredMode.REQUIRED, example = "23897")
+    @Schema(description = "被欠款人身份证：明文或密文，服务端自动识别", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "被欠款人身份证不能为空")
     private String creditorId;
 

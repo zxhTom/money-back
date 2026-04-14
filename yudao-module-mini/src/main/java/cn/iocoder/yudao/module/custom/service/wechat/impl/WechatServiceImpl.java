@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper;
 import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
 import cn.iocoder.yudao.module.custom.service.wechat.OffcialService;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import com.alibaba.fastjson.JSON;
@@ -20,6 +21,7 @@ import me.chanjar.weixin.common.error.WxErrorException;
 import me.chanjar.weixin.mp.api.WxMpService;
 import me.chanjar.weixin.mp.bean.template.WxMpTemplateData;
 import me.chanjar.weixin.mp.bean.template.WxMpTemplateMessage;
+import cn.hutool.core.util.StrUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -51,6 +53,8 @@ public class WechatServiceImpl implements WechatService {
     AdminUserService adminUserService;
     @Autowired
     OffcialService offcialService;
+    @Autowired
+    IdCardCipherService idCardCipherService;
 
     private static final String CODE2SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session";
     private static final String GET_VERSION_INFO_URL = "https://api.weixin.qq.com/wxa/getversioninfo";
@@ -103,7 +107,14 @@ public class WechatServiceImpl implements WechatService {
 
     @Override
     public Integer updateVerify(String idCard, int verified) {
-        return customDefineMapper.updateVerify(idCard,verified);
+        String idForDb = idCard;
+        if (StrUtil.isNotBlank(idCard)) {
+            String plain = idCardCipherService.resolveToPlain(idCard.trim());
+            if (StrUtil.isNotBlank(plain)) {
+                idForDb = plain;
+            }
+        }
+        return customDefineMapper.updateVerify(idForDb, verified);
     }
 
     @Override

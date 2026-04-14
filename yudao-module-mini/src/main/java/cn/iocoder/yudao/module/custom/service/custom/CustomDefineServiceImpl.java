@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.custom.service.custom;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -40,6 +41,7 @@ import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import com.alibaba.fastjson.JSON;
 import com.anji.captcha.util.MD5Util;
@@ -97,6 +99,10 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     private AdminUserMapper adminUserMapper;
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private IdCardCipherService idCardCipherService;
+
     @Override
     public StaticsContractPeriodRespVO staticsContractByTimePeriod() {
         return customDefineMapper.staticsContractByTimePeriod();
@@ -133,11 +139,23 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     public List<RecentContractVO> rencentContractList() {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         AdminUserDO user = adminUserService.getUser(loginUser.getId());
-        return customDefineMapper.rencentContractList(user.getIdNo());
+        List<RecentContractVO> list = customDefineMapper.rencentContractList(user.getIdNo());
+        for (RecentContractVO vo : list) {
+            if (vo == null || StrUtil.isBlank(vo.getIdNo())) {
+                continue;
+            }
+            String stored = vo.getIdNo();
+            vo.setIdNo(idCardCipherService.storedToCipherForResponse(stored));
+            vo.setIdNoDisplay(idCardCipherService.idNoDisplayFromStored(stored));
+        }
+        return list;
     }
 
     @Override
     public Page<CreditSearchVO> creditSearch(CreditPageReqVO pageReqVO) {
+        if (StrUtil.isNotBlank(pageReqVO.getIdNo())) {
+            pageReqVO.setIdNo(idCardCipherService.normalizeRequestToCipher(pageReqVO.getIdNo()));
+        }
         Page<CreditPageReqVO> objectPage = new Page<>(pageReqVO.getPageNo(), pageReqVO.getPageSize());
         Page<CreditSearchVO> pageList = customDefineMapper.creditSearch(objectPage,pageReqVO);
          return pageList;
@@ -145,6 +163,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Integer edit(ContractSaveReqVO contractSaveReqVO) {
+        normalizeContractIdNos(contractSaveReqVO);
         ContractDO contractDO = contractMapper.selectById(contractSaveReqVO.getId());
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
 
@@ -228,7 +247,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         List<AdminUserDO> adminUserDO = adminUserService.getUserListByRealname(userReqVO.getRealname());
         if (CollectionUtil.isNotEmpty(adminUserDO)) {
             AdminUserDO dataAdminUserDO = adminUserDO.get(0);
-            return userReqVO.getIdNo().equals(dataAdminUserDO.getIdNo());
+            return idCardCipherService.sameIdCard(userReqVO.getIdNo(), dataAdminUserDO.getIdNo());
         }
         return false;
     }
@@ -286,6 +305,10 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     public ContractRespVoDto getContract(Long id) {
         ContractDO contract = contractService.getContract(id);
         ContractRespVoDto contractRespVoDto = BeanUtils.toBean(contract, ContractRespVoDto.class);
+        contractRespVoDto.setIndebtedId(idCardCipherService.storedToCipherForResponse(contract.getIndebtedId()));
+        contractRespVoDto.setCreditorId(idCardCipherService.storedToCipherForResponse(contract.getCreditorId()));
+        contractRespVoDto.setIndebtedIdDisplay(idCardCipherService.maskFromStored(contract.getIndebtedId()));
+        contractRespVoDto.setCreditorIdDisplay(idCardCipherService.maskFromStored(contract.getCreditorId()));
         String codeUrl =customDefineMapper.selectLatestCodeUrlBaseContractId(id);
         contractRespVoDto.setCodeUrl(codeUrl);
         return contractRespVoDto;
@@ -299,6 +322,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Integer update(ContractSaveReqVO contractSaveReqVO) {
+        normalizeContractIdNos(contractSaveReqVO);
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         AdminUserDO user = userService.getUser(loginUser.getId());
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
@@ -380,6 +404,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Integer extension(ContractSaveReqVO contractSaveReqVO) {
+        normalizeContractIdNos(contractSaveReqVO);
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
         AdminUserDO user = userService.getUser(SecurityFrameworkUtils.getLoginUserId());
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -411,6 +436,14 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     public Integer register(AdminUserDO adminUserDO) {
 
         AdminUserDO user = BeanUtils.toBean(adminUserDO, AdminUserDO.class);
+        if (org.apache.commons.lang3.StringUtils.isBlank(user.getIdNo())
+                && org.apache.commons.lang3.StringUtils.isNotBlank(user.getIdCard())) {
+            user.setIdNo(user.getIdCard().trim());
+        }
+        user.setIdCard(null);
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(user.getIdNo())) {
+            user.setIdNo(idCardCipherService.normalizeRequestToCipher(user.getIdNo()));
+        }
 
         // 先做不依赖最终 username 的校验：手机号、身份证号、真实姓名唯一
         validateRegisterUserUnique(user);
@@ -481,6 +514,18 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     }
 
     private static final String DEFAULT_PASSWORD = "123456";
+
+    private void normalizeContractIdNos(ContractSaveReqVO vo) {
+        if (vo == null) {
+            return;
+        }
+        if (StrUtil.isNotBlank(vo.getIndebtedId())) {
+            vo.setIndebtedId(idCardCipherService.normalizeRequestToCipher(vo.getIndebtedId()));
+        }
+        if (StrUtil.isNotBlank(vo.getCreditorId())) {
+            vo.setCreditorId(idCardCipherService.normalizeRequestToCipher(vo.getCreditorId()));
+        }
+    }
 
     /**
      * 注册时 password 与 payPassword 规则：两都有值则各存各的，只有一个有值则另一个取该值，都为空则用默认 123456
@@ -579,7 +624,8 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public void resetPasswordByIdNo(ResetPasswordByIdNoReqVO reqVO) {
-        AdminUserDO user = adminUserMapper.selectByIdNo(reqVO.getIdNo());
+        String plain = idCardCipherService.resolveToPlain(reqVO.getIdNo());
+        AdminUserDO user = adminUserMapper.selectByIdNo(plain);
         if (user == null) {
             throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS);
         }

@@ -17,9 +17,9 @@ public class ResetPasswordByIdNoReqVO {
     @NotEmpty(message = "真实姓名不能为空")
     private String realname;
 
-    @Schema(description = "身份证号", requiredMode = Schema.RequiredMode.REQUIRED, example = "110101199001011234")
+    @Schema(description = "身份证：忘记密码场景多为手输明文；亦可传密文；服务端自动识别", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "身份证号不能为空")
-    @Length(min = 15, max = 20, message = "身份证号长度 15-20 位")
+    @Length(max = 512, message = "证件参数过长")
     private String idNo;
 
     @Schema(description = "新密码", requiredMode = Schema.RequiredMode.REQUIRED, example = "123456")

@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.controller.admin.user.vo.user;
 import cn.iocoder.yudao.framework.excel.core.annotations.DictFormat;
 import cn.iocoder.yudao.framework.excel.core.convert.DictConvert;
 import cn.iocoder.yudao.module.system.enums.DictTypeConstants;
+import cn.idev.excel.annotation.ExcelIgnore;
 import cn.idev.excel.annotation.ExcelIgnoreUnannotated;
 import cn.idev.excel.annotation.ExcelProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -71,5 +72,13 @@ public class UserRespVO{
 
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED, example = "时间戳格式")
     private LocalDateTime createTime;
+
+    @Schema(description = "证件号：密文（与解密接口 cipher 一致）；plain-for-id-no-display=true 时可能为明文；无证件为空")
+    @ExcelIgnore
+    private String idNo;
+
+    @Schema(description = "证件号脱敏展示（列表展示用）；plain-for-id-no-display=true 时与 idNo 同为明文")
+    @ExcelProperty("证件号(脱敏)")
+    private String idNoDisplay;
 
 }

@@ -182,8 +182,8 @@
             <span th:text="${status}">-</span>
         </div>
         <div class="info-item">
-            <span class="info-label">标识：</span>
-            <span th:text="${idNo}">-</span>
+            <span class="info-label">证件展示：</span>
+            <span th:text="${idNoDisplay}">-</span>
         </div>
         <div class="info-item">
             <span class="info-label">验证令牌：</span>
@@ -196,13 +196,15 @@
     (function () {
         // 获取页面参数
         const status = /*[[${status}]]*/ 'success';
-        const idNo = /*[[${idNo}]]*/ '';
+        const idNoCipher = /*[[${idNoCipher}]]*/ '';
+        const idNoDisplay = /*[[${idNoDisplay}]]*/ '';
         const verifyToken = /*[[${verifyToken}]]*/ '';
 
-        // 准备发送给小程序的数据
+        // 准备发送给小程序的数据（idNo 为密文，与接口约定一致；idNoDisplay 为脱敏展示）
         const messageData = {
             status: status,
-            idNo: idNo,
+            idNo: idNoCipher,
+            idNoDisplay: idNoDisplay,
             verifyToken: verifyToken || ''
         };
 

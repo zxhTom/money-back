@@ -58,6 +58,26 @@ public interface ErrorCodeConstants {
      * 姓名与身份证号不匹配（用于找回密码等身份校验）
      */
     ErrorCode USER_IDNO_REALNAME_MISMATCH = new ErrorCode(1_002_003_014, "姓名与身份证号不匹配");
+    /**
+     * 接口入参须为证件密文（割接期可在 yudao.id-card.request.allow-plain=true 时临时允许明文）
+     */
+    ErrorCode USER_ID_CARD_CIPHER_REQUIRED = new ErrorCode(1_002_003_015, "证件号码请传递加密后的密文（或开启配置 yudao.id-card.request.allow-plain 临时允许明文）");
+    /**
+     * 解密接口调用过于频繁（同一用户、同一统计窗口）
+     */
+    ErrorCode USER_ID_CARD_DECRYPT_RATE_LIMIT = new ErrorCode(1_002_003_016, "身份证解密接口调用过于频繁，每 {} 秒最多 {} 次，请稍后再试");
+    /**
+     * 解密接口：本统计周期内可解密的不同证件种数已达上限
+     */
+    ErrorCode USER_ID_CARD_DECRYPT_DISTINCT_LIMIT = new ErrorCode(1_002_003_017, "当前 {} 秒内可解密的不同证件数量已达上限（{} 个），请稍后再试或联系管理员");
+    /**
+     * 密文无法解密或格式非法
+     */
+    ErrorCode USER_ID_CARD_DECRYPT_FAIL = new ErrorCode(1_002_003_018, "身份证密文无效或无法解密");
+    /**
+     * 解密接口：入参为 15/18 位明文形态，不应作为 cipher 传入
+     */
+    ErrorCode USER_ID_CARD_DECRYPT_CIPHER_IS_PLAIN = new ErrorCode(1_002_003_019, "请勿将明文身份证号作为密文传入解密接口");
 
     // ========== 部门模块 1-002-004-000 ==========
     ErrorCode DEPT_NAME_DUPLICATE = new ErrorCode(1_002_004_000, "已经存在该名字的部门");

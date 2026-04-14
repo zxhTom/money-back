@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.custom.controller.admin.wechat;
 
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,12 +32,15 @@ public class MiniCallbackController {
     @Autowired
     WechatService wechatService;
 
+    @Autowired
+    private IdCardCipherService idCardCipherService;
+
     /**
      * 接收回调并返回结果页面
-     * 访问示例：/api/mini/callback?status=success&idNo=xxx&verifyToken=xxx
+     * 访问示例：/api/mini/callback?status=success&idCard=xxx（URL 编码）&verifyToken=xxx
      *
      * @param status 状态：success 或 failed
-     * @param idCard 身份证号或其他标识
+     * @param idCard 证件密文或历史明文（与库中 id_no 一致；回调页与 postMessage 仅回传密文 + 脱敏展示）
      * @param verifyToken 验证令牌
      * @param response HTTP 响应对象
      */
@@ -51,10 +55,14 @@ public class MiniCallbackController {
         // 设置响应内容类型为HTML
         response.setContentType("text/html; charset=utf-8");
 
+        String idNoCipher = idCardCipherService.storedToCipherForResponse(idCard);
+        String idNoDisplay = idCardCipherService.idNoDisplayFromStored(idCard);
+
         // 创建 Thymeleaf 上下文，设置变量
         Context context = new Context();
         context.setVariable("status", status);
-        context.setVariable("idNo", idCard);
+        context.setVariable("idNoCipher", idNoCipher);
+        context.setVariable("idNoDisplay", idNoDisplay);
         context.setVariable("verifyToken", verifyToken);
 
         // 使用 Thymeleaf 渲染模板
