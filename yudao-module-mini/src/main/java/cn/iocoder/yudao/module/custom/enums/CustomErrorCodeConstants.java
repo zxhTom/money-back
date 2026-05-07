@@ -18,4 +18,10 @@ public interface CustomErrorCodeConstants {
     /** 时间窗口不存在 */
     ErrorCode TIME_WINDOW_NOT_EXISTS = new ErrorCode(10005, "时间窗口不存在");
 
+    /** 设备模块开放配置不存在 */
+    ErrorCode DEVICE_MODULE_ACCESS_NOT_EXISTS = new ErrorCode(10006, "设备模块开放配置不存在");
+
+    /** 同一模块名与设备 ID 组合已被其它记录占用 */
+    ErrorCode DEVICE_MODULE_ACCESS_MODULE_DEVICE_DUPLICATE = new ErrorCode(10007, "模块与设备组合已存在");
+
 }
