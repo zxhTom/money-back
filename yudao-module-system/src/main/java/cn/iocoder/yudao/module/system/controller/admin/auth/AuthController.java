@@ -69,6 +69,14 @@ public class AuthController {
         return success(authService.login(reqVO));
     }
 
+    @GetMapping("/check-username-conflict")
+    @PermitAll
+    @Operation(summary = "检查用户名是否存在重名（用于登录前消歧）")
+    @Parameter(name = "username", description = "用户名", required = true)
+    public CommonResult<Boolean> checkUsernameConflict(@RequestParam("username") String username) {
+        return success(userService.getUserListByUsername(username).size() > 1);
+    }
+
     @PostMapping("/logout")
     @PermitAll
     @Operation(summary = "登出系统")

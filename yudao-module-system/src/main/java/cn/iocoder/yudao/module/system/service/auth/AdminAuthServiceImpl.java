@@ -158,11 +158,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
             return null;
         }
         List<AdminUserDO> byUsername = userService.getUserListByUsername(identifier);
-        if (byUsername.size() == 1) {
+        if (!byUsername.isEmpty()) {
             return byUsername.get(0);
-        }
-        if (byUsername.size() > 1) {
-            throw exception(AUTH_LOGIN_USERNAME_CONFLICT);
         }
         List<AdminUserDO> byIdNo = userService.getUserByIdNo(identifier);
         if (byIdNo != null && !byIdNo.isEmpty()) {
