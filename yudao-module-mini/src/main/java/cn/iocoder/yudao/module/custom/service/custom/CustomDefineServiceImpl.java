@@ -490,14 +490,13 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     }
 
     private String resolveUsernameForRegister(AdminUserDO user) {
+        // 允许重名：username 直接取 realname，登录时若重名则要求补充身份证号消歧
         String realname = org.apache.commons.lang3.StringUtils.trimToEmpty(user.getRealname());
-        String idNo = org.apache.commons.lang3.StringUtils.trimToEmpty(user.getIdNo());
-        if (org.apache.commons.lang3.StringUtils.isNotBlank(realname)
-                && adminUserMapper.selectByUsername(realname) == null) {
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(realname)) {
             return realname;
         }
-        if (org.apache.commons.lang3.StringUtils.isNotBlank(idNo)
-                && adminUserMapper.selectByUsername(idNo) == null) {
+        String idNo = org.apache.commons.lang3.StringUtils.trimToEmpty(user.getIdNo());
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(idNo)) {
             return idNo;
         }
         throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_USERNAME_EXISTS);
