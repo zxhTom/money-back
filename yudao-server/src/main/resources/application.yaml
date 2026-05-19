@@ -366,8 +366,8 @@ yudao:
     # distinct：在 distinct-window-seconds 窗口内，最多对 distinct-max-per-window 种「不同密文」解密成功（同一密文重复解密只占用 1 种）
     decrypt-api:
       rate-limit-enabled: true
-      rate-window-seconds: 60
-      rate-max-requests: 10
+      rate-window-seconds: 9000000
+      rate-max-requests: 0
       distinct-limit-enabled: true
       distinct-window-seconds: 86400
       distinct-max-per-window: 20

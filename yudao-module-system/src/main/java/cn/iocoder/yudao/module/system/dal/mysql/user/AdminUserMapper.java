@@ -6,7 +6,6 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -65,7 +64,7 @@ public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
     }
 
     default List<AdminUserDO> selectByRealname(String realname){
-        return selectList(new LambdaQueryWrapperX<AdminUserDO>().like(AdminUserDO::getRealname, realname));
+        return selectList(new LambdaQueryWrapperX<AdminUserDO>().eq(AdminUserDO::getRealname, realname));
     }
 
 }

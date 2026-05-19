@@ -43,7 +43,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import javax.validation.ConstraintViolationException;
-import java.sql.Wrapper;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -196,7 +195,6 @@ public class AdminUserServiceImpl implements AdminUserService {
         validateUserExists(id);
         validateEmailUnique(id, reqVO.getEmail());
         validateMobileUnique(id, reqVO.getMobile());
-        validateRealnameUnique(id, reqVO.getRealname());
 
         String idNoPlain = null;
         if (StrUtil.isNotBlank(reqVO.getIdNo())) {
@@ -530,29 +528,6 @@ public class AdminUserServiceImpl implements AdminUserService {
         }
         if (!user.getId().equals(id)) {
             throw exception(USER_ID_NO_EXISTS);
-        }
-    }
-
-    /**
-     * 校验真实姓名唯一（仅未删除的用户）
-     *
-     * @param id       当前用户 ID，可为空（创建时）
-     * @param realname 真实姓名
-     */
-    @VisibleForTesting
-    void validateRealnameUnique(Long id, String realname) {
-        if (StrUtil.isBlank(realname)) {
-            return;
-        }
-        AdminUserDO user = userMapper.selectByRealnameEqual(realname);
-        if (user == null) {
-            return;
-        }
-        if (id == null) {
-            throw exception(USER_REALNAME_EXISTS);
-        }
-        if (!user.getId().equals(id)) {
-            throw exception(USER_REALNAME_EXISTS);
         }
     }
 

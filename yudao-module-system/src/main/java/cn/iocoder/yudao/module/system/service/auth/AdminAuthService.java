@@ -24,6 +24,16 @@ public interface AdminAuthService {
     AdminUserDO authenticate(String username, String password);
 
     /**
+     * 验证账号 + 密码；姓名重名时可传 idNo 与 username（姓名）组合定位用户
+     *
+     * @param username 账号 / 姓名 / 身份证号
+     * @param password 密码
+     * @param idNo     可选身份证号（与姓名组合登录）
+     * @return 用户
+     */
+    AdminUserDO authenticate(String username, String password, String idNo);
+
+    /**
      * 账号登录
      *
      * @param reqVO 登录信息

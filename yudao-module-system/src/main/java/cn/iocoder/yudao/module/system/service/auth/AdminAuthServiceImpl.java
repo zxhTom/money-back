@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.service.auth;
 
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.annotation.Resource;
 import javax.validation.Validator;
 import java.util.Objects;
+import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP;
@@ -82,23 +84,76 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     @Override
     public AdminUserDO authenticate(String username, String password) {
+        return authenticate(username, password, null);
+    }
+
+    @Override
+    public AdminUserDO authenticate(String username, String password, String idNo) {
         final LoginLogTypeEnum logTypeEnum = LoginLogTypeEnum.LOGIN_USERNAME;
-        // 校验账号是否存在
-        AdminUserDO user = userService.getUserByUsername(username);
+        String identifier = StrUtil.trim(username);
+        // 兼容旧账号：优先按 username 登录；若未命中再按身份证号/真实姓名解析
+        AdminUserDO user = resolveLoginUser(identifier, idNo);
         if (user == null) {
-            createLoginLog(null, username, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
+            createLoginLog(null, identifier, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
             throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
         }
         if (!userService.isPasswordMatch(password, user.getPassword())) {
-            createLoginLog(user.getId(), username, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
+            createLoginLog(user.getId(), identifier, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
             throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
         }
         // 校验是否禁用
         if (CommonStatusEnum.isDisable(user.getStatus())) {
-            createLoginLog(user.getId(), username, logTypeEnum, LoginResultEnum.USER_DISABLED);
+            createLoginLog(user.getId(), identifier, logTypeEnum, LoginResultEnum.USER_DISABLED);
             throw exception(AUTH_LOGIN_USER_DISABLED);
         }
         return user;
+    }
+
+    private AdminUserDO resolveLoginUser(String identifier, String idNo) {
+        if (StrUtil.isNotBlank(idNo)) {
+            return resolveLoginUserByRealnameAndIdNo(identifier, idNo);
+        }
+        return resolveLoginUser(identifier);
+    }
+
+    /**
+     * 姓名 + 身份证号组合登录（重名场景）
+     */
+    private AdminUserDO resolveLoginUserByRealnameAndIdNo(String identifier, String idNo) {
+        String plain = idCardCipherService.resolveToPlain(idNo);
+        List<AdminUserDO> users = userService.getUserByIdNo(plain);
+        if (users == null || users.isEmpty()) {
+            return null;
+        }
+        AdminUserDO user = users.get(0);
+        String inputRealname = StrUtil.trim(identifier);
+        String dbRealname = user.getRealname() != null ? user.getRealname().trim() : "";
+        if (!inputRealname.equals(dbRealname)) {
+            throw exception(USER_IDNO_REALNAME_MISMATCH);
+        }
+        return user;
+    }
+
+    private AdminUserDO resolveLoginUser(String identifier) {
+        if (StrUtil.isBlank(identifier)) {
+            return null;
+        }
+        AdminUserDO byUsername = userService.getUserByUsername(identifier);
+        if (byUsername != null) {
+            return byUsername;
+        }
+        List<AdminUserDO> byIdNo = userService.getUserByIdNo(identifier);
+        if (byIdNo != null && !byIdNo.isEmpty()) {
+            return byIdNo.get(0);
+        }
+        List<AdminUserDO> byRealname = userService.getUserListByRealname(identifier);
+        if (byRealname == null || byRealname.isEmpty()) {
+            return null;
+        }
+        if (byRealname.size() > 1) {
+            throw exception(AUTH_LOGIN_REALNAME_CONFLICT);
+        }
+        return byRealname.get(0);
     }
 
     @Override
@@ -108,7 +163,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         validateCaptcha(reqVO);
 
         // 使用账号密码，进行登录
-        AdminUserDO user = authenticate(reqVO.getUsername(), reqVO.getPassword());
+        AdminUserDO user = authenticate(reqVO.getUsername(), reqVO.getPassword(), reqVO.getIdNo());
 
         // 如果 socialType 非空，说明需要绑定社交用户
         if (reqVO.getSocialType() != null) {

@@ -353,7 +353,7 @@ public class CustomDefineController {
 
     @PostMapping("/id-card/decrypt")
     @Operation(summary = "身份证密文解密（按用户限流：短时间调用次数 + 周期内不同证件种数，见 yudao.id-card.decrypt-api）")
-    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    @PreAuthorize("@ss.hasPermission('custom:contract:decypt')")
     public CommonResult<IdCardDecryptRespVO> decryptIdCard(@Valid @RequestBody IdCardDecryptReqVO reqVO) {
         Long userId = getLoginUserId();
         String cipher = reqVO.getCipher().trim();

@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.system.service.logger.LoginLogService;
 import cn.iocoder.yudao.module.system.service.member.MemberService;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
 import cn.iocoder.yudao.module.system.service.social.SocialUserService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import com.anji.captcha.model.common.ResponseModel;
 import com.anji.captcha.service.CaptchaService;
@@ -29,6 +30,8 @@ import org.springframework.context.annotation.Import;
 import javax.annotation.Resource;
 import javax.validation.Validation;
 import javax.validation.Validator;
+import java.util.Arrays;
+import java.util.Collections;
 
 import static cn.hutool.core.util.RandomUtil.randomEle;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertPojoEquals;
@@ -60,6 +63,8 @@ public class AdminAuthServiceImplTest extends BaseDbUnitTest {
     private OAuth2TokenService oauth2TokenService;
     @MockBean
     private MemberService memberService;
+    @MockBean
+    private IdCardCipherService idCardCipherService;
     @MockBean
     private Validator validator;
 
@@ -145,6 +150,49 @@ public class AdminAuthServiceImplTest extends BaseDbUnitTest {
                         && o.getResult().equals(LoginResultEnum.USER_DISABLED.getResult())
                         && o.getUserId().equals(user.getId()))
         );
+    }
+
+    @Test
+    public void testAuthenticate_realnameConflict_noIdNo() {
+        String realname = "张三";
+        String password = randomString();
+        AdminUserDO user1 = randomPojo(AdminUserDO.class, o -> o.setRealname(realname));
+        AdminUserDO user2 = randomPojo(AdminUserDO.class, o -> o.setRealname(realname));
+        when(userService.getUserByUsername(eq(realname))).thenReturn(null);
+        when(userService.getUserByIdNo(eq(realname))).thenReturn(Collections.emptyList());
+        when(userService.getUserListByRealname(eq(realname))).thenReturn(Arrays.asList(user1, user2));
+
+        assertServiceException(() -> authService.authenticate(realname, password),
+                AUTH_LOGIN_REALNAME_CONFLICT);
+    }
+
+    @Test
+    public void testAuthenticate_realnameAndIdNo_success() {
+        String realname = "张三";
+        String idNo = "110101199001011234";
+        String password = randomString();
+        AdminUserDO user = randomPojo(AdminUserDO.class, o -> o.setRealname(realname)
+                .setPassword(password).setStatus(CommonStatusEnum.ENABLE.getStatus()));
+        when(idCardCipherService.resolveToPlain(eq(idNo))).thenReturn(idNo);
+        when(userService.getUserByIdNo(eq(idNo))).thenReturn(Collections.singletonList(user));
+        when(userService.isPasswordMatch(eq(password), eq(user.getPassword()))).thenReturn(true);
+
+        AdminUserDO loginUser = authService.authenticate(realname, password, idNo);
+        assertPojoEquals(user, loginUser);
+    }
+
+    @Test
+    public void testAuthenticate_realnameAndIdNo_mismatch() {
+        String realname = "张三";
+        String idNo = "110101199001011234";
+        String password = randomString();
+        AdminUserDO user = randomPojo(AdminUserDO.class, o -> o.setRealname("李四")
+                .setPassword(password).setStatus(CommonStatusEnum.ENABLE.getStatus()));
+        when(idCardCipherService.resolveToPlain(eq(idNo))).thenReturn(idNo);
+        when(userService.getUserByIdNo(eq(idNo))).thenReturn(Collections.singletonList(user));
+
+        assertServiceException(() -> authService.authenticate(realname, password, idNo),
+                USER_IDNO_REALNAME_MISMATCH);
     }
 
     @Test

@@ -35,7 +35,7 @@ public interface CustomDefineMapper {
 
     Integer updateVerify(@Param("idCard") String idCard, @Param("verified") int verified);
 
-    String delete24HourContract(@Param("realname") String realname);
+    String delete24HourContract(@Param("idNo") String idNo);
 
     String selectOffcialOpenIdByUserId(@Param("id") Long id);
 

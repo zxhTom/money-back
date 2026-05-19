@@ -5,13 +5,11 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
-import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
-import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.*;
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.WechatLoginController;
@@ -244,12 +242,11 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Boolean checkUserInfo(UserReqVO userReqVO) {
-        List<AdminUserDO> adminUserDO = adminUserService.getUserListByRealname(userReqVO.getRealname());
-        if (CollectionUtil.isNotEmpty(adminUserDO)) {
-            AdminUserDO dataAdminUserDO = adminUserDO.get(0);
-            return idCardCipherService.sameIdCard(userReqVO.getIdNo(), dataAdminUserDO.getIdNo());
+        List<AdminUserDO> users = adminUserService.getUserListByRealname(userReqVO.getRealname());
+        if (CollectionUtil.isEmpty(users)) {
+            return false;
         }
-        return false;
+        return users.stream().anyMatch(user -> idCardCipherService.sameIdCard(userReqVO.getIdNo(), user.getIdNo()));
     }
 
     @Override
@@ -445,18 +442,15 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             user.setIdNo(idCardCipherService.normalizeRequestToCipher(user.getIdNo()));
         }
 
-        // 先做不依赖最终 username 的校验：手机号、身份证号、真实姓名唯一
+        // 先做不依赖最终 username 的校验：手机号、身份证号
         validateRegisterUserUnique(user);
 
         user.setId(System.currentTimeMillis());
         if (org.apache.commons.lang3.StringUtils.isEmpty(user.getNickname())) {
             user.setNickname(MD5Util.md5(user.getUsername()));
         }
-        if (StringUtils.isEmpty(user.getUsername())) {
-            user.setUsername(user.getNickname());
-        }
-        // 再校验最终落库的 username 唯一
-        validateUsernameUnique(user.getUsername());
+        String resolvedUsername = resolveUsernameForRegister(user);
+        user.setUsername(resolvedUsername);
         // password 与 payPassword：两都有值则各存各的，只有一个有值则另一个取该值，都为空则用默认 123456
         normalizePasswordAndPayPassword(user);
 //            user.setUserCode(openId.hashCode());
@@ -476,7 +470,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     }
 
     /**
-     * 注册前校验：mobile、idNo、realname 在 deleted = 0 的用户中唯一（username 在落库前单独校验）
+     * 注册前校验：mobile、idNo 在 deleted = 0 的用户中唯一（realname 允许重名）
      */
     private void validateRegisterUserUnique(AdminUserDO user) {
         // 校验手机号唯一
@@ -493,24 +487,20 @@ public class CustomDefineServiceImpl implements CustomDefineService{
                 throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_ID_NO_EXISTS);
             }
         }
-        // 校验真实姓名唯一
-        if (org.apache.commons.lang3.StringUtils.isNotBlank(user.getRealname())) {
-            AdminUserDO realnameUser = adminUserMapper.selectByRealnameEqual(user.getRealname());
-            if (realnameUser != null) {
-                throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_REALNAME_EXISTS);
-            }
-        }
     }
 
-    /** 校验用户名在未删除用户中唯一，与落库的 username 一致时调用 */
-    private void validateUsernameUnique(String username) {
-        if (org.apache.commons.lang3.StringUtils.isBlank(username)) {
-            return;
+    private String resolveUsernameForRegister(AdminUserDO user) {
+        String realname = org.apache.commons.lang3.StringUtils.trimToEmpty(user.getRealname());
+        String idNo = org.apache.commons.lang3.StringUtils.trimToEmpty(user.getIdNo());
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(realname)
+                && adminUserMapper.selectByUsername(realname) == null) {
+            return realname;
         }
-        AdminUserDO existUser = adminUserMapper.selectByUsername(username);
-        if (existUser != null) {
-            throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_USERNAME_EXISTS);
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(idNo)
+                && adminUserMapper.selectByUsername(idNo) == null) {
+            return idNo;
         }
+        throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_USERNAME_EXISTS);
     }
 
     private static final String DEFAULT_PASSWORD = "123456";
@@ -561,7 +551,10 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     public String delete24HourContract() {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         AdminUserDO user = adminUserService.getUser(loginUser.getId());
-        return customDefineMapper.delete24HourContract(user.getRealname());
+        if (StrUtil.isBlank(user.getIdNo())) {
+            return "0";
+        }
+        return customDefineMapper.delete24HourContract(user.getIdNo());
     }
 
     @Override

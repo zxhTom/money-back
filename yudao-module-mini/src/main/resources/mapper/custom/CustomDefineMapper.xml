@@ -21,7 +21,7 @@
     <delete id="delete24HourContract">
         update custom_contract
         set deleted =1
-        where (indebted_name =#{realname} or creditor_name =#{realname} )
+        where (indebted_id =#{idNo} or creditor_id =#{idNo})
         and update_time >= DATE_SUB(NOW(), INTERVAL 24 HOUR);
     </delete>
     <select id="staticsContractByTimePeriod"
