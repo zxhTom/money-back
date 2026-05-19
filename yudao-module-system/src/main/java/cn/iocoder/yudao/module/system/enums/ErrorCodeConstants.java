@@ -17,6 +17,7 @@ public interface ErrorCodeConstants {
     ErrorCode AUTH_MOBILE_NOT_EXISTS = new ErrorCode(1_002_000_007, "手机号不存在");
     ErrorCode AUTH_REGISTER_CAPTCHA_CODE_ERROR = new ErrorCode(1_002_000_008, "验证码不正确，原因：{}");
     ErrorCode AUTH_LOGIN_REALNAME_CONFLICT = new ErrorCode(1_002_000_009, "姓名存在重名，请补充身份证号登录");
+    ErrorCode AUTH_LOGIN_USERNAME_CONFLICT = new ErrorCode(1_002_000_010, "用户名存在重名，请补充身份证号登录");
 
     // ========== 菜单模块 1-002-001-000 ==========
     ErrorCode MENU_NAME_DUPLICATE = new ErrorCode(1_002_001_000, "已经存在该名字的菜单");

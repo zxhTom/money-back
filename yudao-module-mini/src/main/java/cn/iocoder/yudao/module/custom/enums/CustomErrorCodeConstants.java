@@ -24,4 +24,7 @@ public interface CustomErrorCodeConstants {
     /** 同一模块名与设备 ID 组合已被其它记录占用 */
     ErrorCode DEVICE_MODULE_ACCESS_MODULE_DEVICE_DUPLICATE = new ErrorCode(10007, "模块与设备组合已存在");
 
+    /** 欠款人与债权人为同一人（身份证号相同） */
+    ErrorCode CONTRACT_PARTY_SAME = new ErrorCode(10008, "欠款人与债权人不能为同一人，请核对双方身份证号");
+
 }

@@ -17,6 +17,10 @@ public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
         return selectOne(AdminUserDO::getUsername, username);
     }
 
+    default List<AdminUserDO> selectListByUsername(String username) {
+        return selectList(AdminUserDO::getUsername, username);
+    }
+
     default AdminUserDO selectByEmail(String email) {
         return selectOne(AdminUserDO::getEmail, email);
     }

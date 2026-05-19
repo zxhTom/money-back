@@ -331,6 +331,14 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    public List<AdminUserDO> getUserListByUsername(String username) {
+        if (StrUtil.isBlank(username)) {
+            return Collections.emptyList();
+        }
+        return userMapper.selectListByUsername(username);
+    }
+
+    @Override
     public AdminUserDO getUserByMobile(String mobile) {
         return userMapper.selectByMobile(mobile);
     }

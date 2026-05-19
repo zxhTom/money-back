@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS;
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_PARTY_SAME;
 import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.WECHAT_TEMPLATE_SEND_FAIL;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSWORD_FAILED;
 
@@ -92,6 +93,11 @@ public class ContractServiceImpl implements ContractService {
         }
         if (StrUtil.isNotBlank(contract.getCreditorId())) {
             contract.setCreditorId(idCardCipherService.normalizeRequestToCipher(contract.getCreditorId()));
+        }
+        // 欠款人与债权人不能为同一人（归一明文后比对）
+        if (StrUtil.isNotBlank(contract.getIndebtedId()) && StrUtil.isNotBlank(contract.getCreditorId())
+                && contract.getIndebtedId().equalsIgnoreCase(contract.getCreditorId())) {
+            throw exception(CONTRACT_PARTY_SAME);
         }
         // 设置部门ID，用于数据权限控制
         Long deptId = SecurityFrameworkUtils.getLoginUserDeptId();

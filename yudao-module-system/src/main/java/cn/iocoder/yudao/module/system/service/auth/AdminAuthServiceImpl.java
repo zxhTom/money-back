@@ -111,13 +111,32 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     private AdminUserDO resolveLoginUser(String identifier, String idNo) {
         if (StrUtil.isNotBlank(idNo)) {
+            // username + idNo：先尝试 username 重名消歧，再兜底 realname+idNo
+            List<AdminUserDO> byUsername = userService.getUserListByUsername(identifier);
+            if (!byUsername.isEmpty()) {
+                return resolveLoginUserByUsernameAndIdNo(byUsername, idNo);
+            }
             return resolveLoginUserByRealnameAndIdNo(identifier, idNo);
         }
         return resolveLoginUser(identifier);
     }
 
     /**
-     * 姓名 + 身份证号组合登录（重名场景）
+     * username 重名时：从候选列表中按身份证号精确定位
+     */
+    private AdminUserDO resolveLoginUserByUsernameAndIdNo(List<AdminUserDO> candidates, String idNo) {
+        String plain = idCardCipherService.resolveToPlain(idNo).toUpperCase();
+        for (AdminUserDO u : candidates) {
+            String storedIdNo = u.getIdNo() != null ? u.getIdNo().trim().toUpperCase() : "";
+            if (plain.equals(storedIdNo)) {
+                return u;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 姓名 + 身份证号组合登录（realname 重名场景）
      */
     private AdminUserDO resolveLoginUserByRealnameAndIdNo(String identifier, String idNo) {
         String plain = idCardCipherService.resolveToPlain(idNo);
@@ -138,9 +157,12 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         if (StrUtil.isBlank(identifier)) {
             return null;
         }
-        AdminUserDO byUsername = userService.getUserByUsername(identifier);
-        if (byUsername != null) {
-            return byUsername;
+        List<AdminUserDO> byUsername = userService.getUserListByUsername(identifier);
+        if (byUsername.size() == 1) {
+            return byUsername.get(0);
+        }
+        if (byUsername.size() > 1) {
+            throw exception(AUTH_LOGIN_USERNAME_CONFLICT);
         }
         List<AdminUserDO> byIdNo = userService.getUserByIdNo(identifier);
         if (byIdNo != null && !byIdNo.isEmpty()) {

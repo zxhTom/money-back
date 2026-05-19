@@ -118,6 +118,9 @@ public interface AdminUserService {
      */
     AdminUserDO getUserByUsername(String username);
 
+    /** 通过用户名查询所有匹配用户（支持重名场景） */
+    List<AdminUserDO> getUserListByUsername(String username);
+
     /**
      * 通过手机号获取用户
      *
