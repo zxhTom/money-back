@@ -463,20 +463,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @VisibleForTesting
     void validateUsernameUnique(Long id, String username) {
-        if (StrUtil.isBlank(username)) {
-            return;
-        }
-        AdminUserDO user = userMapper.selectByUsername(username);
-        if (user == null) {
-            return;
-        }
-        // 如果 id 为空，说明不用比较是否为相同 id 的用户
-        if (id == null) {
-            throw exception(USER_USERNAME_EXISTS);
-        }
-        if (!user.getId().equals(id)) {
-            throw exception(USER_USERNAME_EXISTS);
-        }
+        // 系统允许同名用户（username 取 realname，登录时通过身份证号消歧），不再校验唯一性
     }
 
     @VisibleForTesting

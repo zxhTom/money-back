@@ -14,7 +14,8 @@ import java.util.List;
 public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
 
     default AdminUserDO selectByUsername(String username) {
-        return selectOne(AdminUserDO::getUsername, username);
+        List<AdminUserDO> list = selectListByUsername(username);
+        return list.isEmpty() ? null : list.get(0);
     }
 
     default List<AdminUserDO> selectListByUsername(String username) {
