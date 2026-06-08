@@ -96,4 +96,14 @@ public interface AdminAuthService {
     void resetPassword(AuthResetPasswordReqVO reqVO);
 
     AuthLoginRespVO authenticateUserNameOnly(AuthLoginReqVO loginRequest);
+
+    /**
+     * 小程序账号密码登录（跳过图形验证码，适用于无法显示验证码的客户端）
+     *
+     * @param username 账号
+     * @param password 密码
+     * @param idNo     可选身份证号（姓名重名时辅助定位）
+     * @return 登录结果
+     */
+    AuthLoginRespVO loginForMiniprogram(String username, String password, String idNo);
 }

@@ -154,6 +154,18 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeAllTokensByUserId(Long userId, Integer userType) {
+        List<OAuth2AccessTokenDO> tokens = oauth2AccessTokenMapper.selectListByUserId(userId, userType);
+        if (CollUtil.isEmpty(tokens)) {
+            return;
+        }
+        oauth2AccessTokenMapper.deleteByIds(convertSet(tokens, OAuth2AccessTokenDO::getId));
+        oauth2RefreshTokenMapper.deleteByUserId(userId, userType);
+        oauth2AccessTokenRedisDAO.deleteList(convertSet(tokens, OAuth2AccessTokenDO::getAccessToken));
+    }
+
+    @Override
     public PageResult<OAuth2AccessTokenDO> getAccessTokenPage(OAuth2AccessTokenPageReqVO reqVO) {
         return oauth2AccessTokenMapper.selectPage(reqVO);
     }

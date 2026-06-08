@@ -15,6 +15,8 @@ import cn.iocoder.yudao.module.system.controller.admin.auth.vo.AuthLoginRespVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.auth.AdminAuthService;
+import cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter;
+import cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.ClientIpRateLimiterKeyResolver;
 import com.alibaba.fastjson.JSON;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -131,9 +133,18 @@ public class WechatLoginController {
         return ApiResponse.success(wechatLoginResponse);
     }
 
+    @PostMapping("/password-login")
+    @RateLimiter(time = 60, count = 2, keyResolver = ClientIpRateLimiterKeyResolver.class,
+            message = "登录请求过于频繁，请1分钟后再试")
+    public ApiResponse passwordLogin(@RequestBody MiniPasswordLoginRequest request) {
+        AuthLoginRespVO loginResponse = authService.loginForMiniprogram(
+                request.getUsername(), request.getPassword(), request.getIdNo());
+        return ApiResponse.success(loginResponse);
+    }
+
     /**
      * 查询小程序线上版本号
-     * 
+     *
      * @return 小程序版本信息
      */
     @GetMapping("/version")
@@ -153,6 +164,15 @@ public class WechatLoginController {
     private String generateToken(AdminUserDO user) {
         // 生成一个随机的、安全的 Token
         return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    @Data
+    public static class MiniPasswordLoginRequest {
+        private String username;
+        private String password;
+        private String idNo;
+        private String appId;
+        private String appVersion;
     }
 
     // 内部类：接收前端请求

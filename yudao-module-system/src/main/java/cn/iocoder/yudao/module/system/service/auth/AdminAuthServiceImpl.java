@@ -390,4 +390,14 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         // 创建 Token 令牌，记录登录日志
         return createTokenAfterLoginSuccess(user.getId(), loginRequest.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
     }
+
+    @Override
+    @DataPermission(enable = false)
+    public AuthLoginRespVO loginForMiniprogram(String username, String password, String idNo) {
+        AdminUserDO user = authenticate(username, password, idNo);
+        AuthLoginRespVO resp = createTokenAfterLoginSuccess(user.getId(), username, LoginLogTypeEnum.LOGIN_USERNAME);
+        idCardCipherService.exposeCipherIdNoOnly(user);
+        resp.setUser(user);
+        return resp;
+    }
 }

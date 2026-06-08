@@ -70,6 +70,14 @@ public interface OAuth2TokenService {
     OAuth2AccessTokenDO removeAccessToken(String accessToken);
 
     /**
+     * 删除指定用户的所有访问令牌和刷新令牌（Redis + DB），用于密码修改后强制下线
+     *
+     * @param userId   用户编号
+     * @param userType 用户类型
+     */
+    void removeAllTokensByUserId(Long userId, Integer userType);
+
+    /**
      * 获得访问令牌分页
      *
      * @param reqVO 请求

@@ -19,4 +19,11 @@ public interface OAuth2RefreshTokenMapper extends BaseMapperX<OAuth2RefreshToken
         return selectOne(OAuth2RefreshTokenDO::getRefreshToken, refreshToken);
     }
 
+    @TenantIgnore
+    default void deleteByUserId(Long userId, Integer userType) {
+        delete(new LambdaQueryWrapperX<OAuth2RefreshTokenDO>()
+                .eq(OAuth2RefreshTokenDO::getUserId, userId)
+                .eq(OAuth2RefreshTokenDO::getUserType, userType));
+    }
+
 }

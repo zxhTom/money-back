@@ -5,6 +5,8 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
@@ -87,6 +89,10 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Resource
     private IdCardCipherService idCardCipherService;
+
+    @Resource
+    @Lazy // 避免循环依赖
+    private OAuth2TokenService oauth2TokenService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -251,6 +257,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         AdminUserDO updateObj = new AdminUserDO().setId(id);
         updateObj.setPassword(encodePassword(reqVO.getNewPassword())); // 加密密码
         userMapper.updateById(updateObj);
+        // 密码变更后强制下线
+        oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Override
@@ -270,6 +278,9 @@ public class AdminUserServiceImpl implements AdminUserService {
         // 3. 记录操作日志上下文
         LogRecordContext.putVariable("user", user);
         LogRecordContext.putVariable("newPassword", updateObj.getPassword());
+
+        // 4. 密码变更后强制下线
+        oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Override
@@ -280,6 +291,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         updateObj.setPassword(encoded);
         updateObj.setPayPassword(encoded);
         userMapper.updateById(updateObj);
+        // 密码变更后强制下线
+        oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Override
