@@ -9,6 +9,7 @@ import cn.iocoder.yudao.framework.web.core.handler.GlobalResponseBodyHandler;
 import cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.core.env.Environment;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.web.client.RestTemplateAutoConfiguration;
@@ -34,6 +35,8 @@ public class YudaoWebAutoConfiguration implements WebMvcConfigurer {
 
     @Resource
     private WebProperties webProperties;
+    @Resource
+    private Environment environment;
     /**
      * 应用名
      */
@@ -80,18 +83,28 @@ public class YudaoWebAutoConfiguration implements WebMvcConfigurer {
 
     /**
      * 创建 CorsFilter Bean，解决跨域问题
+     * 生产环境建议在 application-prod.yaml 中配置 yudao.web.cors.allowed-origins 白名单
      */
     @Bean
     public FilterRegistrationBean<CorsFilter> corsFilterBean() {
-        // 创建 CorsConfiguration 对象
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        config.addAllowedOriginPattern("*"); // 设置访问源地址
-        config.addAllowedHeader("*"); // 设置访问源请求头
-        config.addAllowedMethod("*"); // 设置访问源请求方法
-        // 创建 UrlBasedCorsConfigurationSource 对象
+        // 从配置读取允许的来源白名单，未配置时开发环境回退到通配（但不能与 allowCredentials=true 同时使用通配）
+        String allowedOrigins = environment.getProperty("yudao.web.cors.allowed-origins", "");
+        if (allowedOrigins.isEmpty()) {
+            // 未配置白名单：仅允许通配但关闭 credentials，适用于开发环境
+            config.setAllowCredentials(false);
+            config.addAllowedOriginPattern("*");
+        } else {
+            // 生产环境：按配置白名单，保留 credentials
+            for (String origin : allowedOrigins.split(",")) {
+                config.addAllowedOrigin(origin.trim());
+            }
+        }
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config); // 对接口配置跨域设置
+        source.registerCorsConfiguration("/**", config);
         return createFilterBean(new CorsFilter(source), WebFilterOrderEnum.CORS_FILTER);
     }
 

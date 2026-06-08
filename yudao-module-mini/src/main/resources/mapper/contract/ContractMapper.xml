@@ -123,8 +123,8 @@
                         <when test="sortField.field == 'level'">level ${sortField.direction}</when>
                         <when test="sortField.field == 'priority'">priority ${sortField.direction}</when>
 
-                        <!-- 默认使用传入的字段名（小写转换） -->
-                        <otherwise>${@org.apache.commons.lang3.StringUtils@lowerCase(sortField.field)} ${sortField.direction}</otherwise>
+                        <!-- 未知字段忽略，使用默认排序，防止 SQL 注入 -->
+                        <otherwise>create_time DESC</otherwise>
                     </choose>
                 </foreach>
             </when>

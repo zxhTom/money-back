@@ -47,17 +47,17 @@ spring:
       primary: master
       datasource:
         master:
-          url: jdbc:mysql://mymysql:3306/contract?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          url: jdbc:mysql://8.130.191.247:3306/contract?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
           username: root
           password: Qq_hello_021615996779085
         slave:
           lazy: true
-          url: jdbc:mysql://mymysql:3306/contract?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          url: jdbc:mysql://8.130.191.247:3306/contract?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
           username: root
           password: Qq_hello_021615996779085
 
   redis:
-    host: myredis
+    host: 8.130.191.247
     port: 6379
     database: 0
     password: Qq_hello_021615996779085

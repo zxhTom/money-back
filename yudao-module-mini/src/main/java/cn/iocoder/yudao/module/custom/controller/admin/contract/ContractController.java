@@ -7,6 +7,8 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
+import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditLog;
+import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditOperationType;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.service.contract.ConfirmPdfService;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
@@ -50,6 +52,9 @@ public class ContractController {
     @PostMapping("/create")
     @Operation(summary = "创建合同")
     @PreAuthorize("@ss.hasPermission('custom:contract:create')")
+    @AuditLog(module = "合同管理", type = AuditOperationType.CREATE, entityType = "contract",
+            operation = "创建合同-{{#createReqVO.indebtedName}}->{{#createReqVO.creditorName}}",
+            entityIdExpression = "#result.data")
     public CommonResult<Long> createContract(@Valid @RequestBody ContractSaveReqVO createReqVO) {
         return success(contractService.createContract(createReqVO));
     }
@@ -57,6 +62,8 @@ public class ContractController {
     @PutMapping("/update")
     @Operation(summary = "更新合同")
     @PreAuthorize("@ss.hasPermission('custom:contract:update')")
+    @AuditLog(module = "合同管理", type = AuditOperationType.UPDATE, entityType = "contract",
+            operation = "更新合同ID={{#updateReqVO.id}}", entityIdExpression = "#updateReqVO.id")
     public CommonResult<Boolean> updateContract(@Valid @RequestBody ContractSaveReqVO updateReqVO) {
         contractService.updateContract(updateReqVO);
         return success(true);
@@ -66,6 +73,8 @@ public class ContractController {
     @Operation(summary = "删除合同")
     @Parameter(name = "id", description = "编号", required = true)
     @PreAuthorize("@ss.hasPermission('custom:contract:delete')")
+    @AuditLog(module = "合同管理", type = AuditOperationType.DELETE, entityType = "contract",
+            operation = "删除合同ID={{#id}}", entityIdExpression = "#id")
     public CommonResult<Boolean> deleteContract(@RequestParam("id") Long id) {
         contractService.deleteContract(id);
         return success(true);
@@ -74,7 +83,9 @@ public class ContractController {
     @DeleteMapping("/delete-list")
     @Parameter(name = "ids", description = "编号", required = true)
     @Operation(summary = "批量删除合同")
-                @PreAuthorize("@ss.hasPermission('custom:contract:delete')")
+    @PreAuthorize("@ss.hasPermission('custom:contract:delete')")
+    @AuditLog(module = "合同管理", type = AuditOperationType.DELETE, entityType = "contract",
+            operation = "批量删除合同IDs={{#ids}}")
     public CommonResult<Boolean> deleteContractList(@RequestParam("ids") List<Long> ids) {
         contractService.deleteContractListByIds(ids);
         return success(true);
@@ -84,6 +95,8 @@ public class ContractController {
     @Operation(summary = "获得合同")
     @Parameter(name = "id", description = "编号", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    @AuditLog(module = "合同管理", type = AuditOperationType.READ, entityType = "contract",
+            operation = "查看合同详情ID={{#id}}", entityIdExpression = "#id")
     public CommonResult<ContractRespVO> getContract(@RequestParam("id") Long id) {
         ContractDO contract = contractService.getContract(id);
         ContractRespVO vo = BeanUtils.toBean(contract, ContractRespVO.class);
@@ -119,6 +132,7 @@ public class ContractController {
     @Operation(summary = "导出合同 Excel")
     @PreAuthorize("@ss.hasPermission('custom:contract:export')")
     @ApiAccessLog(operateType = EXPORT)
+    @AuditLog(module = "合同管理", type = AuditOperationType.EXPORT, operation = "导出合同Excel")
     public void exportContractExcel(@Valid ContractPageReqVO pageReqVO,
               HttpServletResponse response) throws IOException {
         pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);

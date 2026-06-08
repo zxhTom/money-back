@@ -2,6 +2,10 @@ package cn.iocoder.yudao.module.custom.controller.admin.custom;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter;
+import cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.ClientIpRateLimiterKeyResolver;
+import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditLog;
+import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditOperationType;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
@@ -188,6 +192,10 @@ public class CustomDefineController {
     @PostMapping("/register")
     @Operation(summary = "注册")
     @PermitAll
+    @RateLimiter(time = 60, count = 5, keyResolver = ClientIpRateLimiterKeyResolver.class,
+            message = "注册请求过于频繁，请稍后再试")
+    @AuditLog(module = "用户管理", type = AuditOperationType.CREATE,
+            operation = "用户注册-{{#adminUserDO.username}}")
     public CommonResult<Boolean> register(@RequestBody AdminUserDO adminUserDO) {
         customDefineService.register(adminUserDO);
         return success(true);
@@ -309,7 +317,9 @@ public class CustomDefineController {
     @PostMapping("/send-email-code")
     @Operation(summary = "发送邮箱验证码")
     @Parameter(name = "email", description = "邮箱地址", required = true, example = "user@example.com")
-    @PermitAll // 允许未登录访问，用于找回密码场景
+    @PermitAll
+    @RateLimiter(time = 60, count = 3, keyResolver = ClientIpRateLimiterKeyResolver.class,
+            message = "发送验证码过于频繁，请稍后再试")
     public CommonResult<Boolean> sendEmailCode(@RequestParam("email") String email) {
         try {
             Boolean result = emailCodeService.sendCode(email);
@@ -321,31 +331,34 @@ public class CustomDefineController {
     }
 
     @PostMapping("/get-email-by-username")
-    @Operation(summary = "通过登录名查询邮箱")
-    @PermitAll // 允许未登录访问，用于找回密码场景
+    @Operation(summary = "通过登录名查询脱敏邮箱（用于找回密码提示）")
+    @PermitAll
+    @RateLimiter(time = 60, count = 5, keyResolver = ClientIpRateLimiterKeyResolver.class,
+            message = "查询过于频繁，请稍后再试")
     public CommonResult<GetEmailByUsernameRespVO> getEmailByUsername(@Valid @RequestBody GetEmailByUsernameReqVO reqVO) {
-        // 1. 根据登录名查询用户
         AdminUserDO user = userMapper.selectByUsername(reqVO.getUsername());
-        if (user == null) {
-            throw exception(USER_NOT_EXISTS);
-        }
-
-        // 2. 检查用户是否有邮箱
-        if (user.getEmail() == null || user.getEmail().trim().isEmpty()) {
-            log.warn("[getEmailByUsername][用户({})没有绑定邮箱]", reqVO.getUsername());
-            return error(400, "该用户未绑定邮箱，无法通过邮箱找回密码");
-        }
-
-        // 3. 返回邮箱（部分脱敏处理）
+        // 无论用户是否存在，均返回相同结构，防止用户枚举
         GetEmailByUsernameRespVO respVO = new GetEmailByUsernameRespVO();
-        respVO.setEmail(user.getEmail());
-        log.info("[getEmailByUsername][通过登录名({})查询邮箱成功]", reqVO.getUsername());
+        if (user == null || user.getEmail() == null || user.getEmail().trim().isEmpty()) {
+            respVO.setEmail(null);
+            return success(respVO);
+        }
+        // 脱敏：只返回 a***@domain.com 格式，不暴露完整邮箱
+        String email = user.getEmail();
+        int atIdx = email.indexOf('@');
+        String masked = atIdx > 1
+                ? email.charAt(0) + "***" + email.substring(atIdx)
+                : "***" + email.substring(Math.max(0, atIdx));
+        respVO.setEmail(masked);
         return success(respVO);
     }
 
     @PostMapping("/reset-password-by-idno")
     @Operation(summary = "通过身份证+姓名重置密码（B 方案：未绑邮箱用户可用此方式找回）")
     @PermitAll
+    @RateLimiter(time = 300, count = 5, keyResolver = ClientIpRateLimiterKeyResolver.class,
+            message = "重置密码请求过于频繁，请稍后再试")
+    @AuditLog(module = "账户安全", type = AuditOperationType.UPDATE, operation = "通过身份证重置密码")
     public CommonResult<Boolean> resetPasswordByIdNo(@Valid @RequestBody ResetPasswordByIdNoReqVO reqVO) {
         customDefineService.resetPasswordByIdNo(reqVO);
         return success(true);
@@ -382,7 +395,10 @@ public class CustomDefineController {
 
     @PutMapping("/update-password-by-email")
     @Operation(summary = "通过邮箱重置用户密码")
-    @PermitAll // 允许未登录访问，用于找回密码场景
+    @PermitAll
+    @RateLimiter(time = 300, count = 5, keyResolver = ClientIpRateLimiterKeyResolver.class,
+            message = "重置密码请求过于频繁，请稍后再试")
+    @AuditLog(module = "账户安全", type = AuditOperationType.UPDATE, operation = "通过邮箱重置密码")
     public CommonResult<Boolean> updatePasswordByEmail(@Valid @RequestBody UserUpdatePasswordByEmailReqVO reqVO) {
         // 1. 验证邮箱验证码
         Boolean verifyResult = emailCodeService.verifyCode(reqVO.getEmail(), reqVO.getCode());
