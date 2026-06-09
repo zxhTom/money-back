@@ -1,8 +1,8 @@
 package cn.iocoder.yudao.module.custom.config;
 
 import cn.iocoder.yudao.module.custom.framework.security.filter.SecurityDetectFilter;
-import cn.iocoder.yudao.module.custom.service.security.IpBlacklistService;
-import cn.iocoder.yudao.module.custom.service.security.SecurityAlertService;
+import cn.iocoder.yudao.module.system.service.monitor.IpBlacklistService;
+import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

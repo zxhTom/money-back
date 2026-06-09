@@ -1,10 +1,10 @@
-package cn.iocoder.yudao.module.custom.dal.mysql.security;
+package cn.iocoder.yudao.module.system.dal.mysql.monitor;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.SecurityAlertPageReqVO;
-import cn.iocoder.yudao.module.custom.dal.dataobject.security.SecurityAlertDO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 

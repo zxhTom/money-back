@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.custom.controller.admin.security.vo;
+package cn.iocoder.yudao.module.system.controller.admin.monitor.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

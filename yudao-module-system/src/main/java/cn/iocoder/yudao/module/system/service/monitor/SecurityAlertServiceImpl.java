@@ -1,10 +1,10 @@
-package cn.iocoder.yudao.module.custom.service.security;
+package cn.iocoder.yudao.module.system.service.monitor;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.SecurityAlertHandleReqVO;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.SecurityAlertPageReqVO;
-import cn.iocoder.yudao.module.custom.dal.dataobject.security.SecurityAlertDO;
-import cn.iocoder.yudao.module.custom.dal.mysql.security.SecurityAlertMapper;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertHandleReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
+import cn.iocoder.yudao.module.system.dal.mysql.monitor.SecurityAlertMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.extern.slf4j.Slf4j;

@@ -1,9 +1,9 @@
-package cn.iocoder.yudao.module.custom.service.security;
+package cn.iocoder.yudao.module.system.service.monitor;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.SecurityAlertHandleReqVO;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.SecurityAlertPageReqVO;
-import cn.iocoder.yudao.module.custom.dal.dataobject.security.SecurityAlertDO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertHandleReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
 
 import java.util.List;
 import java.util.Map;

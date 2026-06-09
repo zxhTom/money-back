@@ -2,8 +2,8 @@ package cn.iocoder.yudao.module.custom.framework.security.filter;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.custom.framework.audit.util.IpUtils;
-import cn.iocoder.yudao.module.custom.service.security.IpBlacklistService;
-import cn.iocoder.yudao.module.custom.service.security.SecurityAlertService;
+import cn.iocoder.yudao.module.system.service.monitor.IpBlacklistService;
+import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -53,6 +53,7 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
     private static final Set<String> BRUTE_FORCE_PATHS = new HashSet<>(Arrays.asList(
             "/system/auth/login",
             "/system/auth/sms-login",
+            "/wechat/password-login",
             "/custom/contract/dashboard/reset-password-by-idno",
             "/custom/contract/dashboard/update-password-by-email",
             "/custom/contract/dashboard/send-email-code"

@@ -1,12 +1,12 @@
 #!/bin/bash
-# 批量修改用户密码
+# 批量修改用户密码（改密后同步踢出所有在线 token）
 # 用法:
 #   ./reset_password.sh -f users.txt                   # 文件: 每行 "用户名" 或 "用户名,密码"
 #   ./reset_password.sh -f users.txt -p <新密码>       # 文件提供用户名，统一用指定密码
 #   ./reset_password.sh -u <用户名> -p <新密码>        # 单个用户
 #
 # 未指定密码时使用默认密码: $Qq15996779085
-# 依赖: mysql, python3(bcrypt)
+# 依赖: mysql, redis-cli, python3(bcrypt)
 
 # ── 配置 ──────────────────────────────────────────────────────────────────
 MYSQL_HOST="8.130.191.247"
@@ -15,11 +15,19 @@ MYSQL_DB="contract"
 MYSQL_USER="root"
 MYSQL_PASS="Qq_hello_021615996779085"
 
+REDIS_HOST="8.130.191.247"
+REDIS_PORT="6379"
+REDIS_DB="0"
+REDIS_PASS="Qq_hello_021615996779085"
+
 DEFAULT_PASSWORD='$Qq15996779085'
 # ─────────────────────────────────────────────────────────────────────────
 
-command -v mysql   >/dev/null 2>&1 || { echo "错误: 未找到 mysql 命令" >&2; exit 1; }
-command -v python3 >/dev/null 2>&1 || { echo "错误: 需要 python3 + bcrypt 模块" >&2; exit 1; }
+command -v mysql     >/dev/null 2>&1 || { echo "错误: 未找到 mysql 命令" >&2; exit 1; }
+command -v redis-cli >/dev/null 2>&1 || { echo "错误: 未找到 redis-cli 命令" >&2; exit 1; }
+command -v python3   >/dev/null 2>&1 || { echo "错误: 需要 python3 + bcrypt 模块" >&2; exit 1; }
+
+REDIS_ARGS=(-h "$REDIS_HOST" -p "$REDIS_PORT" -n "$REDIS_DB" -a "$REDIS_PASS" --no-auth-warning)
 
 MYSQL_CMD="mysql -h${MYSQL_HOST} -P${MYSQL_PORT} -u${MYSQL_USER} -p${MYSQL_PASS} --default-character-set=utf8mb4 ${MYSQL_DB}"
 
@@ -137,20 +145,34 @@ for i in "${!USERNAMES[@]}"; do
     continue
   fi
 
-  # 执行更新
+  # 更新密码
   $MYSQL_CMD -e "
     UPDATE system_users
     SET password='${hash}', update_time=NOW()
     WHERE id=${user_id} AND deleted=0;
   " 2>/dev/null
 
-  if [ $? -eq 0 ]; then
-    printf "%-20s %-10s %s\n" "$username" "成功" "id=${user_id}"
-    SUCCESS=$((SUCCESS + 1))
-  else
+  if [ $? -ne 0 ]; then
     printf "%-20s %-10s %s\n" "$username" "失败" "SQL 执行出错"
     FAILED=$((FAILED + 1))
+    continue
   fi
+
+  # 踢出所有在线 token（MySQL 软删除 + Redis 删 key）
+  tokens=$(query "SELECT access_token FROM system_oauth2_access_token WHERE user_id=${user_id} AND deleted=0;")
+  query "UPDATE system_oauth2_access_token SET deleted=1 WHERE user_id=${user_id} AND deleted=0;"
+  query "UPDATE system_oauth2_refresh_token SET deleted=1 WHERE user_id=${user_id} AND deleted=0;"
+  token_count=0
+  if [ -n "$tokens" ]; then
+    while IFS= read -r tok; do
+      [ -z "$tok" ] && continue
+      redis-cli "${REDIS_ARGS[@]}" DEL "oauth2_access_token:${tok}" >/dev/null
+      token_count=$((token_count + 1))
+    done <<< "$tokens"
+  fi
+
+  printf "%-20s %-10s %s\n" "$username" "成功" "id=${user_id}，踢出 token ${token_count} 个"
+  SUCCESS=$((SUCCESS + 1))
 done
 
 echo "────────────────────────────────────────────────"

@@ -2,7 +2,7 @@ package cn.iocoder.yudao.module.custom.framework.security.aop;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
-import cn.iocoder.yudao.module.custom.service.security.SecurityAlertService;
+import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;

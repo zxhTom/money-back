@@ -1,15 +1,17 @@
-package cn.iocoder.yudao.module.custom.service.security;
+package cn.iocoder.yudao.module.system.service.monitor;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.IpBlacklistAddReqVO;
-import cn.iocoder.yudao.module.custom.dal.dataobject.security.IpBlacklistDO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpBlacklistAddReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO;
+
+import java.time.LocalDateTime;
 
 public interface IpBlacklistService {
 
     boolean isBlacklisted(String ip);
 
-    void addToBlacklist(String ip, String reason, boolean autoAdded, java.time.LocalDateTime expireTime);
+    void addToBlacklist(String ip, String reason, boolean autoAdded, LocalDateTime expireTime);
 
     void addToBlacklist(IpBlacklistAddReqVO reqVO);
 

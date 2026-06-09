@@ -1,16 +1,16 @@
-package cn.iocoder.yudao.module.custom.controller.admin.security;
+package cn.iocoder.yudao.module.system.controller.admin.monitor;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.IpBlacklistAddReqVO;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.SecurityAlertHandleReqVO;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.SecurityAlertPageReqVO;
-import cn.iocoder.yudao.module.custom.dal.dataobject.security.IpBlacklistDO;
-import cn.iocoder.yudao.module.custom.dal.dataobject.security.SecurityAlertDO;
-import cn.iocoder.yudao.module.custom.service.security.IpBlacklistService;
-import cn.iocoder.yudao.module.custom.service.security.SecurityAlertService;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpBlacklistAddReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertHandleReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
+import cn.iocoder.yudao.module.system.service.monitor.IpBlacklistService;
+import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,14 +30,14 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RestController
 @RequestMapping("/custom/security")
 @Validated
-public class SecurityController {
+public class SecurityMonitorController {
 
     @Resource
     private SecurityAlertService securityAlertService;
     @Resource
     private IpBlacklistService ipBlacklistService;
 
-    // ========== 安全告警 ==========
+    // ─── 安全告警 ────────────────────────────────────────────
 
     @GetMapping("/alert/page")
     @Operation(summary = "分页查询安全告警")
@@ -65,7 +65,7 @@ public class SecurityController {
         return success(stats);
     }
 
-    // ========== IP 黑名单 ==========
+    // ─── IP 黑名单 ────────────────────────────────────────────
 
     @GetMapping("/blacklist/page")
     @Operation(summary = "分页查询IP黑名单")
@@ -75,27 +75,19 @@ public class SecurityController {
     }
 
     @PostMapping("/blacklist/add")
-    @Operation(summary = "手动添加IP到黑名单")
+    @Operation(summary = "手动添加IP黑名单")
     @PreAuthorize("@ss.hasPermission('custom:security:blacklist:add')")
-    public CommonResult<Boolean> addToBlacklist(@Valid @RequestBody IpBlacklistAddReqVO reqVO) {
+    public CommonResult<Boolean> addBlacklist(@Valid @RequestBody IpBlacklistAddReqVO reqVO) {
         ipBlacklistService.addToBlacklist(reqVO);
         return success(true);
     }
 
     @DeleteMapping("/blacklist/remove")
-    @Operation(summary = "解除IP黑名单封禁")
+    @Operation(summary = "从黑名单移除IP")
     @Parameter(name = "id", description = "黑名单记录ID", required = true)
     @PreAuthorize("@ss.hasPermission('custom:security:blacklist:remove')")
-    public CommonResult<Boolean> removeFromBlacklist(@RequestParam("id") Long id) {
+    public CommonResult<Boolean> removeBlacklist(@RequestParam Long id) {
         ipBlacklistService.removeFromBlacklist(id);
-        return success(true);
-    }
-
-    @PostMapping("/blacklist/refresh-cache")
-    @Operation(summary = "刷新黑名单缓存")
-    @PreAuthorize("@ss.hasPermission('custom:security:blacklist:add')")
-    public CommonResult<Boolean> refreshBlacklistCache() {
-        ipBlacklistService.refreshCache();
         return success(true);
     }
 }

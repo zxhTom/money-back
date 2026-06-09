@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.custom.dal.dataobject.security;
+package cn.iocoder.yudao.module.system.dal.dataobject.monitor;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;

@@ -1,11 +1,11 @@
-package cn.iocoder.yudao.module.custom.service.security;
+package cn.iocoder.yudao.module.system.service.monitor;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
-import cn.iocoder.yudao.module.custom.controller.admin.security.vo.IpBlacklistAddReqVO;
-import cn.iocoder.yudao.module.custom.dal.dataobject.security.IpBlacklistDO;
-import cn.iocoder.yudao.module.custom.dal.mysql.security.IpBlacklistMapper;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpBlacklistAddReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO;
+import cn.iocoder.yudao.module.system.dal.mysql.monitor.IpBlacklistMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -24,7 +24,6 @@ import java.util.stream.Collectors;
 public class IpBlacklistServiceImpl implements IpBlacklistService {
 
     private static final String BLACKLIST_CACHE_KEY = "security:ip:blacklist";
-    // 缓存有效期 5 分钟，到期后下次查询时重建
     private static final long CACHE_TTL_SECONDS = 300;
 
     @Resource
@@ -44,16 +43,13 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     @Override
     public boolean isBlacklisted(String ip) {
         if (ip == null) return false;
-        // 先查 Redis 缓存
         Boolean member = stringRedisTemplate.opsForSet().isMember(BLACKLIST_CACHE_KEY, ip);
         if (Boolean.TRUE.equals(member)) return true;
-        // 缓存可能已失效，走 DB 确认
         return ipBlacklistMapper.countActiveByIp(ip) > 0;
     }
 
     @Override
     public void addToBlacklist(String ip, String reason, boolean autoAdded, LocalDateTime expireTime) {
-        // 已存在则更新，否则插入
         IpBlacklistDO existing = ipBlacklistMapper.selectOne(
                 new LambdaQueryWrapper<IpBlacklistDO>().eq(IpBlacklistDO::getIp, ip));
         if (existing != null) {
@@ -69,7 +65,6 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
             blacklist.setCreateTime(LocalDateTime.now());
             ipBlacklistMapper.insert(blacklist);
         }
-        // 同步到 Redis 缓存
         stringRedisTemplate.opsForSet().add(BLACKLIST_CACHE_KEY, ip);
         log.warn("[IpBlacklist] IP 已加入黑名单: {} 原因: {}", ip, reason);
     }

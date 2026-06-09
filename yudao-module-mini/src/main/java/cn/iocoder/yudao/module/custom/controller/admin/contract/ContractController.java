@@ -107,6 +107,7 @@ public class ContractController {
     @GetMapping("/page")
     @Operation(summary = "获得合同分页")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    @cn.iocoder.yudao.module.system.framework.monitor.annotation.DataAccessMonitor(module = "合同管理", entityType = "contract")
     public CommonResult<PageResult<ContractRespVO>> getContractPage(@Valid ContractPageReqVO pageReqVO) {
         PageResult<ContractDO> pageResult = contractService.getContractPage(pageReqVO);
         PageResult<ContractRespVO> voPage = BeanUtils.toBean(pageResult, ContractRespVO.class);
@@ -119,6 +120,7 @@ public class ContractController {
     @GetMapping("/selfPage")
     @Operation(summary = "获得当前登录用户创建的合同分页")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    @cn.iocoder.yudao.module.system.framework.monitor.annotation.DataAccessMonitor(module = "合同管理", entityType = "contract")
     public CommonResult<PageResult<ContractRespVO>> getSelfContractPage(@Valid ContractPageReqVO pageReqVO) {
         PageResult<ContractDO> pageResult = contractService.getSelfContractPage(pageReqVO);
         PageResult<ContractRespVO> voPage = BeanUtils.toBean(pageResult, ContractRespVO.class);
