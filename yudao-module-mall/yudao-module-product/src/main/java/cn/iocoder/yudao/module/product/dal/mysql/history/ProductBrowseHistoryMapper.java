@@ -8,8 +8,11 @@ import cn.iocoder.yudao.module.product.controller.admin.history.vo.ProductBrowse
 import cn.iocoder.yudao.module.product.dal.dataobject.history.ProductBrowseHistoryDO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 
 /**
@@ -19,6 +22,9 @@ import java.util.Collection;
  */
 @Mapper
 public interface ProductBrowseHistoryMapper extends BaseMapperX<ProductBrowseHistoryDO> {
+
+    @Delete("DELETE FROM product_browse_history WHERE create_time < #{createTime} LIMIT #{limit}")
+    Integer deleteByCreateTimeLt(@Param("createTime") LocalDateTime createTime, @Param("limit") Integer limit);
 
     default ProductBrowseHistoryDO selectByUserIdAndSpuId(Long userId, Long spuId) {
         return selectFirstOne(ProductBrowseHistoryDO::getUserId, userId,

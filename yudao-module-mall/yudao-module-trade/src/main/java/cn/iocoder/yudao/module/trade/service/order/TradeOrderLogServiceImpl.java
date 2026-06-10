@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.trade.service.order.bo.TradeOrderLogCreateReqBO;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -29,6 +30,20 @@ public class TradeOrderLogServiceImpl implements TradeOrderLogService {
     @Override
     public List<TradeOrderLogDO> getOrderLogListByOrderId(Long orderId) {
         return tradeOrderLogMapper.selectListByOrderId(orderId);
+    }
+
+    @Override
+    public Integer cleanOrderLog(Integer exceedDay, Integer deleteLimit) {
+        int count = 0;
+        LocalDateTime expireDate = LocalDateTime.now().minusDays(exceedDay);
+        for (int i = 0; i < Short.MAX_VALUE; i++) {
+            int deleteCount = tradeOrderLogMapper.deleteByCreateTimeLt(expireDate, deleteLimit);
+            count += deleteCount;
+            if (deleteCount < deleteLimit) {
+                break;
+            }
+        }
+        return count;
     }
 
 }

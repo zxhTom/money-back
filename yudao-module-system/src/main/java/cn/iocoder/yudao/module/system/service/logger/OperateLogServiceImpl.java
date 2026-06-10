@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.system.service.logger;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+
+import java.time.LocalDateTime;
 import cn.iocoder.yudao.framework.common.biz.system.logger.dto.OperateLogCreateReqDTO;
 import cn.iocoder.yudao.module.system.api.logger.dto.OperateLogPageReqDTO;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.operatelog.OperateLogPageReqVO;
@@ -40,6 +42,20 @@ public class OperateLogServiceImpl implements OperateLogService {
     @Override
     public PageResult<OperateLogDO> getOperateLogPage(OperateLogPageReqDTO pageReqDTO) {
         return operateLogMapper.selectPage(pageReqDTO);
+    }
+
+    @Override
+    public Integer cleanOperateLog(Integer exceedDay, Integer deleteLimit) {
+        int count = 0;
+        LocalDateTime expireDate = LocalDateTime.now().minusDays(exceedDay);
+        for (int i = 0; i < Short.MAX_VALUE; i++) {
+            int deleteCount = operateLogMapper.deleteByCreateTimeLt(expireDate, deleteLimit);
+            count += deleteCount;
+            if (deleteCount < deleteLimit) {
+                break;
+            }
+        }
+        return count;
     }
 
 }

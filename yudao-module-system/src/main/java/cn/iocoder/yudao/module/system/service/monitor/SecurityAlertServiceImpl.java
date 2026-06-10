@@ -88,6 +88,20 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
         return securityAlertMapper.selectTopAttackIps();
     }
 
+    @Override
+    public Integer cleanSecurityAlert(Integer exceedDay, Integer deleteLimit) {
+        int count = 0;
+        LocalDateTime expireDate = LocalDateTime.now().minusDays(exceedDay);
+        for (int i = 0; i < Short.MAX_VALUE; i++) {
+            int deleteCount = securityAlertMapper.deleteByCreateTimeLt(expireDate, deleteLimit);
+            count += deleteCount;
+            if (deleteCount < deleteLimit) {
+                break;
+            }
+        }
+        return count;
+    }
+
     private String truncate(String s, int max) {
         if (s == null || s.length() <= max) return s;
         return s.substring(0, max);

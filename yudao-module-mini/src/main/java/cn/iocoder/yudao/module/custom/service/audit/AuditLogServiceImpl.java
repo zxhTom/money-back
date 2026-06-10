@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 
 @Service
 @Slf4j
@@ -35,5 +36,19 @@ public class AuditLogServiceImpl implements AuditLogService {
     @Override
     public AuditLogDO get(Long id) {
         return auditLogMapper.selectById(id);
+    }
+
+    @Override
+    public Integer cleanAuditLog(Integer exceedDay, Integer deleteLimit) {
+        int count = 0;
+        LocalDateTime expireDate = LocalDateTime.now().minusDays(exceedDay);
+        for (int i = 0; i < Short.MAX_VALUE; i++) {
+            int deleteCount = auditLogMapper.deleteByCreateTimeLt(expireDate, deleteLimit);
+            count += deleteCount;
+            if (deleteCount < deleteLimit) {
+                break;
+            }
+        }
+        return count;
     }
 }

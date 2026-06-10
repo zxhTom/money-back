@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.system.service.logger;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.logger.dto.LoginLogCreateReqDTO;
+
+import java.time.LocalDateTime;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.loginlog.LoginLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.logger.LoginLogDO;
 import cn.iocoder.yudao.module.system.dal.mysql.logger.LoginLogMapper;
@@ -30,6 +32,20 @@ public class LoginLogServiceImpl implements LoginLogService {
     public void createLoginLog(LoginLogCreateReqDTO reqDTO) {
         LoginLogDO loginLog = BeanUtils.toBean(reqDTO, LoginLogDO.class);
         loginLogMapper.insert(loginLog);
+    }
+
+    @Override
+    public Integer cleanLoginLog(Integer exceedDay, Integer deleteLimit) {
+        int count = 0;
+        LocalDateTime expireDate = LocalDateTime.now().minusDays(exceedDay);
+        for (int i = 0; i < Short.MAX_VALUE; i++) {
+            int deleteCount = loginLogMapper.deleteByCreateTimeLt(expireDate, deleteLimit);
+            count += deleteCount;
+            if (deleteCount < deleteLimit) {
+                break;
+            }
+        }
+        return count;
     }
 
 }

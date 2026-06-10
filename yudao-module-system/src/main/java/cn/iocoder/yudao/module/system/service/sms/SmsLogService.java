@@ -66,4 +66,13 @@ public interface SmsLogService {
      */
     PageResult<SmsLogDO> getSmsLogPage(SmsLogPageReqVO pageReqVO);
 
+    /**
+     * 清理超过指定天数的短信日志
+     *
+     * @param exceedDay   超过天数
+     * @param deleteLimit 单次删除条数
+     * @return 删除总条数
+     */
+    Integer cleanSmsLog(Integer exceedDay, Integer deleteLimit);
+
 }

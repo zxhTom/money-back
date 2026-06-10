@@ -24,4 +24,6 @@ public interface SecurityAlertService {
     List<Map<String, Object>> getTodayAlertTypeStats();
 
     List<Map<String, Object>> getTopAttackIps();
+
+    Integer cleanSecurityAlert(Integer exceedDay, Integer deleteLimit);
 }

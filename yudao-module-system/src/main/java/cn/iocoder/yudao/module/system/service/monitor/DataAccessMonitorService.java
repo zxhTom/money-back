@@ -25,4 +25,6 @@ public interface DataAccessMonitorService {
 
     // ─── 日志查询 ────────────────────────────────────────────
     PageResult<DataAccessLogDO> getLogPage(DataAccessLogPageReqVO req);
+
+    Integer cleanDataAccessLog(Integer exceedDay, Integer deleteLimit);
 }

@@ -46,5 +46,13 @@ public interface MemberSignInRecordService {
      */
     AppMemberSignInRecordSummaryRespVO getSignInRecordSummary(Long userId);
 
+    /**
+     * 清理超过指定天数的签到记录
+     *
+     * @param exceedDay   超过天数
+     * @param deleteLimit 单次删除条数
+     * @return 删除总条数
+     */
+    Integer cleanSignInRecord(Integer exceedDay, Integer deleteLimit);
 
 }

@@ -83,4 +83,18 @@ public class SmsLogServiceImpl implements SmsLogService {
         return smsLogMapper.selectPage(pageReqVO);
     }
 
+    @Override
+    public Integer cleanSmsLog(Integer exceedDay, Integer deleteLimit) {
+        int count = 0;
+        LocalDateTime expireDate = LocalDateTime.now().minusDays(exceedDay);
+        for (int i = 0; i < Short.MAX_VALUE; i++) {
+            int deleteCount = smsLogMapper.deleteByCreateTimeLt(expireDate, deleteLimit);
+            count += deleteCount;
+            if (deleteCount < deleteLimit) {
+                break;
+            }
+        }
+        return count;
+    }
+
 }

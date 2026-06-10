@@ -5,7 +5,11 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.sms.vo.log.SmsLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.sms.SmsLogDO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.time.LocalDateTime;
 
 @Mapper
 public interface SmsLogMapper extends BaseMapperX<SmsLogDO> {
@@ -21,6 +25,9 @@ public interface SmsLogMapper extends BaseMapperX<SmsLogDO> {
                 .betweenIfPresent(SmsLogDO::getReceiveTime, reqVO.getReceiveTime())
                 .orderByDesc(SmsLogDO::getId));
     }
+
+    @Delete("DELETE FROM system_sms_log WHERE create_time < #{createTime} LIMIT #{limit}")
+    Integer deleteByCreateTimeLt(@Param("createTime") LocalDateTime createTime, @Param("limit") Integer limit);
 
     default SmsLogDO selectByApiSerialNo(String apiSerialNo) {
         return selectOne(SmsLogDO::getApiSerialNo, apiSerialNo);

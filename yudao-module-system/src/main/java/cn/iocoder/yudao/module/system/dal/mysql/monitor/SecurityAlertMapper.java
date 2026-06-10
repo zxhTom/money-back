@@ -5,14 +5,20 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 @Mapper
 public interface SecurityAlertMapper extends BaseMapperX<SecurityAlertDO> {
+
+    @Delete("DELETE FROM custom_security_alert WHERE create_time < #{createTime} LIMIT #{limit}")
+    Integer deleteByCreateTimeLt(@Param("createTime") LocalDateTime createTime, @Param("limit") Integer limit);
 
     default PageResult<SecurityAlertDO> selectPage(SecurityAlertPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<SecurityAlertDO>()

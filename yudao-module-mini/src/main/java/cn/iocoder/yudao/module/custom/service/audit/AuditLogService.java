@@ -11,4 +11,6 @@ public interface AuditLogService {
     PageResult<AuditLogDO> getPage(AuditLogPageReqVO reqVO);
 
     AuditLogDO get(Long id);
+
+    Integer cleanAuditLog(Integer exceedDay, Integer deleteLimit);
 }

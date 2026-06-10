@@ -6,10 +6,12 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.api.logger.dto.OperateLogPageReqDTO;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.operatelog.OperateLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.logger.OperateLogDO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +29,9 @@ public interface OperateLogMapper extends BaseMapperX<OperateLogDO> {
             "  AND user_ip IS NOT NULL AND user_ip != '' AND deleted = 0 " +
             "GROUP BY user_ip, user_id")
     List<Map<String, Object>> selectIpUserRefs(@Param("days") int days);
+
+    @Delete("DELETE FROM system_operate_log WHERE create_time < #{createTime} LIMIT #{limit}")
+    Integer deleteByCreateTimeLt(@Param("createTime") LocalDateTime createTime, @Param("limit") Integer limit);
 
     default PageResult<OperateLogDO> selectPage(OperateLogPageReqVO pageReqDTO) {
         return selectPage(pageReqDTO, new LambdaQueryWrapperX<OperateLogDO>()

@@ -179,6 +179,20 @@ public class DataAccessMonitorServiceImpl implements DataAccessMonitorService {
         stringRedisTemplate.delete(String.format(CONFIG_CACHE_KEY, module, entityType));
     }
 
+    @Override
+    public Integer cleanDataAccessLog(Integer exceedDay, Integer deleteLimit) {
+        int count = 0;
+        LocalDateTime expireDate = LocalDateTime.now().minusDays(exceedDay);
+        for (int i = 0; i < Short.MAX_VALUE; i++) {
+            int deleteCount = dataAccessLogMapper.deleteByCreateTimeLt(expireDate, deleteLimit);
+            count += deleteCount;
+            if (deleteCount < deleteLimit) {
+                break;
+            }
+        }
+        return count;
+    }
+
     private DataAccessConfigDO toConfigDO(DataAccessConfigSaveReqVO req) {
         DataAccessConfigDO c = new DataAccessConfigDO();
         c.setId(req.getId());

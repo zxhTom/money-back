@@ -311,6 +311,20 @@ public class PayNotifyServiceImpl implements PayNotifyService {
         return notifyLogMapper.selectListByTaskId(taskId);
     }
 
+    @Override
+    public Integer cleanNotifyLog(Integer exceedDay, Integer deleteLimit) {
+        int count = 0;
+        LocalDateTime expireDate = LocalDateTime.now().minusDays(exceedDay);
+        for (int i = 0; i < Short.MAX_VALUE; i++) {
+            int deleteCount = notifyLogMapper.deleteByCreateTimeLt(expireDate, deleteLimit);
+            count += deleteCount;
+            if (deleteCount < deleteLimit) {
+                break;
+            }
+        }
+        return count;
+    }
+
     /**
      * 获得自身的代理对象，解决 AOP 生效问题
      *

@@ -55,6 +55,11 @@ spring:
           url: jdbc:mysql://mymysql:3306/contract?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
           username: root
           password: Qq_hello_021615996779085
+        archive:
+          lazy: true
+          url: jdbc:mysql://mymysql:3306/contract_archive?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: root
+          password: Qq_hello_021615996779085
 
   redis:
     host: myredis

@@ -6,10 +6,12 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.loginlog.LoginLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.logger.LoginLogDO;
 import cn.iocoder.yudao.module.system.enums.logger.LoginResultEnum;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -52,6 +54,9 @@ public interface LoginLogMapper extends BaseMapperX<LoginLogDO> {
             "WHERE user_id = #{userId} AND deleted = 0 " +
             "ORDER BY create_time DESC LIMIT 1")
     String selectLastLoginIp(@Param("userId") Long userId);
+
+    @Delete("DELETE FROM system_login_log WHERE create_time < #{createTime} LIMIT #{limit}")
+    Integer deleteByCreateTimeLt(@Param("createTime") LocalDateTime createTime, @Param("limit") Integer limit);
 
     default PageResult<LoginLogDO> selectPage(LoginLogPageReqVO reqVO) {
         LambdaQueryWrapperX<LoginLogDO> query = new LambdaQueryWrapperX<LoginLogDO>()
