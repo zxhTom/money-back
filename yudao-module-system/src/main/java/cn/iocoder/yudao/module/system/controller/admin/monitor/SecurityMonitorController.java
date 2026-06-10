@@ -5,11 +5,13 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpBlacklistAddReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpDiagnoseResultVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertHandleReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
 import cn.iocoder.yudao.module.system.service.monitor.IpBlacklistService;
+import cn.iocoder.yudao.module.system.service.monitor.IpRiskCheckService;
 import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 安全监控")
@@ -36,6 +39,8 @@ public class SecurityMonitorController {
     private SecurityAlertService securityAlertService;
     @Resource
     private IpBlacklistService ipBlacklistService;
+    @Resource
+    private IpRiskCheckService ipRiskCheckService;
 
     // ─── 安全告警 ────────────────────────────────────────────
 
@@ -63,6 +68,16 @@ public class SecurityMonitorController {
         stats.put("alertTypeStats", securityAlertService.getTodayAlertTypeStats());
         stats.put("topAttackIps", securityAlertService.getTopAttackIps());
         return success(stats);
+    }
+
+    // ─── IP 诊断 ──────────────────────────────────────────────
+
+    @GetMapping("/ip-diagnose")
+    @Operation(summary = "诊断用户所有历史IP风险")
+    @Parameter(name = "userId", description = "用户ID", required = true)
+    @PreAuthorize("@ss.hasPermission('custom:security:ip-diagnose')")
+    public CommonResult<List<IpDiagnoseResultVO>> diagnoseUserIp(@RequestParam Long userId) {
+        return success(ipRiskCheckService.diagnoseUser(userId));
     }
 
     // ─── IP 黑名单 ────────────────────────────────────────────

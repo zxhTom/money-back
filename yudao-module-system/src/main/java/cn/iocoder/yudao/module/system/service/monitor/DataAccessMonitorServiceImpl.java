@@ -31,9 +31,9 @@ public class DataAccessMonitorServiceImpl implements DataAccessMonitorService {
     private static final long CONFIG_CACHE_TTL = 300; // 5 分钟
 
     @Resource
-    private DataAccessConfigMapper configMapper;
+    private DataAccessConfigMapper dataAccessConfigMapper;
     @Resource
-    private DataAccessLogMapper logMapper;
+    private DataAccessLogMapper dataAccessLogMapper;
     @Resource
     private SecurityAlertService securityAlertService;
     @Resource
@@ -58,7 +58,7 @@ public class DataAccessMonitorServiceImpl implements DataAccessMonitorService {
         log.setAccessTime(LocalDateTime.now());
         log.setDeleted(0);
         try {
-            logMapper.insert(log);
+            dataAccessLogMapper.insert(log);
         } catch (Exception e) {
             this.log.error("[DataAccessMonitor] 日志写入失败 userId={}", userId, e);
         }
@@ -111,7 +111,7 @@ public class DataAccessMonitorServiceImpl implements DataAccessMonitorService {
         config.setCreateTime(LocalDateTime.now());
         config.setUpdateTime(LocalDateTime.now());
         config.setDeleted(0);
-        configMapper.insert(config);
+        dataAccessConfigMapper.insert(config);
         evictConfigCache(req.getModule(), req.getEntityType());
         return config.getId();
     }
@@ -120,35 +120,35 @@ public class DataAccessMonitorServiceImpl implements DataAccessMonitorService {
     public void updateConfig(DataAccessConfigSaveReqVO req) {
         DataAccessConfigDO config = toConfigDO(req);
         config.setUpdateTime(LocalDateTime.now());
-        configMapper.updateById(config);
+        dataAccessConfigMapper.updateById(config);
         evictConfigCache(req.getModule(), req.getEntityType());
     }
 
     @Override
     public void deleteConfig(Long id) {
-        DataAccessConfigDO existing = configMapper.selectById(id);
+        DataAccessConfigDO existing = dataAccessConfigMapper.selectById(id);
         if (existing != null) {
             existing.setDeleted(1);
-            configMapper.updateById(existing);
+            dataAccessConfigMapper.updateById(existing);
             evictConfigCache(existing.getModule(), existing.getEntityType());
         }
     }
 
     @Override
     public DataAccessConfigDO getConfig(Long id) {
-        return configMapper.selectById(id);
+        return dataAccessConfigMapper.selectById(id);
     }
 
     @Override
     public PageResult<DataAccessConfigDO> getConfigPage(DataAccessConfigPageReqVO req) {
-        return configMapper.selectPage(req);
+        return dataAccessConfigMapper.selectPage(req);
     }
 
     // ─── 日志查询 ────────────────────────────────────────────
 
     @Override
     public PageResult<DataAccessLogDO> getLogPage(DataAccessLogPageReqVO req) {
-        return logMapper.selectPage(req);
+        return dataAccessLogMapper.selectPage(req);
     }
 
     // ─── 内部工具 ────────────────────────────────────────────
@@ -160,7 +160,7 @@ public class DataAccessMonitorServiceImpl implements DataAccessMonitorService {
         if (cached != null) {
             configs = JSON.parseArray(cached, DataAccessConfigDO.class);
         } else {
-            configs = configMapper.selectByModuleAndEntityType(module, entityType);
+            configs = dataAccessConfigMapper.selectByModuleAndEntityType(module, entityType);
             stringRedisTemplate.opsForValue().set(cacheKey, JSON.toJSONString(configs),
                     CONFIG_CACHE_TTL, TimeUnit.SECONDS);
         }

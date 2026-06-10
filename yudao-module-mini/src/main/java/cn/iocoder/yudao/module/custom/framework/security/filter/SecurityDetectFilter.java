@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.custom.framework.security.filter;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.custom.framework.audit.util.IpUtils;
 import cn.iocoder.yudao.module.system.service.monitor.IpBlacklistService;
+import cn.iocoder.yudao.module.system.service.monitor.IpRiskCheckService;
 import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -69,13 +70,16 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
     private final IpBlacklistService ipBlacklistService;
     private final SecurityAlertService securityAlertService;
     private final StringRedisTemplate redisTemplate;
+    private final IpRiskCheckService ipRiskCheckService;
 
     public SecurityDetectFilter(IpBlacklistService ipBlacklistService,
                                 SecurityAlertService securityAlertService,
-                                StringRedisTemplate redisTemplate) {
+                                StringRedisTemplate redisTemplate,
+                                IpRiskCheckService ipRiskCheckService) {
         this.ipBlacklistService = ipBlacklistService;
         this.securityAlertService = securityAlertService;
         this.redisTemplate = redisTemplate;
+        this.ipRiskCheckService = ipRiskCheckService;
     }
 
     @Override
@@ -92,17 +96,20 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
             return;
         }
 
-        // 2. 暴力破解检测
+        // 2. IP 风险检测（异步，不阻塞请求）
+        ipRiskCheckService.checkAsync(ip, getUserId(request), uri);
+
+        // 4. 暴力破解检测
         if (isBruteForcePath(uri)) {
             if (checkBruteForce(ip, uri, response)) {
                 return;
             }
         }
 
-        // 3. 收集所有请求参数用于安全检测
+        // 5. 收集所有请求参数用于安全检测
         String suspiciousContent = collectRequestContent(request);
 
-        // 4. SQL 注入检测
+        // 6. SQL 注入检测
         if (StrUtil.isNotBlank(suspiciousContent)) {
             String sqlMatch = detectSqlInjection(suspiciousContent);
             if (sqlMatch != null) {
@@ -110,7 +117,7 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
                 return;
             }
 
-            // 5. XSS 检测（仅告警，不拦截 - 因为后端有 XssFilter 处理）
+            // 7. XSS 检测（仅告警，不拦截 - 因为后端有 XssFilter 处理）
             String xssMatch = detectXss(suspiciousContent);
             if (xssMatch != null) {
                 securityAlertService.saveAsync("XSS", 2, ip, null, uri, method,

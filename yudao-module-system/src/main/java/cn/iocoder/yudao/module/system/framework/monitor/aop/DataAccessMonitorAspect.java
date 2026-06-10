@@ -61,8 +61,8 @@ public class DataAccessMonitorAspect {
         // 3. 获取当前用户
         LoginUser loginUser = tryGetLoginUser();
         Long userId = loginUser != null ? loginUser.getId() : null;
-        String username = loginUser != null ? loginUser.getUsername() : "anonymous";
         if (userId == null) return; // 未登录不记录
+        String username = tryGetNickname(userId);
 
         // 4. 提取查询参数（方法第一个参数序列化为 JSON）
         String queryParams = extractQueryParams(joinPoint);
@@ -133,6 +133,15 @@ public class DataAccessMonitorAspect {
             return SecurityFrameworkUtils.getLoginUser();
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private String tryGetNickname(Long userId) {
+        try {
+            String nickname = SecurityFrameworkUtils.getLoginUserNickname();
+            return nickname != null ? nickname : String.valueOf(userId);
+        } catch (Exception e) {
+            return String.valueOf(userId);
         }
     }
 
