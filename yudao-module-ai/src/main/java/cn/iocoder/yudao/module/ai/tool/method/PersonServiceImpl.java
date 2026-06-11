@@ -287,7 +287,7 @@ public class PersonServiceImpl implements PersonService {
         description = "Search for persons by job title in the in-memory store."
     )
     public List<Person> searchByJobTitle(String jobTitleQuery) {
-        if (jobTitleQuery == null || jobTitleQuery.isBlank()) {
+        if (jobTitleQuery == null || jobTitleQuery.trim().isEmpty()) {
             log.debug("Search by job title skipped due to blank query.");
             return Collections.emptyList();
         }
@@ -305,7 +305,7 @@ public class PersonServiceImpl implements PersonService {
         description = "Filters Persons by sex (case-insensitive)."
     )
     public List<Person> filterBySex(String sex) {
-        if (sex == null || sex.isBlank()) {
+        if (sex == null || sex.trim().isEmpty()) {
              log.debug("Filter by sex skipped due to blank filter.");
             return Collections.emptyList();
         }

@@ -3,6 +3,7 @@ package cn.iocoder.yudao.framework.mybatis.config;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.mybatis.core.archive.DataArchiveService;
 import cn.iocoder.yudao.framework.mybatis.core.handler.DefaultDBFieldHandler;
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
@@ -55,6 +56,11 @@ public class YudaoMybatisAutoConfiguration {
     @Bean
     public MetaObjectHandler defaultMetaObjectHandler() {
         return new DefaultDBFieldHandler(); // 自动填充参数类
+    }
+
+    @Bean
+    public DataArchiveService dataArchiveService() {
+        return new DataArchiveService();
     }
 
     @Bean

@@ -3,7 +3,6 @@ package cn.iocoder.yudao.framework.mybatis.core.archive;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
@@ -18,7 +17,6 @@ import java.util.stream.Collectors;
  * 2. 批量写入 archive 库对应表
  * 3. 从主库物理删除已归档记录（写入成功后才删）
  */
-@Service
 @Slf4j
 public class DataArchiveService {
 

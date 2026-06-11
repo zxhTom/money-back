@@ -42,7 +42,7 @@ public class IpRiskCheckServiceImpl implements IpRiskCheckService {
     @Override
     @Async
     public void checkAsync(String ip, Long userId, String requestUrl) {
-        if (ip == null || ip.isBlank() || isPrivateIp(ip)) return;
+        if (ip == null || ip.trim().isEmpty() || isPrivateIp(ip)) return;
 
         String cacheKey = String.format(CACHE_KEY, ip);
         if (stringRedisTemplate.opsForValue().get(cacheKey) != null) return; // 已检测过
@@ -93,7 +93,7 @@ public class IpRiskCheckServiceImpl implements IpRiskCheckService {
     private void collectIps(List<String> ips, String source, Map<String, List<String>> ipSources) {
         if (ips == null) return;
         for (String ip : ips) {
-            if (ip == null || ip.isBlank()) continue;
+            if (ip == null || ip.trim().isEmpty()) continue;
             ipSources.computeIfAbsent(ip, k -> new ArrayList<>()).add(source);
         }
     }

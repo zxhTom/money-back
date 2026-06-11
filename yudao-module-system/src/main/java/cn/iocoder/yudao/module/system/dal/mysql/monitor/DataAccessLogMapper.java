@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.DataAccessLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.DataAccessLogDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpUserRefDO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -27,7 +28,7 @@ public interface DataAccessLogMapper extends BaseMapperX<DataAccessLogDO> {
             "WHERE access_time >= DATE_SUB(NOW(), INTERVAL #{days} DAY) " +
             "  AND client_ip IS NOT NULL AND client_ip != '' AND deleted = 0 " +
             "GROUP BY client_ip, user_id, username")
-    List<Map<String, Object>> selectIpUserRefs(@Param("days") int days);
+    List<IpUserRefDO> selectIpUserRefs(@Param("days") int days);
 
     @Delete("DELETE FROM custom_data_access_log WHERE access_time < #{createTime} LIMIT #{limit}")
     Integer deleteByCreateTimeLt(@Param("createTime") LocalDateTime createTime, @Param("limit") Integer limit);

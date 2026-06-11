@@ -4,6 +4,8 @@ import cn.hutool.http.HttpUtil;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.GlobalIpDiagnoseVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpUserInfoVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.UserBehaviorVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpUserRefDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.LoginUserStatsDO;
 import cn.iocoder.yudao.module.system.dal.mysql.logger.LoginLogMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.logger.OperateLogMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.monitor.DataAccessLogMapper;
@@ -51,9 +53,9 @@ public class GlobalDiagnoseServiceImpl implements GlobalDiagnoseService {
         // 1. 从三个日志来源汇聚: ip → { userId → IpUserInfoVO }
         Map<String, Map<Long, IpUserInfoVO>> ipUserMap = new LinkedHashMap<>();
 
-        mergeRefs(loginLogMapper.selectIpUserRefs(days),      "登录日志",      ipUserMap, true);
-        mergeRefs(operateLogMapper.selectIpUserRefs(days),    "操作日志",      ipUserMap, false);
-        mergeRefs(dataAccessLogMapper.selectIpUserRefs(days), "数据访问日志",   ipUserMap, true);
+        mergeRefs(loginLogMapper.selectIpUserRefs(days),      "登录日志",     ipUserMap);
+        mergeRefs(operateLogMapper.selectIpUserRefs(days),    "操作日志",     ipUserMap);
+        mergeRefs(dataAccessLogMapper.selectIpUserRefs(days), "数据访问日志",  ipUserMap);
 
         // 2. 逐 IP 构建 VO，已缓存直接读缓存，未缓存逐一调接口（限量）
         List<GlobalIpDiagnoseVO> results = new ArrayList<>();
@@ -104,7 +106,7 @@ public class GlobalDiagnoseServiceImpl implements GlobalDiagnoseService {
 
     @Override
     public List<UserBehaviorVO> analyzeUserBehavior() {
-        List<Map<String, Object>> stats     = loginLogMapper.selectUserLoginStats();
+        List<LoginUserStatsDO>    stats     = loginLogMapper.selectUserLoginStats();
         List<Map<String, Object>> hourStats = loginLogMapper.selectUserLoginCountLastHour();
 
         Map<Long, Integer> hourMap = new HashMap<>();
@@ -114,29 +116,26 @@ public class GlobalDiagnoseServiceImpl implements GlobalDiagnoseService {
         }
 
         List<UserBehaviorVO> results = new ArrayList<>();
-        for (Map<String, Object> row : stats) {
-            Long userId = toLong(row.get("userId"));
+        for (LoginUserStatsDO stat : stats) {
+            Long userId = stat.getUserId();
             if (userId == null) continue;
 
             UserBehaviorVO vo = new UserBehaviorVO();
             vo.setUserId(userId);
-            vo.setUsername(str(row.get("username")));
-            vo.setLoginCount(toInt(row.get("loginCount")));
-            vo.setFailCount(toInt(row.get("failCount")));
-            vo.setDistinctIpCount(toInt(row.get("distinctIpCount")));
+            vo.setUsername(stat.getUsername());
+            vo.setLoginCount(stat.getLoginCount() != null ? stat.getLoginCount() : 0);
+            vo.setFailCount(stat.getFailCount() != null ? stat.getFailCount() : 0);
+            vo.setDistinctIpCount(stat.getDistinctIpCount() != null ? stat.getDistinctIpCount() : 0);
             vo.setLoginCountLastHour(hourMap.getOrDefault(userId, 0));
 
-            Object lastLogin = row.get("lastLoginTime");
-            String lastLoginStr = lastLogin != null ? lastLogin.toString() : null;
+            String lastLoginStr = stat.getLastLoginTime() != null ? stat.getLastLoginTime().format(FMT) : null;
             vo.setLastLoginTime(lastLoginStr);
             vo.setLastLoginIp(loginLogMapper.selectLastLoginIp(userId));
             vo.setActivityLevel(calcActivityLevel(lastLoginStr));
 
-            // 检查该用户使用的 IP 是否有风险缓存
             List<String> abnormalIps = findAbnormalIps(userId);
             vo.setAbnormalIps(abnormalIps);
 
-            // 异常判断
             List<String> reasons = buildSuspiciousReasons(vo);
             vo.setSuspiciousReasons(reasons);
             vo.setSuspicious(!reasons.isEmpty());
@@ -144,7 +143,6 @@ public class GlobalDiagnoseServiceImpl implements GlobalDiagnoseService {
             results.add(vo);
         }
 
-        // 可疑 > 登录次数多 排序
         results.sort((a, b) -> {
             if (a.isSuspicious() != b.isSuspicious()) return Boolean.compare(b.isSuspicious(), a.isSuspicious());
             return Integer.compare(b.getLoginCount(), a.getLoginCount());
@@ -154,16 +152,16 @@ public class GlobalDiagnoseServiceImpl implements GlobalDiagnoseService {
 
     // ─── 内部工具 ─────────────────────────────────────────────
 
-    private void mergeRefs(List<Map<String, Object>> rows, String source,
-                           Map<String, Map<Long, IpUserInfoVO>> ipUserMap, boolean hasUsername) {
+    private void mergeRefs(List<IpUserRefDO> rows, String source,
+                           Map<String, Map<Long, IpUserInfoVO>> ipUserMap) {
         if (rows == null) return;
-        for (Map<String, Object> row : rows) {
-            String ip     = str(row.get("ip"));
-            Long   userId = toLong(row.get("userId"));
+        for (IpUserRefDO row : rows) {
+            String ip     = row.getIp();
+            Long   userId = row.getUserId();
             if (ip == null || userId == null) continue;
 
-            String lastSeen  = row.get("lastSeen") != null ? row.get("lastSeen").toString() : null;
-            String username  = hasUsername ? str(row.get("username")) : null;
+            String lastSeen = row.getLastSeen();
+            String username = row.getUsername();
 
             Map<Long, IpUserInfoVO> userMap = ipUserMap.computeIfAbsent(ip, k -> new LinkedHashMap<>());
             IpUserInfoVO info = userMap.computeIfAbsent(userId, k -> {

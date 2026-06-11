@@ -5,6 +5,8 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.loginlog.LoginLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.logger.LoginLogDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpUserRefDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.LoginUserStatsDO;
 import cn.iocoder.yudao.module.system.enums.logger.LoginResultEnum;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
@@ -29,7 +31,7 @@ public interface LoginLogMapper extends BaseMapperX<LoginLogDO> {
             "WHERE create_time >= DATE_SUB(NOW(), INTERVAL #{days} DAY) " +
             "  AND user_ip IS NOT NULL AND user_ip != '' AND deleted = 0 " +
             "GROUP BY user_ip, user_id, username")
-    List<Map<String, Object>> selectIpUserRefs(@Param("days") int days);
+    List<IpUserRefDO> selectIpUserRefs(@Param("days") int days);
 
     /** 近 30 天用户登录统计 */
     @Select("SELECT user_id AS userId, username, " +
@@ -40,7 +42,7 @@ public interface LoginLogMapper extends BaseMapperX<LoginLogDO> {
             "FROM system_login_log " +
             "WHERE create_time >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND deleted = 0 " +
             "GROUP BY user_id, username")
-    List<Map<String, Object>> selectUserLoginStats();
+    List<LoginUserStatsDO> selectUserLoginStats();
 
     /** 近 1 小时每用户登录次数 */
     @Select("SELECT user_id AS userId, COUNT(*) AS loginCountLastHour " +
