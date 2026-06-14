@@ -62,7 +62,7 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
 
     private static final int BRUTE_FORCE_THRESHOLD = 10;
     private static final long BRUTE_FORCE_WINDOW_SECONDS = 300; // 5 分钟
-    private static final long AUTO_BAN_DURATION_SECONDS = 1800; // 自动封禁 30 分钟
+    private static final long AUTO_BAN_DURATION_SECONDS = 180000; // 自动封禁 3000 分钟
 
     // SQL 注入可疑次数阈值
     private static final int SQL_INJECT_THRESHOLD = 5;

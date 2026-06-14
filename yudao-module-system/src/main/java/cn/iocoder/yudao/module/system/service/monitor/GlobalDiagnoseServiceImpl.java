@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.system.service.monitor;
 
-import cn.hutool.http.HttpUtil;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.GlobalIpDiagnoseVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpUserInfoVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.UserBehaviorVO;
@@ -26,7 +25,6 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalDiagnoseServiceImpl implements GlobalDiagnoseService {
 
-    private static final String CHECK_URL   = "https://voidmob.com/api/tools/ip-check?ip=%s";
     private static final String CACHE_KEY   = "ip_risk:%s";
     private static final String CACHE_SAFE  = "safe";
     private static final long   CACHE_TTL   = 3600;
@@ -40,8 +38,9 @@ public class GlobalDiagnoseServiceImpl implements GlobalDiagnoseService {
     private static final int MULTI_IP_THRESHOLD       = 5;   // 30天不同 IP > 5
     private static final int HIGH_FREQ_HOUR_THRESHOLD = 10;  // 1小时登录 > 10
 
-    @Resource private StringRedisTemplate  stringRedisTemplate;
-    @Resource private SecurityAlertService  securityAlertService;
+    @Resource private VoidmobIpCheckClient   ipCheckClient;
+    @Resource private StringRedisTemplate    stringRedisTemplate;
+    @Resource private SecurityAlertService   securityAlertService;
     @Resource private LoginLogMapper        loginLogMapper;
     @Resource private OperateLogMapper      operateLogMapper;
     @Resource private DataAccessLogMapper   dataAccessLogMapper;
@@ -180,37 +179,33 @@ public class GlobalDiagnoseServiceImpl implements GlobalDiagnoseService {
     }
 
     private void callApiAndFill(GlobalIpDiagnoseVO vo, String ip) {
-        try {
-            String body = HttpUtil.get(String.format(CHECK_URL, ip), 8000);
-            JSONObject resp = JSON.parseObject(body);
-            if (resp == null) { vo.setError("接口返回为空"); return; }
+        JSONObject resp = ipCheckClient.check(ip);
+        if (resp == null) {
+            vo.setError("检测失败");
+            return;
+        }
 
-            List<String> risks = extractRisks(resp);
-            vo.setRisky(!risks.isEmpty());
-            vo.setRisks(risks);
-            vo.setType(resp.getString("type"));
-            vo.setCarrier(resp.getString("carrier"));
-            JSONObject loc = resp.getJSONObject("location");
-            if (loc != null) { vo.setCountry(loc.getString("country")); vo.setCity(loc.getString("city")); }
+        List<String> risks = extractRisks(resp);
+        vo.setRisky(!risks.isEmpty());
+        vo.setRisks(risks);
+        vo.setType(resp.getString("type"));
+        vo.setCarrier(resp.getString("carrier"));
+        JSONObject loc = resp.getJSONObject("location");
+        if (loc != null) { vo.setCountry(loc.getString("country")); vo.setCity(loc.getString("city")); }
 
-            // 存完整信息到缓存
-            JSONObject cacheObj = new JSONObject();
-            cacheObj.put("risks", risks);
-            cacheObj.put("type", vo.getType());
-            cacheObj.put("carrier", vo.getCarrier());
-            cacheObj.put("country", vo.getCountry());
-            cacheObj.put("city", vo.getCity());
-            stringRedisTemplate.opsForValue().set(String.format(CACHE_KEY, ip), cacheObj.toJSONString(), CACHE_TTL, TimeUnit.SECONDS);
+        JSONObject cacheObj = new JSONObject();
+        cacheObj.put("risks", risks);
+        cacheObj.put("type", vo.getType());
+        cacheObj.put("carrier", vo.getCarrier());
+        cacheObj.put("country", vo.getCountry());
+        cacheObj.put("city", vo.getCity());
+        stringRedisTemplate.opsForValue().set(String.format(CACHE_KEY, ip), cacheObj.toJSONString(), CACHE_TTL, TimeUnit.SECONDS);
 
-            if (!risks.isEmpty()) {
-                int severity = risks.contains("TOR") || risks.contains("ABUSER") ? 3 : 2;
-                String msg = String.format("全局扫描发现风险IP [%s]：%s (%s %s)",
-                        ip, String.join("/", risks), vo.getCountry(), vo.getCity());
-                securityAlertService.saveAsync("IP_RISK", severity, ip, null, "/global-diagnose", "SCAN", null, msg);
-            }
-        } catch (Exception e) {
-            log.warn("[GlobalDiagnose] IP检测失败 ip={} err={}", ip, e.getMessage());
-            vo.setError("检测失败：" + e.getMessage());
+        if (!risks.isEmpty()) {
+            int severity = risks.contains("TOR") || risks.contains("ABUSER") ? 3 : 2;
+            String msg = String.format("全局扫描发现风险IP [%s]：%s (%s %s)",
+                    ip, String.join("/", risks), vo.getCountry(), vo.getCity());
+            securityAlertService.saveAsync("IP_RISK", severity, ip, null, "/global-diagnose", "SCAN", null, msg);
         }
     }
 

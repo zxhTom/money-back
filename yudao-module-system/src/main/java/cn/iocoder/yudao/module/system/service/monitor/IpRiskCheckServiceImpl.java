@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.system.service.monitor;
 
-import cn.hutool.http.HttpUtil;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpDiagnoseResultVO;
 import cn.iocoder.yudao.module.system.dal.mysql.logger.LoginLogMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.logger.OperateLogMapper;
@@ -21,11 +20,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public class IpRiskCheckServiceImpl implements IpRiskCheckService {
 
-    private static final String CHECK_URL = "https://voidmob.com/api/tools/ip-check?ip=%s";
     private static final String CACHE_KEY = "ip_risk:%s";
     private static final long CACHE_TTL_SECONDS = 3600;
     private static final String CACHE_SAFE = "safe";
 
+    @Resource
+    private VoidmobIpCheckClient ipCheckClient;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
     @Resource
@@ -48,8 +48,7 @@ public class IpRiskCheckServiceImpl implements IpRiskCheckService {
         if (stringRedisTemplate.opsForValue().get(cacheKey) != null) return; // 已检测过
 
         try {
-            String body = HttpUtil.get(String.format(CHECK_URL, ip), 5000);
-            JSONObject resp = JSON.parseObject(body);
+            JSONObject resp = ipCheckClient.check(ip);
             if (resp == null) return;
 
             List<String> risks = extractRisks(resp);
@@ -60,7 +59,7 @@ public class IpRiskCheckServiceImpl implements IpRiskCheckService {
             String msg = String.format("IP [%s] 检测到风险类型：%s %s", ip, String.join("/", risks), buildLocation(resp));
             log.warn("[IpRiskCheck] {}", msg);
             securityAlertService.saveAsync("IP_RISK", severity, ip, userId, requestUrl, "REQUEST",
-                    body.length() > 500 ? body.substring(0, 500) : body, msg);
+                    resp.toJSONString().length() > 500 ? resp.toJSONString().substring(0, 500) : resp.toJSONString(), msg);
         } catch (Exception e) {
             log.warn("[IpRiskCheck] 检测失败 ip={} err={}", ip, e.getMessage());
         }
@@ -120,40 +119,34 @@ public class IpRiskCheckServiceImpl implements IpRiskCheckService {
             return vo;
         }
 
-        try {
-            String body = HttpUtil.get(String.format(CHECK_URL, ip), 8000);
-            JSONObject resp = JSON.parseObject(body);
-            if (resp == null) {
-                vo.setError("接口返回为空");
-                return vo;
-            }
+        JSONObject resp = ipCheckClient.check(ip);
+        if (resp == null) {
+            vo.setError("检测失败");
+            return vo;
+        }
 
-            List<String> risks = extractRisks(resp);
-            vo.setRisky(!risks.isEmpty());
-            vo.setRisks(risks);
-            vo.setType(resp.getString("type"));
-            vo.setCarrier(resp.getString("carrier"));
+        List<String> risks = extractRisks(resp);
+        vo.setRisky(!risks.isEmpty());
+        vo.setRisks(risks);
+        vo.setType(resp.getString("type"));
+        vo.setCarrier(resp.getString("carrier"));
 
-            JSONObject loc = resp.getJSONObject("location");
-            if (loc != null) {
-                vo.setCountry(loc.getString("country"));
-                vo.setCity(loc.getString("city"));
-            }
+        JSONObject loc = resp.getJSONObject("location");
+        if (loc != null) {
+            vo.setCountry(loc.getString("country"));
+            vo.setCity(loc.getString("city"));
+        }
 
-            writeCache(ip, resp, risks);
+        writeCache(ip, resp, risks);
 
-            // 有风险则写告警
-            if (!risks.isEmpty()) {
-                int severity = risks.contains("TOR") || risks.contains("ABUSER") ? 3 : 2;
-                String msg = String.format("IP [%s] 经用户诊断发现风险：%s (%s %s)",
-                        ip, String.join("/", risks), vo.getCountry(), vo.getCity());
-                log.warn("[IpRiskCheck] {}", msg);
-                securityAlertService.saveAsync("IP_RISK", severity, ip, userId, "/user-diagnose", "DIAGNOSE",
-                        body.length() > 500 ? body.substring(0, 500) : body, msg);
-            }
-        } catch (Exception e) {
-            log.warn("[IpRiskCheck] 诊断失败 ip={} err={}", ip, e.getMessage());
-            vo.setError("检测失败：" + e.getMessage());
+        if (!risks.isEmpty()) {
+            int severity = risks.contains("TOR") || risks.contains("ABUSER") ? 3 : 2;
+            String msg = String.format("IP [%s] 经用户诊断发现风险：%s (%s %s)",
+                    ip, String.join("/", risks), vo.getCountry(), vo.getCity());
+            log.warn("[IpRiskCheck] {}", msg);
+            String respStr = resp.toJSONString();
+            securityAlertService.saveAsync("IP_RISK", severity, ip, userId, "/user-diagnose", "DIAGNOSE",
+                    respStr.length() > 500 ? respStr.substring(0, 500) : respStr, msg);
         }
 
         return vo;

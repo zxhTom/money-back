@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.system.controller.admin.monitor.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -22,5 +23,6 @@ public class IpBlacklistAddReqVO {
 
     @Schema(description = "过期时间(不填=永久封禁)")
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
+    @JsonFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime expireTime;
 }

@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper">
+
+    <!-- ─── 顶部汇总卡片 ───────────────────────────────────────── -->
+    <select id="selectOverview"
+            resultType="cn.iocoder.yudao.module.custom.controller.admin.dashboard.vo.DashboardOverviewVO">
+        SELECT
+            u.total_users,
+            u.today_new_users,
+            u.verified_users,
+            u.active_users_7d,
+            u.active_users_30d,
+            c.total_contracts,
+            c.today_new_contracts,
+            c.overdue_contracts,
+            c.total_contract_amount,
+            p.total_pay_success,
+            p.today_pay_amount,
+            p.month_pay_amount
+        FROM
+        (SELECT
+            COUNT(*)                                                                     AS total_users,
+            SUM(CASE WHEN DATE(create_time) = CURDATE() THEN 1 ELSE 0 END)              AS today_new_users,
+            SUM(CASE WHEN verified = 2 THEN 1 ELSE 0 END)                               AS verified_users,
+            SUM(CASE WHEN login_date >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END)  AS active_users_7d,
+            SUM(CASE WHEN login_date >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS active_users_30d
+         FROM system_users WHERE deleted = 0) u,
+        (SELECT
+            COUNT(*)                                                                     AS total_contracts,
+            SUM(CASE WHEN DATE(create_time) = CURDATE() THEN 1 ELSE 0 END)              AS today_new_contracts,
+            SUM(CASE WHEN end_date &lt; CURDATE() AND status NOT IN (3,4) THEN 1 ELSE 0 END) AS overdue_contracts,
+            COALESCE(SUM(salary), 0)                                                    AS total_contract_amount
+         FROM custom_contract WHERE deleted = 0) c,
+        (SELECT
+            SUM(CASE WHEN status = 10 THEN 1 ELSE 0 END)                                AS total_pay_success,
+            COALESCE(SUM(CASE WHEN status = 10 AND DATE(create_time) = CURDATE() THEN price ELSE 0 END), 0) / 100  AS today_pay_amount,
+            COALESCE(SUM(CASE WHEN status = 10 AND create_time >= DATE_FORMAT(CURDATE(),'%Y-%m-01') THEN price ELSE 0 END), 0) / 100 AS month_pay_amount
+         FROM pay_order WHERE deleted = 0) p
+    </select>
+
+    <!-- ─── 近 30 天新增用户趋势 ───────────────────────────────── -->
+    <select id="selectNewUserTrend"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$TrendPoint">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m-%d') AS date,
+            COUNT(*)                              AS count
+        FROM system_users
+        WHERE deleted = 0
+          AND create_time >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY date
+    </select>
+
+    <!-- ─── 近 30 天 DAU 趋势 ─────────────────────────────────── -->
+    <select id="selectDauTrend"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$TrendPoint">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m-%d') AS date,
+            COUNT(DISTINCT user_id)              AS count
+        FROM system_login_log
+        WHERE deleted = 0
+          AND result = 0
+          AND create_time >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY date
+    </select>
+
+    <!-- ─── 登录时段分布（近 7 天，按小时） ──────────────────────── -->
+    <select id="selectLoginHourDist"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$HourCount">
+        SELECT
+            HOUR(create_time) AS hour,
+            COUNT(*)          AS count
+        FROM system_login_log
+        WHERE deleted = 0
+          AND result = 0
+          AND create_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        GROUP BY HOUR(create_time)
+        ORDER BY hour
+    </select>
+
+    <!-- ─── 支付汇总 ──────────────────────────────────────────── -->
+    <select id="selectPaySummary"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$PaySummary">
+        SELECT
+            COUNT(*)                                                            AS total_orders,
+            SUM(CASE WHEN status = 10 THEN 1 ELSE 0 END)                       AS success_orders,
+            SUM(CASE WHEN status = 0  THEN 1 ELSE 0 END)                       AS waiting_orders,
+            SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END)                       AS refund_orders,
+            SUM(CASE WHEN status = 30 THEN 1 ELSE 0 END)                       AS closed_orders,
+            COALESCE(SUM(CASE WHEN status = 10 THEN price ELSE 0 END), 0) / 100 AS total_success_amount
+        FROM pay_order
+        WHERE deleted = 0
+    </select>
+
+    <!-- ─── 近 14 天支付趋势 ──────────────────────────────────── -->
+    <select id="selectPayTrend"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$PayTrendPoint">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m-%d')                                AS date,
+            SUM(CASE WHEN status = 10 THEN 1 ELSE 0 END)                        AS success_count,
+            COALESCE(SUM(CASE WHEN status = 10 THEN price ELSE 0 END), 0) / 100 AS success_amount
+        FROM pay_order
+        WHERE deleted = 0
+          AND create_time >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY date
+    </select>
+
+    <!-- ─── 人脸认证分布 ───────────────────────────────────────── -->
+    <select id="selectFaceAuthDist"
+            resultType="cn.iocoder.yudao.module.custom.controller.admin.dashboard.vo.FaceAuthStatsVO">
+        SELECT
+            SUM(CASE WHEN verified = 0 OR verified IS NULL THEN 1 ELSE 0 END) AS unverified,
+            SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END)                     AS verifying,
+            SUM(CASE WHEN verified = 2 THEN 1 ELSE 0 END)                     AS verified
+        FROM system_users
+        WHERE deleted = 0
+    </select>
+
+    <!-- ─── 合同逾期摘要 ─────────────────────────────────────── -->
+    <select id="selectContractSummary"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$ContractSummary">
+        SELECT
+            SUM(CASE WHEN end_date &lt; CURDATE() AND status NOT IN (3,4) THEN 1 ELSE 0 END)          AS overdue_contracts,
+            COALESCE(SUM(CASE WHEN end_date &lt; CURDATE() AND status NOT IN (3,4) THEN salary END), 0) AS overdue_amount
+        FROM custom_contract
+        WHERE deleted = 0
+    </select>
+
+    <!-- ─── 合同状态分布 ─────────────────────────────────────── -->
+    <select id="selectContractStatusDist"
+            resultType="cn.iocoder.yudao.module.custom.controller.admin.dashboard.vo.ContractStatsVO$StatusItem">
+        SELECT
+            COALESCE(d.label, CONCAT('状态', c.status)) AS name,
+            COUNT(*)                                    AS value,
+            COALESCE(SUM(c.salary), 0)                  AS amount
+        FROM custom_contract c
+        LEFT JOIN system_dict_data d
+               ON d.value = CAST(c.status AS CHAR) COLLATE utf8mb4_unicode_ci AND d.dict_type = 'contract_status' AND d.deleted = 0
+        WHERE c.deleted = 0
+        GROUP BY c.status, d.label
+        ORDER BY c.status
+    </select>
+
+    <!-- ─── 近 30 天合同金额趋势 ────────────────────────────────── -->
+    <select id="selectContractAmountTrend"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$ContractTrendPoint">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m-%d') AS date,
+            COUNT(*)                             AS count,
+            COALESCE(SUM(salary), 0)             AS amount
+        FROM custom_contract
+        WHERE deleted = 0
+          AND create_time >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY date
+    </select>
+
+</mapper>
