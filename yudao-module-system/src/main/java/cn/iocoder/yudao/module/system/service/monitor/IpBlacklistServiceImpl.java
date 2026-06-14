@@ -15,6 +15,7 @@ import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -25,7 +26,8 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     /** 每个 IP 独立的 Redis key，TTL = 剩余封禁时长 */
     private static final String IP_KEY          = "security:ip:ban:%s";
     /** 永久封禁使用 100 年作为占位 TTL（Redis key 必须有 TTL） */
-    private static final long   PERMANENT_SECS  = 100L * 365 * 24 * 3600;
+    private static final long              PERMANENT_SECS  = 100L * 365 * 24 * 3600;
+    private static final DateTimeFormatter EXPIRE_FMT      = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     /** 兼容旧版 Set key，在 refreshCache 时一并清除 */
     private static final String LEGACY_SET_KEY  = "security:ip:blacklist";
 
@@ -78,7 +80,11 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
 
     @Override
     public void addToBlacklist(IpBlacklistAddReqVO reqVO) {
-        addToBlacklist(reqVO.getIp(), reqVO.getReason(), false, reqVO.getExpireTime());
+        LocalDateTime expireTime = null;
+        if (reqVO.getExpireTime() != null && !reqVO.getExpireTime().trim().isEmpty()) {
+            expireTime = LocalDateTime.parse(reqVO.getExpireTime().trim(), EXPIRE_FMT);
+        }
+        addToBlacklist(reqVO.getIp(), reqVO.getReason(), false, expireTime);
     }
 
     @Override

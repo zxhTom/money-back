@@ -105,4 +105,12 @@ public class SecurityMonitorController {
         ipBlacklistService.removeFromBlacklist(id);
         return success(true);
     }
+
+    @PostMapping("/blacklist/refresh-cache")
+    @Operation(summary = "刷新IP黑名单缓存")
+    @PreAuthorize("@ss.hasPermission('custom:security:blacklist:add')")
+    public CommonResult<Boolean> refreshBlacklistCache() {
+        ipBlacklistService.refreshCache();
+        return success(true);
+    }
 }
