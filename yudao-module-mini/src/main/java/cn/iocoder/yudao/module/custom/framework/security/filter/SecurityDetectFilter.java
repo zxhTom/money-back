@@ -97,7 +97,7 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
         }
 
         // 2. IP 风险检测（异步，不阻塞请求）
-        ipRiskCheckService.checkAsync(ip, getUserId(request), uri);
+//        ipRiskCheckService.checkAsync(ip, getUserId(request), uri);
 
         // 4. 暴力破解检测
         if (isBruteForcePath(uri)) {
