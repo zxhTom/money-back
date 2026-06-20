@@ -41,6 +41,7 @@ public interface OperateLogMapper extends BaseMapperX<OperateLogDO> {
                 .likeIfPresent(OperateLogDO::getType, pageReqDTO.getType())
                 .likeIfPresent(OperateLogDO::getSubType, pageReqDTO.getSubType())
                 .likeIfPresent(OperateLogDO::getAction, pageReqDTO.getAction())
+                .likeIfPresent(OperateLogDO::getUserIp, pageReqDTO.getUserIp())
                 .betweenIfPresent(OperateLogDO::getCreateTime, pageReqDTO.getCreateTime())
                 .orderByDesc(OperateLogDO::getId));
     }

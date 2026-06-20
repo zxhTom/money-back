@@ -59,7 +59,7 @@ spring:
   redis:
     host: 8.130.191.247
     port: 6379
-    database: 0
+    database: 1
     password: Qq_hello_021615996779085
 
 --- #################### 定时任务相关配置 ####################

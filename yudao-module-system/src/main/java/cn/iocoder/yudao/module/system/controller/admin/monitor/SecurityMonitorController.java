@@ -9,10 +9,13 @@ import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpDiagnoseResu
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertHandleReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistLogDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.UserIpHistoryDO;
 import cn.iocoder.yudao.module.system.service.monitor.IpBlacklistService;
 import cn.iocoder.yudao.module.system.service.monitor.IpRiskCheckService;
 import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
+import cn.iocoder.yudao.module.system.service.monitor.UserIpHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,6 +44,8 @@ public class SecurityMonitorController {
     private IpBlacklistService ipBlacklistService;
     @Resource
     private IpRiskCheckService ipRiskCheckService;
+    @Resource
+    private UserIpHistoryService userIpHistoryService;
 
     // ─── 安全告警 ────────────────────────────────────────────
 
@@ -112,5 +117,21 @@ public class SecurityMonitorController {
     public CommonResult<Boolean> refreshBlacklistCache() {
         ipBlacklistService.refreshCache();
         return success(true);
+    }
+
+    @GetMapping("/user/ip-history")
+    @Operation(summary = "查询用户历史IP")
+    @Parameter(name = "userId", description = "用户ID", required = true)
+    @PreAuthorize("@ss.hasPermission('system:user:query')")
+    public CommonResult<List<UserIpHistoryDO>> getUserIpHistory(@RequestParam Long userId) {
+        return success(userIpHistoryService.getByUserId(userId));
+    }
+
+    @GetMapping("/blacklist/logs")
+    @Operation(summary = "查询IP封禁历史")
+    @Parameter(name = "ip", description = "IP地址", required = true)
+    @PreAuthorize("@ss.hasPermission('custom:security:blacklist:query')")
+    public CommonResult<List<IpBlacklistLogDO>> getBanLogs(@RequestParam String ip) {
+        return success(ipBlacklistService.getBanLogs(ip));
     }
 }

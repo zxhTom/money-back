@@ -15,6 +15,9 @@ public class IpBlacklistDO {
     private Long id;
     private String ip;
     private String reason;
+    private Integer banCount;
+    /** 0=封禁中 1=已解封 */
+    private Integer status;
     private Boolean autoAdded;
     private LocalDateTime expireTime;
     private LocalDateTime createTime;

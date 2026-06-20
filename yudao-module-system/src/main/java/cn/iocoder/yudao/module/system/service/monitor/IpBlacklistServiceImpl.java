@@ -5,8 +5,11 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpBlacklistAddReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistLogDO;
+import cn.iocoder.yudao.module.system.dal.mysql.monitor.IpBlacklistLogMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.monitor.IpBlacklistMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -23,18 +26,14 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class IpBlacklistServiceImpl implements IpBlacklistService {
 
-    /** 每个 IP 独立的 Redis key，TTL = 剩余封禁时长 */
-    private static final String IP_KEY          = "security:ip:ban:%s";
-    /** 永久封禁使用 100 年作为占位 TTL（Redis key 必须有 TTL） */
-    private static final long              PERMANENT_SECS  = 100L * 365 * 24 * 3600;
-    private static final DateTimeFormatter EXPIRE_FMT      = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    /** 兼容旧版 Set key，在 refreshCache 时一并清除 */
-    private static final String LEGACY_SET_KEY  = "security:ip:blacklist";
+    private static final String            IP_KEY         = "security:ip:ban:%s";
+    private static final long              PERMANENT_SECS = 100L * 365 * 24 * 3600;
+    private static final DateTimeFormatter EXPIRE_FMT     = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String            LEGACY_SET_KEY = "security:ip:blacklist";
 
-    @Resource
-    private IpBlacklistMapper ipBlacklistMapper;
-    @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    @Resource private IpBlacklistMapper    ipBlacklistMapper;
+    @Resource private IpBlacklistLogMapper ipBlacklistLogMapper;
+    @Resource private StringRedisTemplate  stringRedisTemplate;
 
     @PostConstruct
     public void init() {
@@ -48,31 +47,43 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     @Override
     public boolean isBlacklisted(String ip) {
         if (ip == null) return false;
-        // 先查 Redis 独立 key（O(1)，带 TTL 自动过期）
         if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(String.format(IP_KEY, ip)))) return true;
-        // Redis 无记录时回查 DB（冷启动或 key 丢失）
         return ipBlacklistMapper.countActiveByIp(ip) > 0;
     }
 
     @Override
     public void addToBlacklist(String ip, String reason, boolean autoAdded, LocalDateTime expireTime) {
-        // 1. 写库
         IpBlacklistDO existing = ipBlacklistMapper.selectOne(
                 new LambdaQueryWrapper<IpBlacklistDO>().eq(IpBlacklistDO::getIp, ip));
+
         if (existing != null) {
-            existing.setReason(reason);
-            existing.setExpireTime(expireTime);
-            ipBlacklistMapper.updateById(existing);
+            ipBlacklistMapper.update(null, new LambdaUpdateWrapper<IpBlacklistDO>()
+                    .eq(IpBlacklistDO::getId, existing.getId())
+                    .set(IpBlacklistDO::getReason, reason)
+                    .set(IpBlacklistDO::getExpireTime, expireTime)
+                    .set(IpBlacklistDO::getStatus, 0)
+                    .setSql("ban_count = ban_count + 1"));
         } else {
             IpBlacklistDO record = new IpBlacklistDO();
             record.setIp(ip);
             record.setReason(reason);
             record.setAutoAdded(autoAdded);
             record.setExpireTime(expireTime);
+            record.setBanCount(1);
+            record.setStatus(0);
             record.setCreateTime(LocalDateTime.now());
             ipBlacklistMapper.insert(record);
         }
-        // 2. 写 Redis（独立 key + TTL 与过期时间对齐）
+
+        // 写历史日志
+        IpBlacklistLogDO entry = new IpBlacklistLogDO();
+        entry.setIp(ip);
+        entry.setReason(reason);
+        entry.setAutoAdded(autoAdded);
+        entry.setExpireTime(expireTime);
+        entry.setCreateTime(LocalDateTime.now());
+        ipBlacklistLogMapper.insert(entry);
+
         setRedisKey(ip, expireTime);
         log.warn("[IpBlacklist] IP 已加入黑名单: {} 原因: {} 过期: {}", ip, reason,
                 expireTime != null ? expireTime : "永久");
@@ -90,26 +101,32 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     @Override
     public void removeFromBlacklist(Long id) {
         IpBlacklistDO record = ipBlacklistMapper.selectById(id);
-        if (record != null) {
-            ipBlacklistMapper.deleteById(id);
-            stringRedisTemplate.delete(String.format(IP_KEY, record.getIp()));
-        }
+        if (record == null) return;
+        ipBlacklistMapper.update(null, new LambdaUpdateWrapper<IpBlacklistDO>()
+                .eq(IpBlacklistDO::getId, id)
+                .set(IpBlacklistDO::getStatus, 1));
+        stringRedisTemplate.delete(String.format(IP_KEY, record.getIp()));
+        log.info("[IpBlacklist] IP 已解封: {}", record.getIp());
     }
 
     @Override
     public PageResult<IpBlacklistDO> getPage(PageParam pageParam) {
         return ipBlacklistMapper.selectPage(pageParam, new LambdaQueryWrapperX<IpBlacklistDO>()
+                .eq(IpBlacklistDO::getStatus, 0)
                 .orderByDesc(IpBlacklistDO::getId));
     }
 
     @Override
-    public void refreshCache() {
-        // 清除旧版 Set key
-        stringRedisTemplate.delete(LEGACY_SET_KEY);
+    public List<IpBlacklistLogDO> getBanLogs(String ip) {
+        return ipBlacklistLogMapper.selectByIp(ip);
+    }
 
-        // 查所有有效记录，重建各自的独立 key
+    @Override
+    public void refreshCache() {
+        stringRedisTemplate.delete(LEGACY_SET_KEY);
         List<IpBlacklistDO> actives = ipBlacklistMapper.selectList(
                 new LambdaQueryWrapper<IpBlacklistDO>()
+                        .eq(IpBlacklistDO::getStatus, 0)
                         .and(w -> w.isNull(IpBlacklistDO::getExpireTime)
                                    .or().gt(IpBlacklistDO::getExpireTime, LocalDateTime.now())));
         for (IpBlacklistDO record : actives) {
@@ -118,8 +135,6 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
         log.info("[IpBlacklist] 黑名单缓存已刷新，共 {} 个IP", actives.size());
     }
 
-    // ── 工具方法 ──────────────────────────────────────────────────
-
     private void setRedisKey(String ip, LocalDateTime expireTime) {
         String key = String.format(IP_KEY, ip);
         if (expireTime != null) {
@@ -127,7 +142,6 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
             if (ttl > 0) {
                 stringRedisTemplate.opsForValue().set(key, "1", ttl, TimeUnit.SECONDS);
             }
-            // ttl <= 0 说明已过期，不写入（等价于未封禁）
         } else {
             stringRedisTemplate.opsForValue().set(key, "1", PERMANENT_SECS, TimeUnit.SECONDS);
         }

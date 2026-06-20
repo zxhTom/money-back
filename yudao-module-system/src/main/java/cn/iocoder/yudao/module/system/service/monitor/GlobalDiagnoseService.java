@@ -4,17 +4,23 @@ import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.GlobalIpDiagno
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.UserBehaviorVO;
 
 import java.util.List;
+import java.util.Map;
 
 public interface GlobalDiagnoseService {
 
-    /**
-     * 扫描近 N 天内出现的所有 IP，关联用户、时间、来源，并检测风险。
-     * 已缓存的 IP 直接返回缓存结果；未缓存的逐一调用外部接口（最多 MAX_UNCACHED 个）。
-     */
     List<GlobalIpDiagnoseVO> scanAllIps(int days);
 
-    /**
-     * 分析近 30 天所有用户的登录行为：登录频次、失败次数、多 IP、活跃度、异常 IP。
-     */
     List<UserBehaviorVO> analyzeUserBehavior();
+
+    /**
+     * 触发IP全局扫描。
+     * 有缓存 → 立即返回 {status:"cached", data:[...]}
+     * 无缓存 → 启动异步任务，返回 {status:"processing"}，完成后通过 WebSocket 推送结果
+     */
+    Map<String, Object> triggerScanAllIps(int days);
+
+    /**
+     * 触发用户行为分析，同上。
+     */
+    Map<String, Object> triggerAnalyzeUserBehavior();
 }

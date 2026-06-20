@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.loginlog.LoginLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.logger.LoginLogDO;
 import cn.iocoder.yudao.module.system.dal.mysql.logger.LoginLogMapper;
+import cn.iocoder.yudao.module.system.service.monitor.UserIpHistoryService;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -22,6 +23,8 @@ public class LoginLogServiceImpl implements LoginLogService {
 
     @Resource
     private LoginLogMapper loginLogMapper;
+    @Resource
+    private UserIpHistoryService userIpHistoryService;
 
     @Override
     public PageResult<LoginLogDO> getLoginLogPage(LoginLogPageReqVO pageReqVO) {
@@ -32,6 +35,10 @@ public class LoginLogServiceImpl implements LoginLogService {
     public void createLoginLog(LoginLogCreateReqDTO reqDTO) {
         LoginLogDO loginLog = BeanUtils.toBean(reqDTO, LoginLogDO.class);
         loginLogMapper.insert(loginLog);
+        // 登录成功时记录用户IP历史（result=0 表示成功）
+        if (Integer.valueOf(0).equals(reqDTO.getResult()) && reqDTO.getUserId() != null) {
+            userIpHistoryService.record(reqDTO.getUserId(), reqDTO.getUserIp());
+        }
     }
 
     @Override

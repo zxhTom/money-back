@@ -10,9 +10,9 @@ import java.util.List;
 @Mapper
 public interface IpBlacklistMapper extends BaseMapperX<IpBlacklistDO> {
 
-    @Select("SELECT ip FROM custom_ip_blacklist WHERE expire_time IS NULL OR expire_time > NOW()")
+    @Select("SELECT ip FROM custom_ip_blacklist WHERE status = 0 AND (expire_time IS NULL OR expire_time > NOW())")
     List<String> selectAllActiveIps();
 
-    @Select("SELECT COUNT(*) FROM custom_ip_blacklist WHERE ip = #{ip} AND (expire_time IS NULL OR expire_time > NOW())")
+    @Select("SELECT COUNT(*) FROM custom_ip_blacklist WHERE ip = #{ip} AND status = 0 AND (expire_time IS NULL OR expire_time > NOW())")
     int countActiveByIp(String ip);
 }
