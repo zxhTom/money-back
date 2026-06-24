@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.system.api.logger.dto.OperateLogPageReqDTO;
 import cn.iocoder.yudao.module.system.controller.admin.logger.vo.operatelog.OperateLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.logger.OperateLogDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpUserRefDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.UserIpStatDO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -22,6 +23,13 @@ public interface OperateLogMapper extends BaseMapperX<OperateLogDO> {
     @Select("SELECT DISTINCT user_ip FROM system_operate_log " +
             "WHERE user_id = #{userId} AND user_ip IS NOT NULL AND user_ip != '' AND deleted = 0")
     List<String> selectDistinctIpsByUserId(Long userId);
+
+    /** 某用户的 IP 使用统计（用于 IP 记录，与诊断同源） */
+    @Select("SELECT user_ip AS ip, MIN(create_time) AS firstSeen, MAX(create_time) AS lastSeen, COUNT(*) AS count " +
+            "FROM system_operate_log " +
+            "WHERE user_id = #{userId} AND user_ip IS NOT NULL AND user_ip != '' AND deleted = 0 " +
+            "GROUP BY user_ip")
+    List<UserIpStatDO> selectIpStatsByUserId(@Param("userId") Long userId);
 
     @Select("SELECT user_ip AS ip, user_id AS userId, " +
             "  MAX(create_time) AS lastSeen, MIN(create_time) AS firstSeen " +

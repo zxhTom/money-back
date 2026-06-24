@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.system.controller.admin.logger.vo.loginlog.LoginL
 import cn.iocoder.yudao.module.system.dal.dataobject.logger.LoginLogDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpUserRefDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.LoginUserStatsDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.UserIpStatDO;
 import cn.iocoder.yudao.module.system.enums.logger.LoginResultEnum;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
@@ -23,6 +24,13 @@ public interface LoginLogMapper extends BaseMapperX<LoginLogDO> {
     @Select("SELECT DISTINCT user_ip FROM system_login_log " +
             "WHERE user_id = #{userId} AND user_ip IS NOT NULL AND user_ip != '' AND deleted = 0")
     List<String> selectDistinctIpsByUserId(Long userId);
+
+    /** 某用户的 IP 使用统计（用于 IP 记录，与诊断同源） */
+    @Select("SELECT user_ip AS ip, MIN(create_time) AS firstSeen, MAX(create_time) AS lastSeen, COUNT(*) AS count " +
+            "FROM system_login_log " +
+            "WHERE user_id = #{userId} AND user_ip IS NOT NULL AND user_ip != '' AND deleted = 0 " +
+            "GROUP BY user_ip")
+    List<UserIpStatDO> selectIpStatsByUserId(@Param("userId") Long userId);
 
     /** 近 N 天内：IP → 用户关联（用于全局诊断） */
     @Select("SELECT user_ip AS ip, user_id AS userId, username, " +

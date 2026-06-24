@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.DataAccessLogPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.DataAccessLogDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpUserRefDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.UserIpStatDO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -21,6 +22,13 @@ public interface DataAccessLogMapper extends BaseMapperX<DataAccessLogDO> {
     @Select("SELECT DISTINCT client_ip FROM custom_data_access_log " +
             "WHERE user_id = #{userId} AND deleted = 0 AND client_ip IS NOT NULL AND client_ip != ''")
     List<String> selectDistinctIpsByUserId(Long userId);
+
+    /** 某用户的 IP 使用统计（用于 IP 记录，与诊断同源） */
+    @Select("SELECT client_ip AS ip, MIN(access_time) AS firstSeen, MAX(access_time) AS lastSeen, COUNT(*) AS count " +
+            "FROM custom_data_access_log " +
+            "WHERE user_id = #{userId} AND client_ip IS NOT NULL AND client_ip != '' AND deleted = 0 " +
+            "GROUP BY client_ip")
+    List<UserIpStatDO> selectIpStatsByUserId(@Param("userId") Long userId);
 
     @Select("SELECT client_ip AS ip, user_id AS userId, username, " +
             "  MAX(access_time) AS lastSeen, MIN(access_time) AS firstSeen " +
