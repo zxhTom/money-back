@@ -4,7 +4,6 @@ import lombok.Data;
 
 @Data
 public class FaceAuthStatsVO {
-    private Long unverified; // verified = 0
-    private Long verifying;  // verified = 1
-    private Long verified;   // verified = 2
+    private Long unverified; // verified = 0 或 null
+    private Long verified;   // verified = 1
 }

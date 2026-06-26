@@ -68,4 +68,7 @@ public class ContractPageReqVO extends PageParam {
     @Schema(description = "已还金额")
     private BigDecimal refund;
 
+    @Schema(description = "仅查询逾期合同：结束时间早于当前时间，且状态非已完结(3)/已取消(4)", example = "true")
+    private Boolean overdue;
+
 }

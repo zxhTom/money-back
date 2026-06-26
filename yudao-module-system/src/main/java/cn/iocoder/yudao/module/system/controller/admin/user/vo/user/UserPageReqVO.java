@@ -41,4 +41,11 @@ public class UserPageReqVO extends PageParam {
     @Schema(description = "角色编号", example = "1024")
     private Long roleId;
 
+    @Schema(description = "人脸认证状态：0-未认证，1-已认证", example = "1")
+    private Integer verified;
+
+    @Schema(description = "最近登录时间", example = "[2022-07-01 00:00:00, 2022-07-01 23:59:59]")
+    @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
+    private LocalDateTime[] loginDate;
+
 }

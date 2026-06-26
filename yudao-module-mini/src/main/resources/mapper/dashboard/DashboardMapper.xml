@@ -22,7 +22,7 @@
         (SELECT
             COUNT(*)                                                                     AS total_users,
             SUM(CASE WHEN DATE(create_time) = CURDATE() THEN 1 ELSE 0 END)              AS today_new_users,
-            SUM(CASE WHEN verified = 2 THEN 1 ELSE 0 END)                               AS verified_users,
+            SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END)                               AS verified_users,
             SUM(CASE WHEN login_date >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END)  AS active_users_7d,
             SUM(CASE WHEN login_date >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS active_users_30d
          FROM system_users WHERE deleted = 0) u,
@@ -109,12 +109,12 @@
     </select>
 
     <!-- ─── 人脸认证分布 ───────────────────────────────────────── -->
+    <!-- verified 实际只有 0/1 两个值（见 WechatServiceImpl.updateVerify），不存在“认证中”状态 -->
     <select id="selectFaceAuthDist"
             resultType="cn.iocoder.yudao.module.custom.controller.admin.dashboard.vo.FaceAuthStatsVO">
         SELECT
             SUM(CASE WHEN verified = 0 OR verified IS NULL THEN 1 ELSE 0 END) AS unverified,
-            SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END)                     AS verifying,
-            SUM(CASE WHEN verified = 2 THEN 1 ELSE 0 END)                     AS verified
+            SUM(CASE WHEN verified = 1 THEN 1 ELSE 0 END)                     AS verified
         FROM system_users
         WHERE deleted = 0
     </select>

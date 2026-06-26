@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.dal.mysql.contract;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -17,8 +18,18 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 @Mapper
 public interface ContractMapper extends BaseMapperX<ContractDO> {
 
+    /** 与 DashboardMapper 中“逾期合同”的口径保持一致：已完结(3)/已取消(4)状态不算逾期 */
+    List<Integer> NOT_OVERDUE_STATUSES = Arrays.asList(3, 4);
+
+    static void applyOverdue(LambdaQueryWrapperX<ContractDO> wrapper, Boolean overdue) {
+        if (Boolean.TRUE.equals(overdue)) {
+            wrapper.lt(ContractDO::getEndDate, LocalDateTime.now())
+                    .notIn(ContractDO::getStatus, NOT_OVERDUE_STATUSES);
+        }
+    }
+
     default PageResult<ContractDO> selectPage(ContractPageReqVO reqVO) {
-        return selectPage(reqVO, new LambdaQueryWrapperX<ContractDO>()
+        LambdaQueryWrapperX<ContractDO> wrapper = new LambdaQueryWrapperX<ContractDO>()
                 .likeIfPresent(ContractDO::getIndebtedName, reqVO.getIndebtedName())
                 .eqIfPresent(ContractDO::getIndebtedId, reqVO.getIndebtedId())
                 .likeIfPresent(ContractDO::getCreditorName, reqVO.getCreditorName())
@@ -36,7 +47,9 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
                 .eqIfPresent(ContractDO::getFile, reqVO.getFile())
                 .eqIfPresent(ContractDO::getInterest, reqVO.getInterest())
                 .eqIfPresent(ContractDO::getRefund, reqVO.getRefund())
-                .orderByDesc(ContractDO::getId));
+                .orderByDesc(ContractDO::getId);
+        applyOverdue(wrapper, reqVO.getOverdue());
+        return selectPage(reqVO, wrapper);
     }
 
     /**
@@ -47,7 +60,7 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
      * @return 合同分页
      */
     default PageResult<ContractDO> selectSelfPage(ContractPageReqVO reqVO, String creator) {
-        return selectPage(reqVO, new LambdaQueryWrapperX<ContractDO>()
+        LambdaQueryWrapperX<ContractDO> wrapper = new LambdaQueryWrapperX<ContractDO>()
                 .eqIfPresent(ContractDO::getCreator, creator)  // 只查询当前登录用户创建的数据
                 .likeIfPresent(ContractDO::getIndebtedName, reqVO.getIndebtedName())
                 .eqIfPresent(ContractDO::getIndebtedId, reqVO.getIndebtedId())
@@ -66,7 +79,9 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
                 .eqIfPresent(ContractDO::getFile, reqVO.getFile())
                 .eqIfPresent(ContractDO::getInterest, reqVO.getInterest())
                 .eqIfPresent(ContractDO::getRefund, reqVO.getRefund())
-                .orderByDesc(ContractDO::getId));
+                .orderByDesc(ContractDO::getId);
+        applyOverdue(wrapper, reqVO.getOverdue());
+        return selectPage(reqVO, wrapper);
     }
 
 }

@@ -50,7 +50,9 @@ public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
                 .likeIfPresent(AdminUserDO::getMobile, reqVO.getMobile())
                 .eqIfPresent(AdminUserDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(AdminUserDO::getIdNo, reqVO.getIdNo())
+                .eqIfPresent(AdminUserDO::getVerified, reqVO.getVerified())
                 .betweenIfPresent(AdminUserDO::getCreateTime, reqVO.getCreateTime())
+                .betweenIfPresent(AdminUserDO::getLoginDate, reqVO.getLoginDate())
                 .inIfPresent(AdminUserDO::getDeptId, deptIds)
                 .inIfPresent(AdminUserDO::getId, userIds)
                 .orderByDesc(AdminUserDO::getId));
