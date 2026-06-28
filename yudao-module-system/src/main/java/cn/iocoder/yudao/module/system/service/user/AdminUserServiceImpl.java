@@ -52,6 +52,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.system.enums.LogRecordConstants.*;
+import cn.iocoder.yudao.module.system.util.PasswordStrengthUtil;
 
 /**
  * 后台用户 Service 实现类
@@ -113,6 +114,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         AdminUserDO user = BeanUtils.toBean(createReqVO, AdminUserDO.class);
         user.setStatus(CommonStatusEnum.ENABLE.getStatus()); // 默认开启
         user.setPassword(encodePassword(createReqVO.getPassword())); // 加密密码
+        user.setPasswordStrength(PasswordStrengthUtil.calc(createReqVO.getPassword()));
         userMapper.insert(user);
         // 2.2 插入关联岗位
         if (CollectionUtil.isNotEmpty(user.getPostIds())) {
@@ -256,6 +258,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         // 执行更新
         AdminUserDO updateObj = new AdminUserDO().setId(id);
         updateObj.setPassword(encodePassword(reqVO.getNewPassword())); // 加密密码
+        updateObj.setPasswordStrength(PasswordStrengthUtil.calc(reqVO.getNewPassword()));
         userMapper.updateById(updateObj);
         // 密码变更后强制下线
         oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
@@ -271,8 +274,12 @@ public class AdminUserServiceImpl implements AdminUserService {
         // 2. 更新密码
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(id);
-        updateObj.setPassword(encodePassword(password)); // 加密密码
-        updateObj.setPayPassword(updateObj.getPassword());
+        updateObj.setPassword(encodePassword(password));
+        // 读取配置：false=仅重置登录密码；其他（true/null）=同时重置支付密码（保持原有行为）
+        if (!"false".equals(configApi.getConfigValueByKey("system.user.reset-password-sync-pay"))) {
+            updateObj.setPayPassword(updateObj.getPassword());
+        }
+        updateObj.setPasswordStrength(PasswordStrengthUtil.calc(password));
         userMapper.updateById(updateObj);
 
         // 3. 记录操作日志上下文
@@ -290,9 +297,19 @@ public class AdminUserServiceImpl implements AdminUserService {
         String encoded = encodePassword(password);
         updateObj.setPassword(encoded);
         updateObj.setPayPassword(encoded);
+        updateObj.setPasswordStrength(PasswordStrengthUtil.calc(password));
         userMapper.updateById(updateObj);
         // 密码变更后强制下线
         oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
+    }
+
+    @Override
+    public void updateUserPayPassword(Long id, String payPassword) {
+        validateUserExists(id);
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(id);
+        updateObj.setPayPassword(encodePassword(payPassword));
+        userMapper.updateById(updateObj);
     }
 
     @Override
@@ -592,7 +609,9 @@ public class AdminUserServiceImpl implements AdminUserService {
             AdminUserDO existUser = userMapper.selectByUsername(importUser.getUsername());
             if (existUser == null) {
                 userMapper.insert(BeanUtils.toBean(importUser, AdminUserDO.class)
-                        .setPassword(encodePassword(initPassword)).setPostIds(new HashSet<>())); // 设置默认密码及空岗位编号数组
+                        .setPassword(encodePassword(initPassword))
+                        .setPasswordStrength(PasswordStrengthUtil.calc(initPassword))
+                        .setPostIds(new HashSet<>()));
                 respVO.getCreateUsernames().add(importUser.getUsername());
                 return;
             }
@@ -631,6 +650,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         String rawPayPassword = StrUtil.isNotBlank(user.getPayPassword()) ? user.getPayPassword() : rawPassword;
         user.setPassword(encodePassword(rawPassword)); // 加密密码
         user.setPayPassword(encodePassword(rawPayPassword));
+        user.setPasswordStrength(PasswordStrengthUtil.calc(rawPassword));
         userMapper.insert(user);
         return 1;
     }

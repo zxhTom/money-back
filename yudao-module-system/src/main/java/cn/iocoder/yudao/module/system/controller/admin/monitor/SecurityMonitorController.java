@@ -8,6 +8,8 @@ import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpBlacklistAdd
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpDiagnoseResultVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertHandleReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.UserIpStatVO;
+import cn.iocoder.yudao.module.system.dal.mysql.monitor.UserIpHistoryMapper;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistLogDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
@@ -41,6 +43,8 @@ public class SecurityMonitorController {
     @Resource
     private SecurityAlertService securityAlertService;
     @Resource
+    private UserIpHistoryMapper userIpHistoryMapper;
+    @Resource
     private IpBlacklistService ipBlacklistService;
     @Resource
     private IpRiskCheckService ipRiskCheckService;
@@ -51,14 +55,14 @@ public class SecurityMonitorController {
 
     @GetMapping("/alert/page")
     @Operation(summary = "分页查询安全告警")
-    @PreAuthorize("@ss.hasPermission('custom:security:alert:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:alert:query','mini:admin:security:alert')")
     public CommonResult<PageResult<SecurityAlertDO>> getAlertPage(@Valid SecurityAlertPageReqVO pageReqVO) {
         return success(securityAlertService.getPage(pageReqVO));
     }
 
     @PutMapping("/alert/handle")
     @Operation(summary = "处理安全告警")
-    @PreAuthorize("@ss.hasPermission('custom:security:alert:handle')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:alert:handle','mini:admin:security:alert')")
     public CommonResult<Boolean> handleAlert(@Valid @RequestBody SecurityAlertHandleReqVO reqVO) {
         securityAlertService.handle(reqVO, SecurityFrameworkUtils.getLoginUserId());
         return success(true);
@@ -66,7 +70,7 @@ public class SecurityMonitorController {
 
     @GetMapping("/stats")
     @Operation(summary = "安全统计概览")
-    @PreAuthorize("@ss.hasPermission('custom:security:alert:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:alert:query','mini:admin:security:alert')")
     public CommonResult<Map<String, Object>> getStats() {
         Map<String, Object> stats = new HashMap<>();
         stats.put("todayUnhandled", securityAlertService.countTodayUnhandled());
@@ -89,14 +93,14 @@ public class SecurityMonitorController {
 
     @GetMapping("/blacklist/page")
     @Operation(summary = "分页查询IP黑名单")
-    @PreAuthorize("@ss.hasPermission('custom:security:blacklist:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:query','mini:admin:security:blacklist')")
     public CommonResult<PageResult<IpBlacklistDO>> getBlacklistPage(@Valid PageParam pageParam) {
         return success(ipBlacklistService.getPage(pageParam));
     }
 
     @PostMapping("/blacklist/add")
     @Operation(summary = "手动添加IP黑名单")
-    @PreAuthorize("@ss.hasPermission('custom:security:blacklist:add')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:add','mini:admin:security:blacklist')")
     public CommonResult<Boolean> addBlacklist(@Valid @RequestBody IpBlacklistAddReqVO reqVO) {
         ipBlacklistService.addToBlacklist(reqVO);
         return success(true);
@@ -105,7 +109,7 @@ public class SecurityMonitorController {
     @DeleteMapping("/blacklist/remove")
     @Operation(summary = "从黑名单移除IP")
     @Parameter(name = "id", description = "黑名单记录ID", required = true)
-    @PreAuthorize("@ss.hasPermission('custom:security:blacklist:remove')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
     public CommonResult<Boolean> removeBlacklist(@RequestParam Long id) {
         ipBlacklistService.removeFromBlacklist(id);
         return success(true);
@@ -113,10 +117,19 @@ public class SecurityMonitorController {
 
     @PostMapping("/blacklist/refresh-cache")
     @Operation(summary = "刷新IP黑名单缓存")
-    @PreAuthorize("@ss.hasPermission('custom:security:blacklist:add')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:add','mini:admin:security:blacklist')")
     public CommonResult<Boolean> refreshBlacklistCache() {
         ipBlacklistService.refreshCache();
         return success(true);
+    }
+
+    @GetMapping("/user/ip-count-stats")
+    @Operation(summary = "按用户统计使用过的 IP 数（Top N）")
+    @Parameter(name = "limit", description = "返回条数", example = "10")
+    @PreAuthorize("@ss.hasPermission('system:user:query')")
+    public CommonResult<List<UserIpStatVO>> getUserIpCountStats(
+            @RequestParam(defaultValue = "10") int limit) {
+        return success(userIpHistoryMapper.selectTopUsersByIpCount(limit));
     }
 
     @GetMapping("/user/ip-history")

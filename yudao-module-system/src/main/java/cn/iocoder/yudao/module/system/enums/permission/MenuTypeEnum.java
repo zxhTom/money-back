@@ -14,7 +14,8 @@ public enum MenuTypeEnum {
 
     DIR(1), // 目录
     MENU(2), // 菜单
-    BUTTON(3) // 按钮
+    BUTTON(3), // 按钮
+    MINI_APP(4) // 小程序功能资源
     ;
 
     /**

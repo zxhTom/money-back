@@ -13,6 +13,8 @@ public @interface AuditLog {
     String entityType() default "";
     // SpEL 表达式，从方法返回值或参数中提取实体ID，如 "#result.data" 或 "#id"
     String entityIdExpression() default "";
+    // 无登录态时（如 @PermitAll 接口），用 SpEL 从请求参数中提取用户标识作为 username
+    String usernameExpression() default "";
     // 是否在执行前抓取操作对象的快照（需要 Service 配合）
     boolean captureBeforeData() default false;
     boolean captureAfterData() default false;

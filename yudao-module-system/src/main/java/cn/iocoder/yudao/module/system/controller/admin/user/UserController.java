@@ -95,6 +95,14 @@ public class UserController {
         return success(true);
     }
 
+    @PutMapping("/update-pay-password")
+    @Operation(summary = "重置用户支付密码")
+    @PreAuthorize("@ss.hasPermission('system:user:update-password')")
+    public CommonResult<Boolean> updateUserPayPassword(@Valid @RequestBody UserUpdatePayPasswordReqVO reqVO) {
+        userService.updateUserPayPassword(reqVO.getId(), reqVO.getPayPassword());
+        return success(true);
+    }
+
     @PutMapping("/update-status")
     @Operation(summary = "修改用户状态")
     @PreAuthorize("@ss.hasPermission('system:user:update')")

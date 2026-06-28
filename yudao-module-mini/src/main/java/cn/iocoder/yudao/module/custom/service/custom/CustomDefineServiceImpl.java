@@ -255,7 +255,12 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     }
 
     @Override
-    public Long createDemoOrder(Long userId, ContractPayOrderCreateReqVO createReqVO ) {
+    public Long createDemoOrder(Long userId, ContractPayOrderCreateReqVO createReqVO) {
+        // 校验支付密码
+        AdminUserDO user = userService.getUser(userId);
+        if (!passwordEncoder.matches(createReqVO.getPassword(), user.getPayPassword())) {
+            throw exception(USER_PASSWORD_FAILED);
+        }
         // 1.1 获得商品
         ContractDO contractDO = contractMapper.selectById(createReqVO.getContractId());
         Assert.notNull(contractDO, "合同({}) 不存在", createReqVO.getContractId());

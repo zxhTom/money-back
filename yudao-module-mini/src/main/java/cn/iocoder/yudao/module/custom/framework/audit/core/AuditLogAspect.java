@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.custom.dal.dataobject.audit.AuditLogDO;
 import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditLog;
 import cn.iocoder.yudao.module.custom.framework.audit.util.IpUtils;
 import cn.iocoder.yudao.module.custom.service.audit.AuditLogService;
+import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserUpdatePasswordReqVO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -36,6 +37,8 @@ public class AuditLogAspect {
 
     private static final ExpressionParser SPEL_PARSER = new SpelExpressionParser();
     private static final Pattern TEMPLATE_PATTERN = Pattern.compile("\\{\\{(.*?)\\}\\}");
+    private static final Pattern PASSWORD_PATTERN =
+            Pattern.compile("\"(?i)(password|passwd|pwd|payPassword|oldPassword|newPassword)\"\\s*:\\s*\"[^\"]*\"");
 
     @Resource
     private AuditLogService auditLogService;
@@ -54,11 +57,46 @@ public class AuditLogAspect {
             if (auditLog.captureAfterData() && result != null) {
                 logDO.setAfterData(toJson(result));
             }
-            // 解析实体 ID（从返回值中）
             if (StrUtil.isNotBlank(auditLog.entityIdExpression()) && result != null) {
                 Long entityId = evalEntityId(auditLog.entityIdExpression(), pjp, result);
                 if (entityId != null) logDO.setEntityId(entityId);
             }
+        } catch (Throwable e) {
+            logDO.setStatus(1);
+            logDO.setErrorMessage(truncate(e.getMessage(), 500));
+            throw e;
+        } finally {
+            logDO.setCostTime((int) (System.currentTimeMillis() - startTime));
+            logDO.setCreateTime(LocalDateTime.now());
+            auditLogService.saveAsync(logDO);
+        }
+        return result;
+    }
+
+    // 专门拦截 UserController.updateUserPassword，补录密码修改审计日志
+    @Around("execution(* cn.iocoder.yudao.module.system.controller.admin.user.UserController.updateUserPassword(..))")
+    public Object aroundUserPasswordUpdate(ProceedingJoinPoint pjp) throws Throwable {
+        long startTime = System.currentTimeMillis();
+        AuditLogDO logDO = new AuditLogDO();
+        logDO.setModule("用户管理");
+        logDO.setOperationType("UPDATE");
+        logDO.setOperation("管理员重置用户密码");
+        logDO.setEntityType("system_user");
+
+        Object[] args = pjp.getArgs();
+        if (args.length > 0 && args[0] instanceof UserUpdatePasswordReqVO) {
+            UserUpdatePasswordReqVO reqVO = (UserUpdatePasswordReqVO) args[0];
+            logDO.setEntityId(reqVO.getId());
+        }
+
+        fillUserInfo(logDO);
+        fillRequestInfo(logDO);
+        logDO.setRequestParams(captureRequestParams(pjp));
+
+        Object result = null;
+        try {
+            result = pjp.proceed();
+            logDO.setStatus(0);
         } catch (Throwable e) {
             logDO.setStatus(1);
             logDO.setErrorMessage(truncate(e.getMessage(), 500));
@@ -77,17 +115,31 @@ public class AuditLogAspect {
         logDO.setOperationType(auditLog.type().name());
         logDO.setEntityType(auditLog.entityType());
 
-        // 解析操作描述（支持简单 {{#param}} 模板替换）
         String operation = resolveOperation(auditLog.operation(), pjp);
         logDO.setOperation(operation);
 
-        // 解析实体 ID（从方法参数中）
         if (StrUtil.isNotBlank(auditLog.entityIdExpression())) {
             Long entityId = evalEntityId(auditLog.entityIdExpression(), pjp, null);
             if (entityId != null) logDO.setEntityId(entityId);
         }
 
-        // 填充当前用户信息
+        fillUserInfo(logDO);
+
+        // 无登录态时（@PermitAll），用 usernameExpression 提取目标标识作为 username
+        if (logDO.getUserId() == null && StrUtil.isNotBlank(auditLog.usernameExpression())) {
+            String resolved = evalStringExpression(auditLog.usernameExpression(), pjp);
+            if (StrUtil.isNotBlank(resolved)) {
+                logDO.setUsername(resolved);
+            }
+        }
+
+        fillRequestInfo(logDO);
+        logDO.setRequestParams(captureRequestParams(pjp));
+
+        return logDO;
+    }
+
+    private void fillUserInfo(AuditLogDO logDO) {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         if (loginUser != null) {
             logDO.setUserId(loginUser.getId());
@@ -95,8 +147,9 @@ public class AuditLogAspect {
             String nickname = loginUser.getInfo() != null ? loginUser.getInfo().get(LoginUser.INFO_KEY_NICKNAME) : null;
             logDO.setUsername(nickname);
         }
+    }
 
-        // 填充请求信息
+    private void fillRequestInfo(AuditLogDO logDO) {
         ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attrs != null) {
             HttpServletRequest request = attrs.getRequest();
@@ -107,14 +160,34 @@ public class AuditLogAspect {
             logDO.setAllIpHeaders(IpUtils.getAllIpHeadersJson(request));
             logDO.setUserAgent(truncate(request.getHeader("User-Agent"), 500));
         }
+    }
 
-        return logDO;
+    private String captureRequestParams(ProceedingJoinPoint pjp) {
+        try {
+            MethodSignature sig = (MethodSignature) pjp.getSignature();
+            Parameter[] params = sig.getMethod().getParameters();
+            Object[] args = pjp.getArgs();
+            for (int i = 0; i < params.length; i++) {
+                Object arg = args[i];
+                if (arg == null) continue;
+                String clsName = arg.getClass().getName();
+                // skip HttpServlet and primitive wrappers
+                if (clsName.startsWith("javax.servlet") || clsName.startsWith("org.springframework")) continue;
+                String json = toJson(arg);
+                // redact password fields
+                return PASSWORD_PATTERN.matcher(json).replaceAll(m -> {
+                    String key = m.group(1);
+                    return "\"" + key + "\":\"***\"";
+                });
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     private String resolveOperation(String template, ProceedingJoinPoint pjp) {
         if (StrUtil.isBlank(template)) return "";
         if (!template.contains("{{")) return template;
-        // 将 {{#expr}} 替换为实际值
         MethodSignature sig = (MethodSignature) pjp.getSignature();
         Parameter[] params = sig.getMethod().getParameters();
         Object[] args = pjp.getArgs();
@@ -139,6 +212,22 @@ public class AuditLogAspect {
             return sb.toString();
         } catch (Exception e) {
             return template;
+        }
+    }
+
+    private String evalStringExpression(String expression, ProceedingJoinPoint pjp) {
+        try {
+            MethodSignature sig = (MethodSignature) pjp.getSignature();
+            Parameter[] params = sig.getMethod().getParameters();
+            Object[] args = pjp.getArgs();
+            EvaluationContext ctx = new StandardEvaluationContext();
+            for (int i = 0; i < params.length; i++) {
+                ctx.setVariable(params[i].getName(), args[i]);
+            }
+            Object val = SPEL_PARSER.parseExpression(expression).getValue(ctx);
+            return val != null ? val.toString() : null;
+        } catch (Exception e) {
+            return null;
         }
     }
 

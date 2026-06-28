@@ -138,4 +138,10 @@ public class AdminUserDO extends TenantBaseDO {
      */
     private String payPassword;
 
+    /**
+     * 密码强度：0=未知（历史存量），1=弱，2=中，3=强
+     * 密码变更时同步计算写入
+     */
+    private Integer passwordStrength;
+
 }

@@ -358,7 +358,8 @@ public class CustomDefineController {
     @PermitAll
     @RateLimiter(time = 300, count = 5, keyResolver = ClientIpRateLimiterKeyResolver.class,
             message = "重置密码请求过于频繁，请稍后再试")
-    @AuditLog(module = "账户安全", type = AuditOperationType.UPDATE, operation = "通过身份证重置密码")
+    @AuditLog(module = "账户安全", type = AuditOperationType.UPDATE, operation = "通过身份证重置密码",
+              usernameExpression = "#reqVO.realname")
     public CommonResult<Boolean> resetPasswordByIdNo(@Valid @RequestBody ResetPasswordByIdNoReqVO reqVO) {
         customDefineService.resetPasswordByIdNo(reqVO);
         return success(true);
@@ -398,7 +399,8 @@ public class CustomDefineController {
     @PermitAll
     @RateLimiter(time = 300, count = 5, keyResolver = ClientIpRateLimiterKeyResolver.class,
             message = "重置密码请求过于频繁，请稍后再试")
-    @AuditLog(module = "账户安全", type = AuditOperationType.UPDATE, operation = "通过邮箱重置密码")
+    @AuditLog(module = "账户安全", type = AuditOperationType.UPDATE, operation = "通过邮箱重置密码",
+              usernameExpression = "#reqVO.email")
     public CommonResult<Boolean> updatePasswordByEmail(@Valid @RequestBody UserUpdatePasswordByEmailReqVO reqVO) {
         // 1. 验证邮箱验证码
         Boolean verifyResult = emailCodeService.verifyCode(reqVO.getEmail(), reqVO.getCode());

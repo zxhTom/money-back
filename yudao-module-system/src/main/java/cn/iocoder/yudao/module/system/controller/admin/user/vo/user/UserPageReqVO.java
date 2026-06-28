@@ -48,4 +48,7 @@ public class UserPageReqVO extends PageParam {
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] loginDate;
 
+    @Schema(description = "密码强度：0=未知，1=弱，2=中，3=强", example = "1")
+    private Integer passwordStrength;
+
 }

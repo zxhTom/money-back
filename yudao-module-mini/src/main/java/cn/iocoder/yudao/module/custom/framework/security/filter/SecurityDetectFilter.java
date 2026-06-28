@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.custom.framework.security.filter;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.module.custom.framework.audit.util.IpUtils;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.AlertRuleDO;
+import cn.iocoder.yudao.module.system.service.monitor.AlertRuleService;
 import cn.iocoder.yudao.module.system.service.monitor.IpBlacklistService;
 import cn.iocoder.yudao.module.system.service.monitor.IpRiskCheckService;
 import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
@@ -60,26 +62,28 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
             "/custom/contract/dashboard/send-email-code"
     ));
 
-    private static final int BRUTE_FORCE_THRESHOLD = 10;
-    private static final long BRUTE_FORCE_WINDOW_SECONDS = 300; // 5 分钟
-    private static final long AUTO_BAN_DURATION_SECONDS = 180000; // 自动封禁 3000 分钟
-
-    // SQL 注入可疑次数阈值
-    private static final int SQL_INJECT_THRESHOLD = 5;
+    // 默认阈值（数据库规则未配置时使用）
+    private static final int DEFAULT_BRUTE_FORCE_THRESHOLD = 10;
+    private static final long DEFAULT_BRUTE_FORCE_WINDOW = 300;
+    private static final long DEFAULT_AUTO_BAN_SECONDS = 180000;
+    private static final int DEFAULT_SQL_INJECT_THRESHOLD = 5;
 
     private final IpBlacklistService ipBlacklistService;
     private final SecurityAlertService securityAlertService;
     private final StringRedisTemplate redisTemplate;
     private final IpRiskCheckService ipRiskCheckService;
+    private final AlertRuleService alertRuleService;
 
     public SecurityDetectFilter(IpBlacklistService ipBlacklistService,
                                 SecurityAlertService securityAlertService,
                                 StringRedisTemplate redisTemplate,
-                                IpRiskCheckService ipRiskCheckService) {
+                                IpRiskCheckService ipRiskCheckService,
+                                AlertRuleService alertRuleService) {
         this.ipBlacklistService = ipBlacklistService;
         this.securityAlertService = securityAlertService;
         this.redisTemplate = redisTemplate;
         this.ipRiskCheckService = ipRiskCheckService;
+        this.alertRuleService = alertRuleService;
     }
 
     @Override
@@ -136,18 +140,28 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
     }
 
     private boolean checkBruteForce(String ip, String uri, HttpServletResponse response) throws IOException {
+        AlertRuleDO rule = alertRuleService.getCachedRule("BRUTE_FORCE");
+        if (rule != null && rule.getEnabled() == 0) return false; // 规则已禁用，跳过检测
+
+        int threshold = rule != null && rule.getThreshold() != null ? rule.getThreshold() : DEFAULT_BRUTE_FORCE_THRESHOLD;
+        long window = rule != null && rule.getWindowSeconds() != null ? rule.getWindowSeconds() : DEFAULT_BRUTE_FORCE_WINDOW;
+        long banDuration = rule != null && rule.getBanDurationSeconds() != null ? rule.getBanDurationSeconds() : DEFAULT_AUTO_BAN_SECONDS;
+        int severity = rule != null ? rule.getSeverity() : 3;
+        boolean autoBan = rule == null || rule.getAutoBan() == 1;
+
         String key = "security:brute:" + ip + ":" + sanitizeForKey(uri);
         Long count = redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1L) {
-            redisTemplate.expire(key, BRUTE_FORCE_WINDOW_SECONDS, TimeUnit.SECONDS);
+            redisTemplate.expire(key, window, TimeUnit.SECONDS);
         }
-        if (count != null && count > BRUTE_FORCE_THRESHOLD) {
+        if (count != null && count > threshold) {
             log.warn("[SecurityDetect] 暴力破解检测: IP={} URI={} Count={}", ip, uri, count);
-            securityAlertService.saveAsync("BRUTE_FORCE", 3, ip, null, uri, "POST",
-                    null, "5分钟内请求次数达 " + count + " 次，已超过阈值 " + BRUTE_FORCE_THRESHOLD);
-            // 自动封禁
-            ipBlacklistService.addToBlacklist(ip, "自动封禁：暴力破解检测", true,
-                    LocalDateTime.now().plusSeconds(AUTO_BAN_DURATION_SECONDS));
+            securityAlertService.saveAsync("BRUTE_FORCE", severity, ip, null, uri, "POST",
+                    null, window + "秒内请求次数达 " + count + " 次，已超过阈值 " + threshold);
+            if (autoBan) {
+                ipBlacklistService.addToBlacklist(ip, "自动封禁：暴力破解检测", true,
+                        LocalDateTime.now().plusSeconds(banDuration));
+            }
             block(response, "Too many requests");
             return true;
         }
@@ -196,18 +210,25 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
     private void handleSqlInjection(String ip, Long userId, String uri, String method,
                                     String content, HttpServletResponse response) throws IOException {
         log.warn("[SecurityDetect] SQL注入检测: IP={} URI={}", ip, uri);
-        securityAlertService.saveAsync("SQL_INJECTION", 3, ip, userId, uri, method,
+
+        AlertRuleDO rule = alertRuleService.getCachedRule("SQL_INJECTION");
+        int threshold = rule != null && rule.getThreshold() != null ? rule.getThreshold() : DEFAULT_SQL_INJECT_THRESHOLD;
+        long window = rule != null && rule.getWindowSeconds() != null ? rule.getWindowSeconds() : 600;
+        long banDuration = rule != null && rule.getBanDurationSeconds() != null ? rule.getBanDurationSeconds() : DEFAULT_AUTO_BAN_SECONDS;
+        int severity = rule != null ? rule.getSeverity() : 3;
+        boolean autoBan = rule == null || rule.getAutoBan() == 1;
+
+        securityAlertService.saveAsync("SQL_INJECTION", severity, ip, userId, uri, method,
                 truncate(content, 500), "检测到 SQL 注入攻击特征");
 
-        // 累计可疑次数
         String key = "security:sqlinject:" + ip;
         Long count = redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1L) {
-            redisTemplate.expire(key, 600, TimeUnit.SECONDS); // 10 分钟窗口
+            redisTemplate.expire(key, window, TimeUnit.SECONDS);
         }
-        if (count != null && count >= SQL_INJECT_THRESHOLD) {
+        if (autoBan && count != null && count >= threshold) {
             ipBlacklistService.addToBlacklist(ip, "自动封禁：多次SQL注入尝试", true,
-                    LocalDateTime.now().plusSeconds(AUTO_BAN_DURATION_SECONDS));
+                    LocalDateTime.now().plusSeconds(banDuration));
         }
         block(response, "Forbidden");
     }

@@ -26,35 +26,35 @@ public class DashboardController {
 
     @GetMapping("/overview")
     @Operation(summary = "核心指标汇总")
-    @PreAuthorize("@ss.hasPermission('custom:dashboard:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:dashboard:query','mini:admin:dashboard')")
     public CommonResult<DashboardOverviewVO> overview() {
         return success(dashboardService.getOverview());
     }
 
     @GetMapping("/user-trend")
     @Operation(summary = "用户趋势（新增/DAU/登录时段）")
-    @PreAuthorize("@ss.hasPermission('custom:dashboard:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:dashboard:query','mini:admin:dashboard')")
     public CommonResult<UserTrendVO> userTrend() {
         return success(dashboardService.getUserTrend());
     }
 
     @GetMapping("/payment")
     @Operation(summary = "支付情况统计")
-    @PreAuthorize("@ss.hasPermission('custom:dashboard:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:dashboard:query','mini:admin:dashboard')")
     public CommonResult<PaymentStatsVO> payment() {
         return success(dashboardService.getPaymentStats());
     }
 
     @GetMapping("/face-auth")
     @Operation(summary = "人脸识别统计")
-    @PreAuthorize("@ss.hasPermission('custom:dashboard:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:dashboard:query','mini:admin:dashboard')")
     public CommonResult<FaceAuthStatsVO> faceAuth() {
         return success(dashboardService.getFaceAuthStats());
     }
 
     @GetMapping("/contract")
     @Operation(summary = "合同统计（状态分布/金额趋势/逾期）")
-    @PreAuthorize("@ss.hasPermission('custom:dashboard:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:dashboard:query','mini:admin:dashboard')")
     public CommonResult<ContractStatsVO> contract() {
         return success(dashboardService.getContractStats());
     }

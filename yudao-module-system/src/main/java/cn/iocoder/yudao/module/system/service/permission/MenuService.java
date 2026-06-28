@@ -99,4 +99,6 @@ public interface MenuService {
      */
     List<MenuDO> getMenuList(Collection<Long> ids);
 
+    List<MenuDO> getMenuListByType(Integer type);
+
 }

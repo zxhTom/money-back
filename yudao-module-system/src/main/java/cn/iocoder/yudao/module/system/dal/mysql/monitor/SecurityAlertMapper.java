@@ -8,11 +8,8 @@ import cn.iocoder.yudao.module.system.dal.dataobject.monitor.SecurityAlertDO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 
 @Mapper
 public interface SecurityAlertMapper extends BaseMapperX<SecurityAlertDO> {
@@ -30,13 +27,4 @@ public interface SecurityAlertMapper extends BaseMapperX<SecurityAlertDO> {
                 .orderByDesc(SecurityAlertDO::getId));
     }
 
-    @Select("SELECT alert_type, COUNT(*) as cnt FROM custom_security_alert " +
-            "WHERE create_time >= DATE_SUB(NOW(), INTERVAL 24 HOUR) " +
-            "GROUP BY alert_type ORDER BY cnt DESC")
-    List<Map<String, Object>> selectTodayAlertTypeStats();
-
-    @Select("SELECT source_ip, COUNT(*) as cnt FROM custom_security_alert " +
-            "WHERE create_time >= DATE_SUB(NOW(), INTERVAL 24 HOUR) AND source_ip IS NOT NULL " +
-            "GROUP BY source_ip ORDER BY cnt DESC LIMIT 10")
-    List<Map<String, Object>> selectTopAttackIps();
 }

@@ -57,6 +57,9 @@ public class AuditLogRespVO {
     @Schema(description = "操作后数据快照")
     private String afterData;
 
+    @Schema(description = "接口请求参数(JSON，密码已脱敏)")
+    private String requestParams;
+
     @Schema(description = "请求URL")
     @ExcelProperty("请求URL")
     private String requestUrl;

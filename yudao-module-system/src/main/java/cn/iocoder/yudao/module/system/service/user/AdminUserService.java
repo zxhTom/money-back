@@ -89,6 +89,14 @@ public interface AdminUserService {
     void updateUserPasswordAndPayPassword(Long id, String password);
 
     /**
+     * 重置用户支付密码（仅写入 pay_password，不影响登录密码）
+     *
+     * @param id          用户编号
+     * @param payPassword 新支付密码（明文，纯6位数字）
+     */
+    void updateUserPayPassword(Long id, String payPassword);
+
+    /**
      * 修改状态
      *
      * @param id     用户编号

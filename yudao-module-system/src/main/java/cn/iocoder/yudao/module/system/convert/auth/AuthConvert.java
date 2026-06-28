@@ -29,13 +29,15 @@ public interface AuthConvert {
     AuthLoginRespVO convert(OAuth2AccessTokenDO bean);
 
     default AuthPermissionInfoRespVO convert(AdminUserDO user, List<RoleDO> roleList, List<MenuDO> menuList) {
+        // 过滤掉小程序专属资源，不暴露到 Web 权限/菜单体系
+        List<MenuDO> webMenuList = menuList.stream()
+                .filter(m -> !MenuTypeEnum.MINI_APP.getType().equals(m.getType()))
+                .collect(java.util.stream.Collectors.toList());
         return AuthPermissionInfoRespVO.builder()
                 .user(BeanUtils.toBean(user, AuthPermissionInfoRespVO.UserVO.class))
                 .roles(convertSet(roleList, RoleDO::getCode))
-                // 权限标识信息
-                .permissions(convertSet(menuList, MenuDO::getPermission))
-                // 菜单树
-                .menus(buildMenuTree(menuList))
+                .permissions(convertSet(webMenuList, MenuDO::getPermission))
+                .menus(buildMenuTree(webMenuList))
                 .build();
     }
 
@@ -51,8 +53,9 @@ public interface AuthConvert {
         if (CollUtil.isEmpty(menuList)) {
             return Collections.emptyList();
         }
-        // 移除按钮
-        menuList.removeIf(menu -> menu.getType().equals(MenuTypeEnum.BUTTON.getType()));
+        // 移除按钮和小程序专属资源（type=4），不在 Web 菜单树中展示
+        menuList.removeIf(menu -> menu.getType().equals(MenuTypeEnum.BUTTON.getType())
+                || menu.getType().equals(MenuTypeEnum.MINI_APP.getType()));
         // 排序，保证菜单的有序性
         menuList.sort(Comparator.comparing(MenuDO::getSort));
 

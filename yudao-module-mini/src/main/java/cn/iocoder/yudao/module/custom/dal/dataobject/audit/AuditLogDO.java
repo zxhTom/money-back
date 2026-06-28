@@ -24,6 +24,7 @@ public class AuditLogDO {
     private String operation;
     private String beforeData;
     private String afterData;
+    private String requestParams;
     private String requestUrl;
     private String requestMethod;
     private String externalIp;

@@ -3,12 +3,14 @@ package cn.iocoder.yudao.module.custom.dal.mysql.contract;
 import java.time.LocalDateTime;
 import java.util.*;
 
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import org.apache.ibatis.annotations.Mapper;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
+import org.springframework.util.StringUtils;
 
 /**
  * 合同 Mapper
@@ -82,6 +84,15 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
                 .orderByDesc(ContractDO::getId);
         applyOverdue(wrapper, reqVO.getOverdue());
         return selectPage(reqVO, wrapper);
+    }
+
+    default PageResult<ContractDO> selectPageByNameKeyword(String nameKeyword, PageParam pageParam) {
+        return selectPage(pageParam, new LambdaQueryWrapperX<ContractDO>()
+                .and(StringUtils.hasText(nameKeyword), w -> w
+                        .like(ContractDO::getIndebtedName, nameKeyword)
+                        .or()
+                        .like(ContractDO::getCreditorName, nameKeyword))
+                .orderByDesc(ContractDO::getId));
     }
 
 }

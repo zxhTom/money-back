@@ -23,14 +23,14 @@ public class GlobalDiagnoseController {
     private GlobalDiagnoseService globalDiagnoseService;
 
     @GetMapping("/scan-ips")
-    @PreAuthorize("@ss.hasPermission('custom:security:global-diagnose')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:global-diagnose','mini:admin:security:diagnose')")
     public CommonResult<Map<String, Object>> triggerScanAllIps(
             @RequestParam(defaultValue = "7") int days) {
         return success(globalDiagnoseService.triggerScanAllIps(days));
     }
 
     @GetMapping("/user-behavior")
-    @PreAuthorize("@ss.hasPermission('custom:security:global-diagnose')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:global-diagnose','mini:admin:security:diagnose')")
     public CommonResult<Map<String, Object>> triggerAnalyzeUserBehavior() {
         return success(globalDiagnoseService.triggerAnalyzeUserBehavior());
     }

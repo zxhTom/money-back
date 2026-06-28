@@ -201,11 +201,15 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     public List<MenuDO> getMenuList(Collection<Long> ids) {
-        // 当 ids 为空时，返回一个空的实例对象
         if (CollUtil.isEmpty(ids)) {
             return Lists.newArrayList();
         }
         return menuMapper.selectByIds(ids);
+    }
+
+    @Override
+    public List<MenuDO> getMenuListByType(Integer type) {
+        return menuMapper.selectListByType(type);
     }
 
     /**

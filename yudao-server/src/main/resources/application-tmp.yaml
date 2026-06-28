@@ -153,6 +153,8 @@ wx:
       type: RedisTemplate
       key-prefix: wx
       http-client-type: HttpClient
+    template:
+      security-alert-id: 1plltojUdNH28TuA1cNkBEkQcLHjVTSBiIu-IbQxlVc
   miniapp:
     appid: wx7641cb883b4fa670
     secret: 8ce4493f9481e2f2cc9153331a19b094

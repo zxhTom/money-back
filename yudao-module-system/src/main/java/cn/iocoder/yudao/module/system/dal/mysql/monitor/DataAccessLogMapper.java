@@ -41,6 +41,13 @@ public interface DataAccessLogMapper extends BaseMapperX<DataAccessLogDO> {
     @Delete("DELETE FROM custom_data_access_log WHERE access_time < #{createTime} LIMIT #{limit}")
     Integer deleteByCreateTimeLt(@Param("createTime") LocalDateTime createTime, @Param("limit") Integer limit);
 
+    @Select("SELECT * FROM custom_data_access_log WHERE module=#{module} AND entity_type=#{entityType} " +
+            "AND JSON_CONTAINS(result_ids, CAST(#{recordId} AS JSON))=1 AND deleted=0 " +
+            "ORDER BY access_time DESC LIMIT 200")
+    List<DataAccessLogDO> selectViewersByRecordId(@Param("module") String module,
+                                                  @Param("entityType") String entityType,
+                                                  @Param("recordId") Long recordId);
+
     default PageResult<DataAccessLogDO> selectPage(DataAccessLogPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<DataAccessLogDO>()
                 .eqIfPresent(DataAccessLogDO::getUserId, reqVO.getUserId())

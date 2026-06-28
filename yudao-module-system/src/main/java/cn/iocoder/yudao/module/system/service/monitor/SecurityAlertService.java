@@ -21,7 +21,7 @@ public interface SecurityAlertService {
 
     long countTodayUnhandled();
 
-    List<Map<String, Object>> getTodayAlertTypeStats();
+    Map<String, Long> getTodayAlertTypeStats();
 
     List<Map<String, Object>> getTopAttackIps();
 
