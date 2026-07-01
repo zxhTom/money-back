@@ -103,6 +103,15 @@ public class UserController {
         return success(true);
     }
 
+    @PutMapping("/toggle-disable-pwd-change")
+    @Operation(summary = "切换用户禁止自主修改密码开关")
+    @PreAuthorize("@ss.hasPermission('system:user:update')")
+    public CommonResult<Boolean> toggleDisablePwdChange(@RequestParam("id") Long id,
+                                                         @RequestParam("disable") Boolean disable) {
+        userService.updateUserDisablePwdChange(id, disable);
+        return success(true);
+    }
+
     @PutMapping("/update-status")
     @Operation(summary = "修改用户状态")
     @PreAuthorize("@ss.hasPermission('system:user:update')")

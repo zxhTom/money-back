@@ -253,6 +253,11 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public void updateUserPassword(Long id, UserProfileUpdatePasswordReqVO reqVO) {
+        // 检查是否被禁止自主修改密码
+        AdminUserDO user = validateUserExists(id);
+        if (Boolean.TRUE.equals(user.getDisablePwdChange())) {
+            throw exception(USER_PASSWORD_CHANGE_DISABLED);
+        }
         // 校验旧密码密码
         validateOldPassword(id, reqVO.getOldPassword());
         // 执行更新
@@ -301,6 +306,15 @@ public class AdminUserServiceImpl implements AdminUserService {
         userMapper.updateById(updateObj);
         // 密码变更后强制下线
         oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
+    }
+
+    @Override
+    public void updateUserDisablePwdChange(Long id, Boolean disable) {
+        validateUserExists(id);
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(id);
+        updateObj.setDisablePwdChange(disable);
+        userMapper.updateById(updateObj);
     }
 
     @Override

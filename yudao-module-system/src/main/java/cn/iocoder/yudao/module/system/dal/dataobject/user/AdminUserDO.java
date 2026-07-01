@@ -144,4 +144,10 @@ public class AdminUserDO extends TenantBaseDO {
      */
     private Integer passwordStrength;
 
+    /**
+     * 是否禁止用户自主修改密码：0-否，1-是
+     * 为 true 时用户调用个人中心改密接口会被拒绝，管理员重置不受限制
+     */
+    private Boolean disablePwdChange;
+
 }

@@ -97,6 +97,11 @@ public interface AdminUserService {
     void updateUserPayPassword(Long id, String payPassword);
 
     /**
+     * 切换"禁止用户自主修改密码"开关
+     */
+    void updateUserDisablePwdChange(Long id, Boolean disable);
+
+    /**
      * 修改状态
      *
      * @param id     用户编号

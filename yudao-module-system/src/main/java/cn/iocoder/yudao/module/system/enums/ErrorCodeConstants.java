@@ -80,6 +80,7 @@ public interface ErrorCodeConstants {
      * 解密接口：入参为 15/18 位明文形态，不应作为 cipher 传入
      */
     ErrorCode USER_ID_CARD_DECRYPT_CIPHER_IS_PLAIN = new ErrorCode(1_002_003_019, "请勿将明文身份证号作为密文传入解密接口");
+    ErrorCode USER_PASSWORD_CHANGE_DISABLED = new ErrorCode(1_002_003_020, "您的账号已被限制自主修改密码，如需修改请联系管理员");
 
     // ========== 部门模块 1-002-004-000 ==========
     ErrorCode DEPT_NAME_DUPLICATE = new ErrorCode(1_002_004_000, "已经存在该名字的部门");
