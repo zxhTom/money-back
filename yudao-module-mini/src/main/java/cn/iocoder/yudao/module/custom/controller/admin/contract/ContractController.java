@@ -6,17 +6,21 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditLog;
 import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditOperationType;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.service.contract.ConfirmPdfService;
+import cn.iocoder.yudao.module.custom.service.contract.ContractHoneypotFactory;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
 import cn.iocoder.yudao.module.custom.util.ContractRespIdCardEnricher;
 import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
+import cn.iocoder.yudao.module.system.service.monitor.DataAccessMonitorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,10 +30,12 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import javax.validation.constraints.*;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
@@ -39,15 +45,17 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RestController
 @RequestMapping("/custom/contract")
 @Validated
+@Slf4j
 public class ContractController {
 
     @Resource
     private ConfirmPdfService confirmPdfService;
     @Resource
     private ContractService contractService;
-
     @Resource
     private IdCardCipherService idCardCipherService;
+    @Resource
+    private DataAccessMonitorService dataAccessMonitorService;
 
     @PostMapping("/create")
     @Operation(summary = "创建合同")
@@ -97,8 +105,25 @@ public class ContractController {
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
     @AuditLog(module = "合同管理", type = AuditOperationType.READ, entityType = "contract",
             operation = "查看合同详情ID={{#id}}", entityIdExpression = "#id")
-    public CommonResult<ContractRespVO> getContract(@RequestParam("id") Long id) {
+    @ApiAccessLog(responseEnable = false)
+    public CommonResult<ContractRespVO> getContract(@RequestParam("id") Long id, HttpServletRequest request) {
         ContractDO contract = contractService.getContract(id);
+        if (contract == null) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
+                    .exception(cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS);
+        }
+        // 蜜罐命中：写数据访问日志 + 清除内部标记
+        if (ContractHoneypotFactory.HONEYPOT_CREATOR_MARKER.equals(contract.getCreator())) {
+            Long userId = SecurityFrameworkUtils.getLoginUserId();
+            String ip = cn.hutool.extra.servlet.ServletUtil.getClientIP(request);
+            log.warn("[SECURITY][HONEYPOT] userId={} ip={} 合同查询ID={} 命中蜜罐", userId, ip, id);
+            String username = SecurityFrameworkUtils.getLoginUserNickname();
+            dataAccessMonitorService.recordAccess(userId, username, "合同管理", "contract",
+                    "{\"id\":" + id + ",\"honeypot\":true}",
+                    Collections.singletonList(id), 1,
+                    request.getRequestURI(), ip);
+            contract.setCreator(null);
+        }
         ContractRespVO vo = BeanUtils.toBean(contract, ContractRespVO.class);
         ContractRespIdCardEnricher.enrich(vo, contract, idCardCipherService);
         return success(vo);
@@ -108,6 +133,7 @@ public class ContractController {
     @Operation(summary = "获得合同分页")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
     @cn.iocoder.yudao.module.system.framework.monitor.annotation.DataAccessMonitor(module = "合同管理", entityType = "contract")
+    @ApiAccessLog(responseEnable = false)
     public CommonResult<PageResult<ContractRespVO>> getContractPage(@Valid ContractPageReqVO pageReqVO) {
         PageResult<ContractDO> pageResult = contractService.getContractPage(pageReqVO);
         PageResult<ContractRespVO> voPage = BeanUtils.toBean(pageResult, ContractRespVO.class);
@@ -121,6 +147,7 @@ public class ContractController {
     @Operation(summary = "获得当前登录用户创建的合同分页")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
     @cn.iocoder.yudao.module.system.framework.monitor.annotation.DataAccessMonitor(module = "合同管理", entityType = "contract")
+    @ApiAccessLog(responseEnable = false)
     public CommonResult<PageResult<ContractRespVO>> getSelfContractPage(@Valid ContractPageReqVO pageReqVO) {
         PageResult<ContractDO> pageResult = contractService.getSelfContractPage(pageReqVO);
         PageResult<ContractRespVO> voPage = BeanUtils.toBean(pageResult, ContractRespVO.class);

@@ -21,6 +21,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -50,13 +51,23 @@ public class DataAccessMonitorAspect {
     }
 
     private void doMonitor(JoinPoint joinPoint, DataAccessMonitor monitor, Object returnValue) {
-        // 1. 提取 PageResult
+        // 1. 提取记录列表（支持 PageResult 分页和单对象两种响应）
+        List<?> items;
+        int count;
         PageResult<?> pageResult = extractPageResult(returnValue);
-        if (pageResult == null || pageResult.getList() == null || pageResult.getList().isEmpty()) return;
+        if (pageResult != null) {
+            if (pageResult.getList() == null || pageResult.getList().isEmpty()) return;
+            items = pageResult.getList();
+            count = pageResult.getList().size();
+        } else {
+            Object single = extractSingleItem(returnValue);
+            if (single == null) return;
+            items = Collections.singletonList(single);
+            count = 1;
+        }
 
         // 2. 提取返回记录的 ID 列表
-        List<Long> ids = extractIds(pageResult.getList());
-        int count = pageResult.getList().size();
+        List<Long> ids = extractIds(items);
 
         // 3. 获取当前用户
         LoginUser loginUser = tryGetLoginUser();
@@ -92,6 +103,14 @@ public class DataAccessMonitorAspect {
             if (data instanceof PageResult) return (PageResult<?>) data;
         }
         return null;
+    }
+
+    // 从 CommonResult<单对象> 中提取数据（非分页、非集合）
+    private Object extractSingleItem(Object returnValue) {
+        if (!(returnValue instanceof CommonResult)) return null;
+        Object data = ((CommonResult<?>) returnValue).getData();
+        if (data == null || data instanceof PageResult || data instanceof List) return null;
+        return data;
     }
 
     private List<Long> extractIds(List<?> list) {

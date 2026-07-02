@@ -11,37 +11,46 @@ import org.springframework.validation.annotation.Validated;
 import javax.annotation.Resource;
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.framework.common.pojo.CommonResult.error;
 
 /**
  * GoView 数据 Service 实现类
- *
- * 补充说明：
- * 1. 目前默认使用 jdbcTemplate 查询项目配置的数据源。如果你想查询其它数据源，可以新建对应数据源的 jdbcTemplate 来实现。
- * 2. 默认数据源是 MySQL 关系数据源，可能数据量比较大的情况下，会比较慢，可以考虑后续使用 Click House 等等。
- *
- * @author 芋道源码
  */
 @Service
 @Validated
 public class GoViewDataServiceImpl implements GoViewDataService {
+
+    /** 只允许 SELECT 查询，禁止任何 DDL/DML */
+    private static final Pattern SELECT_ONLY = Pattern.compile(
+            "^\\s*SELECT\\b", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
+    /** 危险关键词黑名单（注释绕过统一由 stripComments 处理后检测） */
+    private static final List<String> BLOCKED_KEYWORDS = Arrays.asList(
+            "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER",
+            "TRUNCATE", "RENAME", "REPLACE", "EXEC", "EXECUTE",
+            "INTO OUTFILE", "INTO DUMPFILE", "LOAD_FILE", "LOAD DATA",
+            "CALL", "XP_CMDSHELL", "SP_EXECUTESQL"
+    );
 
     @Resource
     private JdbcTemplate jdbcTemplate;
 
     @Override
     public GoViewDataRespVO getDataBySQL(String sql) {
-        // 1. 执行查询
+        validateSql(sql);
+
         SqlRowSet sqlRowSet = jdbcTemplate.queryForRowSet(sql);
 
-        // 2. 构建返回结果
         GoViewDataRespVO respVO = new GoViewDataRespVO();
-        // 2.1 解析元数据
         SqlRowSetMetaData metaData = sqlRowSet.getMetaData();
         String[] columnNames = metaData.getColumnNames();
         respVO.setDimensions(Arrays.asList(columnNames));
-        // 2.2 解析数据明细
-        respVO.setSource(new LinkedList<>()); // 由于数据量不确认，使用 LinkedList 虽然内存占用大一点，但是不存在扩容复制的问题
+        respVO.setSource(new LinkedList<>());
         while (sqlRowSet.next()) {
             Map<String, Object> data = Maps.newHashMapWithExpectedSize(columnNames.length);
             for (String columnName : columnNames) {
@@ -50,6 +59,47 @@ public class GoViewDataServiceImpl implements GoViewDataService {
             respVO.getSource().add(data);
         }
         return respVO;
+    }
+
+    private void validateSql(String sql) {
+        if (sql == null || sql.isBlank()) {
+            throw new IllegalArgumentException("SQL 不能为空");
+        }
+        // 去除注释后检测，防止 /* DROP */ SELECT ... 绕过
+        String stripped = stripComments(sql).trim();
+
+        if (!SELECT_ONLY.matcher(stripped).find()) {
+            throw new IllegalArgumentException("GoView 数据查询仅允许 SELECT 语句");
+        }
+        // 多语句禁止（分号终止后仍有内容）
+        if (containsMultiStatement(stripped)) {
+            throw new IllegalArgumentException("不允许多语句执行");
+        }
+        String upper = stripped.toUpperCase();
+        for (String kw : BLOCKED_KEYWORDS) {
+            if (upper.contains(kw)) {
+                throw new IllegalArgumentException("SQL 包含禁止操作: " + kw);
+            }
+        }
+    }
+
+    /** 去除 -- 单行注释和 /* 块注释 */
+    private String stripComments(String sql) {
+        // 块注释
+        sql = sql.replaceAll("/\\*[\\s\\S]*?\\*/", " ");
+        // 单行注释
+        sql = sql.replaceAll("--[^\r\n]*", " ");
+        // #注释 (MySQL)
+        sql = sql.replaceAll("#[^\r\n]*", " ");
+        return sql;
+    }
+
+    /** 检测分号后是否还有非空内容（多语句攻击） */
+    private boolean containsMultiStatement(String sql) {
+        int idx = sql.indexOf(';');
+        if (idx < 0) return false;
+        String after = sql.substring(idx + 1).trim();
+        return !after.isEmpty();
     }
 
 }

@@ -116,7 +116,18 @@ public class YudaoWebSecurityConfigurerAdapter {
                 .csrf(AbstractHttpConfigurer::disable)
                 // 基于 token 机制，所以不需要 Session
                 .sessionManagement(c -> c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(c -> c.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
+                .headers(c -> c
+                        // 只允许同源 iframe，防止点击劫持（原为 disable 会完全放开）
+                        .frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin)
+                        // 禁止 MIME 类型嗅探
+                        .contentTypeOptions(Customizer.withDefaults())
+                        // 启用 XSS 过滤（老浏览器兜底）
+                        .xssProtection(Customizer.withDefaults())
+                        // HSTS：强制 HTTPS，1年
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000))
+                )
                 // 一堆自定义的 Spring Security 处理器
                 .exceptionHandling(c -> c.authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler));

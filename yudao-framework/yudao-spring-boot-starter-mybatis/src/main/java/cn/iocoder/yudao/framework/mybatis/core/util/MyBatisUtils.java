@@ -48,6 +48,21 @@ public class MyBatisUtils {
         return page;
     }
 
+    /** 合法列名：只允许字母、数字、下划线，防止 ORDER BY 注入 */
+    private static final java.util.regex.Pattern SAFE_COLUMN = java.util.regex.Pattern.compile("^[a-z][a-z0-9_]*$");
+
+    private static String safeSortColumn(String field) {
+        String col = StrUtil.toUnderlineCase(field);
+        if (!SAFE_COLUMN.matcher(col).matches()) {
+            throw new IllegalArgumentException("非法排序字段: " + field);
+        }
+        return col;
+    }
+
+    private static String safeSortDir(String order) {
+        return SortingField.ORDER_ASC.equalsIgnoreCase(order) ? "ASC" : "DESC";
+    }
+
     @SuppressWarnings("PatternVariableCanBeUsed")
     public static <T> void addOrder(Wrapper<T> wrapper, Collection<SortingField> sortingFields) {
         if (CollUtil.isEmpty(sortingFields)) {
@@ -57,27 +72,24 @@ public class MyBatisUtils {
             QueryWrapper<T> query = (QueryWrapper<T>) wrapper;
             for (SortingField sortingField : sortingFields) {
                 query.orderBy(true,
-                        SortingField.ORDER_ASC.equals(sortingField.getOrder()),
-                        StrUtil.toUnderlineCase(sortingField.getField()));
+                        SortingField.ORDER_ASC.equalsIgnoreCase(sortingField.getOrder()),
+                        safeSortColumn(sortingField.getField()));
             }
         } else if (wrapper instanceof LambdaQueryWrapper) {
-            // LambdaQueryWrapper 不直接支持字符串字段排序，使用 last 方法拼接 ORDER BY
             LambdaQueryWrapper<T> lambdaQuery = (LambdaQueryWrapper<T>) wrapper;
             StringBuilder orderBy = new StringBuilder();
             for (SortingField sortingField : sortingFields) {
                 if (StrUtil.isNotEmpty(orderBy)) {
                     orderBy.append(", ");
                 }
-                orderBy.append(StrUtil.toUnderlineCase(sortingField.getField()))
+                orderBy.append(safeSortColumn(sortingField.getField()))
                        .append(" ")
-                       .append(SortingField.ORDER_ASC.equals(sortingField.getOrder()) ? "ASC" : "DESC");
+                       .append(safeSortDir(sortingField.getOrder()));
             }
             lambdaQuery.last("ORDER BY " + orderBy);
-            // 另外个思路：https://blog.csdn.net/m0_59084856/article/details/138450913
         } else {
             throw new IllegalArgumentException("Unsupported wrapper type: " + wrapper.getClass().getName());
         }
-
     }
 
     /**

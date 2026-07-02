@@ -87,41 +87,43 @@
             <when test="query.sortFields != null and query.sortFields.size() > 0">
                 ORDER BY
                 <foreach collection="query.sortFields" item="sortField" separator=",">
+                    <!-- safeDir: 方向值强制白名单，防止 SQL 注入 -->
+                    <bind name="safeDir" value="'asc'.equalsIgnoreCase(sortField.direction) ? 'ASC' : 'DESC'"/>
                     <choose>
                         <!-- 主键和时间字段 -->
-                        <when test="sortField.field == 'id'">id ${sortField.direction}</when>
-                        <when test="sortField.field == 'createTime'">create_time ${sortField.direction}</when>
-                        <when test="sortField.field == 'updateTime'">update_time ${sortField.direction}</when>
+                        <when test="sortField.field == 'id'">id ${safeDir}</when>
+                        <when test="sortField.field == 'createTime'">create_time ${safeDir}</when>
+                        <when test="sortField.field == 'updateTime'">update_time ${safeDir}</when>
 
                         <!-- 合同日期字段 -->
-                        <when test="sortField.field == 'startDate'">start_date ${sortField.direction}</when>
-                        <when test="sortField.field == 'endDate'">end_date ${sortField.direction}</when>
-                        <when test="sortField.field == 'signDate'">sign_date ${sortField.direction}</when>
+                        <when test="sortField.field == 'startDate'">start_date ${safeDir}</when>
+                        <when test="sortField.field == 'endDate'">end_date ${safeDir}</when>
+                        <when test="sortField.field == 'signDate'">sign_date ${safeDir}</when>
 
                         <!-- 金额相关字段 -->
-                        <when test="sortField.field == 'salary'">salary ${sortField.direction}</when>
-                        <when test="sortField.field == 'tariff'">tariff ${sortField.direction}</when>
-                        <when test="sortField.field == 'totalAmount'">total_amount ${sortField.direction}</when>
-                        <when test="sortField.field == 'paidAmount'">paid_amount ${sortField.direction}</when>
-                        <when test="sortField.field == 'unpaidAmount'">unpaid_amount ${sortField.direction}</when>
+                        <when test="sortField.field == 'salary'">salary ${safeDir}</when>
+                        <when test="sortField.field == 'tariff'">tariff ${safeDir}</when>
+                        <when test="sortField.field == 'totalAmount'">total_amount ${safeDir}</when>
+                        <when test="sortField.field == 'paidAmount'">paid_amount ${safeDir}</when>
+                        <when test="sortField.field == 'unpaidAmount'">unpaid_amount ${safeDir}</when>
 
                         <!-- 名称相关字段 -->
-                        <when test="sortField.field == 'indebtedName'">indebted_name ${sortField.direction}</when>
-                        <when test="sortField.field == 'creditorName'">creditor_name ${sortField.direction}</when>
-                        <when test="sortField.field == 'contractName'">contract_name ${sortField.direction}</when>
-                        <when test="sortField.field == 'contractNo'">contract_no ${sortField.direction}</when>
+                        <when test="sortField.field == 'indebtedName'">indebted_name ${safeDir}</when>
+                        <when test="sortField.field == 'creditorName'">creditor_name ${safeDir}</when>
+                        <when test="sortField.field == 'contractName'">contract_name ${safeDir}</when>
+                        <when test="sortField.field == 'contractNo'">contract_no ${safeDir}</when>
 
                         <!-- 状态字段 -->
-                        <when test="sortField.field == 'status'">status ${sortField.direction}</when>
-                        <when test="sortField.field == 'contractStatus'">contract_status ${sortField.direction}</when>
-                        <when test="sortField.field == 'paymentStatus'">payment_status ${sortField.direction}</when>
-                        <when test="sortField.field == 'auditStatus'">audit_status ${sortField.direction}</when>
+                        <when test="sortField.field == 'status'">status ${safeDir}</when>
+                        <when test="sortField.field == 'contractStatus'">contract_status ${safeDir}</when>
+                        <when test="sortField.field == 'paymentStatus'">payment_status ${safeDir}</when>
+                        <when test="sortField.field == 'auditStatus'">audit_status ${safeDir}</when>
 
                         <!-- 其他业务字段 -->
-                        <when test="sortField.field == 'code'">code ${sortField.direction}</when>
-                        <when test="sortField.field == 'type'">type ${sortField.direction}</when>
-                        <when test="sortField.field == 'level'">level ${sortField.direction}</when>
-                        <when test="sortField.field == 'priority'">priority ${sortField.direction}</when>
+                        <when test="sortField.field == 'code'">code ${safeDir}</when>
+                        <when test="sortField.field == 'type'">type ${safeDir}</when>
+                        <when test="sortField.field == 'level'">level ${safeDir}</when>
+                        <when test="sortField.field == 'priority'">priority ${safeDir}</when>
 
                         <!-- 未知字段忽略，使用默认排序，防止 SQL 注入 -->
                         <otherwise>create_time DESC</otherwise>

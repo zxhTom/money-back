@@ -169,7 +169,65 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     public ContractDO getContract(Long id) {
-        return contractMapper.selectById(id);
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+
+        // 内部调用（定时任务等）不做访问控制
+        if (loginUserId == null) {
+            return contractMapper.selectById(id);
+        }
+
+        ContractDO contract = contractMapper.selectById(id);
+
+        // 合同不存在：低 ID（< 60000）伪造数据迷惑探测者，高 ID 正常报错
+        if (contract == null) {
+            if (id < 60000) {
+                logHoneypot(id, loginUserId, "合同不存在-低ID蜜罐");
+                return ContractHoneypotFactory.generate(id);
+            }
+            return null;
+        }
+
+        // 创建者快速放行
+        if (String.valueOf(loginUserId).equals(contract.getCreator())) {
+            return contract;
+        }
+
+        // 当事人身份证匹配放行（用 sameIdCard 兼容明文/密文两种存储）
+        AdminUserDO user = adminUserService.getUser(loginUserId);
+        if (user != null && StrUtil.isNotBlank(user.getIdNo())) {
+            if (idCardCipherService.sameIdCard(user.getIdNo(), contract.getIndebtedId())
+                    || idCardCipherService.sameIdCard(user.getIdNo(), contract.getCreditorId())) {
+                return contract;
+            }
+        }
+
+        // 管理员 / 合同管理员放行
+        List<Long> roleIdList = userRoleMapper.selectListByUserId(loginUserId)
+                .stream().map(UserRoleDO::getRoleId).collect(Collectors.toList());
+        if (roleService.hasAnySuperAdmin(roleIdList)) {
+            return contract;
+        }
+        boolean isContractManager = roleService.getRoleList(roleIdList).stream()
+                .map(RoleDO::getCode).anyMatch("contract-manager"::equals);
+        if (isContractManager) {
+            return contract;
+        }
+
+        // 无权访问 → 蜜罐，不返回真实数据也不暴露合同是否存在
+        logHoneypot(id, loginUserId, "权限不足");
+        return ContractHoneypotFactory.generate(id);
+    }
+
+    private void logHoneypot(Long contractId, Long loginUserId, String reason) {
+        String ip = "unknown";
+        try {
+            javax.servlet.http.HttpServletRequest req = ((org.springframework.web.context.request.ServletRequestAttributes)
+                    org.springframework.web.context.request.RequestContextHolder.getRequestAttributes()).getRequest();
+            ip = cn.hutool.extra.servlet.ServletUtil.getClientIP(req);
+        } catch (Exception ignored) {
+        }
+        log.warn("[SECURITY][HONEYPOT] userId={} ip={} 访问合同[id={}] 原因={} 已返回蜜罐数据",
+                loginUserId, ip, contractId, reason);
     }
 
     @Override

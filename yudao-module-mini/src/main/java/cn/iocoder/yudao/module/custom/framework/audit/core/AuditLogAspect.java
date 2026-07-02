@@ -175,10 +175,14 @@ public class AuditLogAspect {
                 if (clsName.startsWith("javax.servlet") || clsName.startsWith("org.springframework")) continue;
                 String json = toJson(arg);
                 // redact password fields
-                return PASSWORD_PATTERN.matcher(json).replaceAll(m -> {
-                    String key = m.group(1);
-                    return "\"" + key + "\":\"***\"";
-                });
+                java.util.regex.Matcher pwMatcher = PASSWORD_PATTERN.matcher(json);
+                StringBuffer sb = new StringBuffer();
+                while (pwMatcher.find()) {
+                    String key = pwMatcher.group(1);
+                    pwMatcher.appendReplacement(sb, "\"" + key + "\":\"***\"");
+                }
+                pwMatcher.appendTail(sb);
+                return sb.toString();
             }
         } catch (Exception ignored) {
         }

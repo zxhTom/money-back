@@ -115,7 +115,7 @@ management:
     web:
       base-path: /actuator
       exposure:
-        include: '*'
+        include: 'health,info'  # 生产只暴露健康检查，禁止暴露 env/beans/heapdump 等敏感端点
 
 spring:
   boot:

@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.system.controller.admin.mail.vo.account;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -18,7 +19,8 @@ public class MailAccountRespVO {
     @Schema(description = "用户名", requiredMode = Schema.RequiredMode.REQUIRED, example = "yudao")
     private String username;
 
-    @Schema(description = "密码", requiredMode = Schema.RequiredMode.REQUIRED, example = "123456")
+    @Schema(description = "密码（不返回明文，修改时传空则保留原密码）", example = "")
+    @JsonIgnore  // SMTP 密码不在 API 响应中暴露，防止泄露
     private String password;
 
     @Schema(description = "SMTP 服务器域名", requiredMode = Schema.RequiredMode.REQUIRED, example = "www.iocoder.cn")

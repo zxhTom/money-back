@@ -49,7 +49,11 @@ import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString
 @Slf4j
 public class ApiAccessLogFilter extends ApiRequestFilter {
 
-    private static final String[] SANITIZE_KEYS = new String[]{"password", "token", "accessToken", "refreshToken"};
+    private static final String[] SANITIZE_KEYS = new String[]{
+            "password", "token", "accessToken", "refreshToken",
+            // 合同敏感字段：姓名、证件密文、金额不落系统访问日志
+            "indebtedName", "indebtedId", "creditorName", "creditorId", "salary"
+    };
 
     private final String applicationName;
 

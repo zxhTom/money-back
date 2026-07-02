@@ -12,6 +12,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,7 +40,10 @@ public class AlertRuleController {
     public CommonResult<Map<String, Object>> detail(@PathVariable Long id) {
         AlertRuleDO rule = alertRuleService.getById(id);
         List<AlertRuleNotifyDO> notifies = alertRuleService.listNotifies(id);
-        return success(Map.of("rule", rule, "notifies", notifies));
+        Map<String, Object> result = new HashMap<>();
+        result.put("rule", rule);
+        result.put("notifies", notifies);
+        return success(result);
     }
 
     @PostMapping
