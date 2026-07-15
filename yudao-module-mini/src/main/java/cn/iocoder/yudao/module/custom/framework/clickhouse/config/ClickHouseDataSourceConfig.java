@@ -17,8 +17,12 @@ public class ClickHouseDataSourceConfig {
     @ConditionalOnProperty(prefix = "yudao.clickhouse", name = "enabled", havingValue = "true")
     public DataSource clickHouseDataSource(ClickHouseProperties props) throws Exception {
         Properties p = new Properties();
-        p.setProperty("user", props.getUsername());
-        p.setProperty("password", props.getPassword());
+        if (props.getUsername() != null) {
+            p.setProperty("user", props.getUsername());
+        }
+        if (props.getPassword() != null) {
+            p.setProperty("password", props.getPassword());
+        }
         log.info("[ClickHouse] 数据源已启用 url={}", props.getUrl());
         return new ClickHouseDataSource(props.getUrl(), p);
     }
