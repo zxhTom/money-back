@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.custom.framework.clickhouse.core;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -10,14 +9,21 @@ import java.sql.*;
 import java.util.*;
 
 @Service
-@Slf4j
 public class ClickHouseArchiveServiceImpl implements ClickHouseArchiveService {
+
+    private static final java.util.regex.Pattern IDENT = java.util.regex.Pattern.compile("^[A-Za-z0-9_]+$");
 
     private final DataSource dataSource; // 可能为 null（未启用）
 
     public ClickHouseArchiveServiceImpl(
             @Autowired(required = false) @Qualifier("clickHouseDataSource") DataSource dataSource) {
         this.dataSource = dataSource;
+    }
+
+    private static void validateIdentifier(String s) {
+        if (s == null || !IDENT.matcher(s).matches()) {
+            throw new IllegalArgumentException("非法标识符: " + s);
+        }
     }
 
     @Override
@@ -44,6 +50,13 @@ public class ClickHouseArchiveServiceImpl implements ClickHouseArchiveService {
         requireEnabled();
         if (rows.isEmpty()) {
             return 0;
+        }
+        validateIdentifier(table);
+        for (String col : columns) {
+            validateIdentifier(col);
+        }
+        if (rows.get(0).length != columns.size()) {
+            throw new IllegalArgumentException("列数与数据宽度不一致");
         }
         String cols = String.join(",", columns);
         String ph = String.join(",", Collections.nCopies(columns.size(), "?"));
