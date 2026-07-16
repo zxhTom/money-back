@@ -6,7 +6,12 @@ import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
+import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
 import cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService;
+import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
@@ -47,8 +52,10 @@ import javax.annotation.Resource;
 import javax.validation.ConstraintViolationException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.system.enums.LogRecordConstants.*;
@@ -79,6 +86,8 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Resource
     private PasswordEncoder passwordEncoder;
     @Resource
+    private cn.iocoder.yudao.module.system.dal.mysql.user.PasswordHistoryMapper passwordHistoryMapper;
+    @Resource
     @Lazy // 延迟，避免循环依赖报错
     private TenantService tenantService;
 
@@ -94,6 +103,13 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Resource
     @Lazy // 避免循环依赖
     private OAuth2TokenService oauth2TokenService;
+
+    @Resource
+    private RoleService roleService;
+    @Resource
+    private UserRoleMapper userRoleMapper;
+    @Resource
+    private org.springframework.beans.factory.ObjectProvider<cn.iocoder.yudao.module.infra.framework.file.core.audit.FileContentAuditor> auditorProvider;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -164,6 +180,12 @@ public class AdminUserServiceImpl implements AdminUserService {
         // 1. 校验正确性
         AdminUserDO oldUser = validateUserForCreateOrUpdate(updateReqVO.getId(), updateReqVO.getUsername(),
                 updateReqVO.getMobile(), updateReqVO.getEmail(), updateReqVO.getDeptId(), updateReqVO.getPostIds());
+        // 1.1 非超管不能修改超管账号
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(oldUser.getId());
+        // 1.2 修改 deptId 只有超管能做（没有部门层级数据权限体系可复用，先用这个最简单的兜底）
+        if (!Objects.equals(oldUser.getDeptId(), updateReqVO.getDeptId()) && !isSuperAdmin(SecurityFrameworkUtils.getLoginUserId())) {
+            throw exception0(GlobalErrorCodeConstants.FORBIDDEN.getCode(), "仅超级管理员可以修改用户所属部门");
+        }
 
         // 2.1 更新用户
         AdminUserDO updateObj = BeanUtils.toBean(updateReqVO, AdminUserDO.class);
@@ -198,11 +220,23 @@ public class AdminUserServiceImpl implements AdminUserService {
         userMapper.updateById(new AdminUserDO().setId(id).setLoginIp(loginIp).setLoginDate(LocalDateTime.now()));
     }
 
+    private void validateNicknameContent(String text) {
+        if (StrUtil.isBlank(text)) {
+            return;
+        }
+        cn.iocoder.yudao.module.infra.framework.file.core.audit.FileContentAuditor auditor = auditorProvider.getIfAvailable();
+        if (auditor != null && !auditor.checkText(text)) {
+            throw new IllegalArgumentException("您填写的内容含违规信息，请修改后重试");
+        }
+    }
+
     @Override
     public void updateUserProfile(Long id, UserProfileUpdateReqVO reqVO) {
         validateUserExists(id);
         validateEmailUnique(id, reqVO.getEmail());
         validateMobileUnique(id, reqVO.getMobile());
+        validateNicknameContent(reqVO.getNickname());
+        validateNicknameContent(reqVO.getUsername());
 
         String idNoPlain = null;
         if (StrUtil.isNotBlank(reqVO.getIdNo())) {
@@ -265,8 +299,26 @@ public class AdminUserServiceImpl implements AdminUserService {
         updateObj.setPassword(encodePassword(reqVO.getNewPassword())); // 加密密码
         updateObj.setPasswordStrength(PasswordStrengthUtil.calc(reqVO.getNewPassword()));
         userMapper.updateById(updateObj);
+        recordPasswordHistory(id, user.getUsername(), updateObj.getPassword(), "SELF_PROFILE");
         // 密码变更后强制下线
         oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
+    }
+
+    /** 记录一条密码变更（只存 bcrypt 密文，禁止明文）。永不抛出，避免影响改密主流程。 */
+    private void recordPasswordHistory(Long id, String username, String encodedHash, String scene) {
+        try {
+            cn.iocoder.yudao.module.system.dal.dataobject.user.PasswordHistoryDO h =
+                    new cn.iocoder.yudao.module.system.dal.dataobject.user.PasswordHistoryDO();
+            h.setUserId(id);
+            h.setUsername(username);
+            h.setPasswordHash(encodedHash);
+            h.setScene(scene);
+            h.setOperatorId(SecurityFrameworkUtils.getLoginUserId());
+            h.setSourceIp(cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientIP());
+            passwordHistoryMapper.insert(h);
+        } catch (Exception e) {
+            log.warn("[PwdHistory] 记录密码变更失败 userId={}: {}", id, e.getMessage());
+        }
     }
 
     @Override
@@ -275,6 +327,8 @@ public class AdminUserServiceImpl implements AdminUserService {
     public void updateUserPassword(Long id, String password) {
         // 1. 校验用户存在
         AdminUserDO user = validateUserExists(id);
+        // 1.1 非超管不能重置超管账号密码，防止提权/接管超管
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
 
         // 2. 更新密码
         AdminUserDO updateObj = new AdminUserDO();
@@ -286,6 +340,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         }
         updateObj.setPasswordStrength(PasswordStrengthUtil.calc(password));
         userMapper.updateById(updateObj);
+        recordPasswordHistory(id, user.getUsername(), updateObj.getPassword(), "RESET");
 
         // 3. 记录操作日志上下文
         LogRecordContext.putVariable("user", user);
@@ -304,6 +359,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         updateObj.setPayPassword(encoded);
         updateObj.setPasswordStrength(PasswordStrengthUtil.calc(password));
         userMapper.updateById(updateObj);
+        recordPasswordHistory(id, null, encoded, "RESET_WITH_PAY");
         // 密码变更后强制下线
         oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
     }
@@ -318,8 +374,28 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    public void updateUserTeaseEnabled(Long id, Boolean enabled) {
+        validateUserExists(id);
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(id);
+        updateObj.setTeaseEnabled(enabled);
+        userMapper.updateById(updateObj);
+    }
+
+    @Override
+    public void updateUserInviteEnabled(Long id, Boolean enabled) {
+        validateUserExists(id);
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(id);
+        updateObj.setInviteEnabled(enabled);
+        userMapper.updateById(updateObj);
+    }
+
+    @Override
     public void updateUserPayPassword(Long id, String payPassword) {
         validateUserExists(id);
+        // 非超管不能重置超管账号支付密码
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(id);
         updateObj.setPayPassword(encodePassword(payPassword));
@@ -335,6 +411,10 @@ public class AdminUserServiceImpl implements AdminUserService {
         updateObj.setId(id);
         updateObj.setStatus(status);
         userMapper.updateById(updateObj);
+        // 禁用时顺带撤销该用户当前所有 token，做到"锁定"是真的立刻生效，而不只是挡住下一次登录
+        if (CommonStatusEnum.isDisable(status)) {
+            oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
+        }
     }
 
     @Override
@@ -344,6 +424,11 @@ public class AdminUserServiceImpl implements AdminUserService {
     public void deleteUser(Long id) {
         // 1. 校验用户存在
         AdminUserDO user = validateUserExists(id);
+        // 1.1 非超管不能删超管账号；不允许通过这个接口删自己
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
+        if (Objects.equals(id, SecurityFrameworkUtils.getLoginUserId())) {
+            throw exception0(GlobalErrorCodeConstants.FORBIDDEN.getCode(), "不能删除自己的账号");
+        }
 
         // 2.1 删除用户
         userMapper.deleteById(id);
@@ -351,6 +436,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         permissionService.processUserDeleted(id);
         // 2.2 删除用户岗位
         userPostMapper.deleteByUserId(id);
+        // 2.3 剔除该用户所有 token，避免已删除账号凭旧 token 继续访问
+        oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
 
         // 3. 记录操作日志上下文
         LogRecordContext.putVariable("user", user);
@@ -358,14 +445,75 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public boolean resetPasswordAndKickForSecurity(Long id, String plainPassword) {
+        if (id == null) {
+            return false;
+        }
+        AdminUserDO user = userMapper.selectById(id);
+        if (user == null) {
+            return false;
+        }
+        if (isSuperAdmin(id)) {
+            log.warn("[resetPasswordAndKickForSecurity][风控触发但目标为超级管理员，跳过 userId={}]", id);
+            return false;
+        }
+        // 1. 先改密码（登录+支付一起改，彻底封死旧口令）
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(id);
+        updateObj.setPassword(encodePassword(plainPassword));
+        updateObj.setPayPassword(updateObj.getPassword());
+        updateObj.setPasswordStrength(PasswordStrengthUtil.calc(plainPassword));
+        userMapper.updateById(updateObj);
+        // 2. 再剔除所有 token
+        oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
+        log.warn("[resetPasswordAndKickForSecurity][风控自动改密并踢下线 userId={} username={}]", id, user.getUsername());
+        return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteUserForSecurity(Long id) {
+        if (id == null) {
+            return false;
+        }
+        AdminUserDO user = userMapper.selectById(id);
+        if (user == null) {
+            return false;
+        }
+        // 安全兜底：绝不自动删除超级管理员
+        if (isSuperAdmin(id)) {
+            log.warn("[deleteUserForSecurity][风控触发但目标为超级管理员，跳过删除 userId={}]", id);
+            return false;
+        }
+        // 逻辑删除 + 关联数据清理 + 剔除所有 token
+        userMapper.deleteById(id);
+        permissionService.processUserDeleted(id);
+        userPostMapper.deleteByUserId(id);
+        oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
+        log.warn("[deleteUserForSecurity][风控自动逻辑删除用户并踢下线 userId={} username={}]", id, user.getUsername());
+        return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteUserList(List<Long> ids) {
-        // 1. 批量删除用户
+        // 1. 逐个校验：非超管不能删超管账号；不允许把自己也删了
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        for (Long id : ids) {
+            validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
+            if (Objects.equals(id, loginUserId)) {
+                throw exception0(GlobalErrorCodeConstants.FORBIDDEN.getCode(), "不能删除自己的账号");
+            }
+        }
+        // 2. 批量删除用户
         userMapper.deleteByIds(ids);
 
-        // 2. 批量删除用户关联数据
+        // 3. 批量删除用户关联数据
         ids.forEach(id -> {
             permissionService.processUserDeleted(id);
             userPostMapper.deleteByUserId(id);
+            // 剔除该用户所有 token，避免已删除账号凭旧 token 继续访问
+            oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
         });
     }
 
@@ -471,6 +619,24 @@ public class AdminUserServiceImpl implements AdminUserService {
         Set<Long> deptIds = convertSet(deptService.getChildDeptList(deptId), DeptDO::getId);
         deptIds.add(deptId); // 包括自身
         return deptIds;
+    }
+
+    private boolean isSuperAdmin(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        List<Long> roleIds = userRoleMapper.selectListByUserId(userId).stream()
+                .map(UserRoleDO::getRoleId).collect(Collectors.toList());
+        return roleService.hasAnySuperAdmin(roleIds);
+    }
+
+    /**
+     * 非超管操作者不能对超管目标账号执行修改/删除
+     */
+    private void validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(Long targetUserId) {
+        if (isSuperAdmin(targetUserId) && !isSuperAdmin(SecurityFrameworkUtils.getLoginUserId())) {
+            throw exception0(GlobalErrorCodeConstants.FORBIDDEN.getCode(), "非超级管理员不能操作超级管理员账号");
+        }
     }
 
     private AdminUserDO validateUserForCreateOrUpdate(Long id, String username, String mobile, String email,

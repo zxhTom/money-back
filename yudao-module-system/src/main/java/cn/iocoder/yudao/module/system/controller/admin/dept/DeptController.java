@@ -75,6 +75,9 @@ public class DeptController {
 
     @GetMapping(value = {"/list-all-simple", "/simple-list"})
     @Operation(summary = "获取部门精简信息列表", description = "只包含被开启的部门，主要用于前端的下拉选项")
+    // 注意：不能加 system:dept:query 权限校验——contract-manager 角色有 system:user:create/update
+    // 但没有 system:dept:query，UserForm.vue 创建/编辑用户时依赖这个接口渲染部门下拉框，
+    // 加了权限会直接打断"创建用户"这个核心业务流程。数据本身也只是部门名称/层级，敏感度低，维持登录即可访问。
     public CommonResult<List<DeptSimpleRespVO>> getSimpleDeptList() {
         List<DeptDO> list = deptService.getDeptList(
                 new DeptListReqVO().setStatus(CommonStatusEnum.ENABLE.getStatus()));

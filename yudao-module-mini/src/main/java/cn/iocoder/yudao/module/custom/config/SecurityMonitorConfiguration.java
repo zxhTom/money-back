@@ -29,7 +29,7 @@ public class SecurityMonitorConfiguration {
     public FilterRegistrationBean<SecurityDetectFilter> securityDetectFilter() {
         FilterRegistrationBean<SecurityDetectFilter> bean = new FilterRegistrationBean<>();
         bean.setFilter(new SecurityDetectFilter(ipBlacklistService, securityAlertService,
-                stringRedisTemplate, ipRiskCheckService, alertRuleService));
+                stringRedisTemplate, ipRiskCheckService, alertRuleService, null));
         bean.addUrlPatterns("/*");
         // 在 Spring Security 过滤链之前执行（order=-200 是 Spring Security，这里用 -300）
         bean.setOrder(-300);

@@ -278,6 +278,27 @@ yudao:
     response-key: 96103715984234343991809655248883 # 【AES 案例】响应加密的秘钥，AES 案例，必须 16、24、32 位
 #    request-key: MIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBAKWzasimcZ1icsWDPVdTXcZs1DkOWjI+m9bTQU8aOqflnomkr6QO1WWeSHBHzuJGsTlV/ZY2pFfq/NstKC94hBjx7yioYJvzb2bKN/Uy4j5nM3iCF//u0RiFkkY8j0Bt/EWoFTOb6RHf8cHIAjbYYtP3pYzbpCIwryfe0g//KIuzAgMBAAECgYADDjZrYcpZjR2xr7RbXmGtzYbyUGXwZEAqa3XaWBD51J2iSyOkAlQEDjGmxGQ3vvb4qDHHadWI+3/TKNeDXJUO+xTVJrnismK5BsHyC6dfxlIK/5BAuknryTca/3UoA1yomS9ZlF3Q0wcecaDoEnSmZEaTrp9T3itPAz4KnGjv5QJBAN5mNcfu6iJ5ktNvEdzqcxkKwbXb9Nq1SLnmTvt+d5TPX7eQ9fCwtOfVu5iBLhhZzb5PJ7pSN3Zt6rl5/jPOGv0CQQC+vETX9oe1wbxZSv6/RBGy0Xow6GndbJwvd89PcAJ2h+OJXWtg/rRHB3t9EQm7iis0XbZTapj19E4U6l8EibhvAkEA1CvYpRwmHKu1SqdM+GBnW/2qHlBwwXJvpoK02TOm674HR/4w0+YRQJfkd7LOAgcyxJuJgDTNmtt0MmzS+iNoFQJAMVSUIZ77XoDq69U/qcw7H5qaFcgmiUQr6QL9tTftCyb+LGri+MUnby96OtCLSdvkbLjIDS8GvKYhA7vSM2RDNQJBAKGyVVnFFIrbK3yuwW71yvxQEGoGxlgvZSezZ4vGgqTxrr9HvAtvWLwR6rpe6ybR/x8uUtoW7NRBWgpiIFwjvY4= # 【RSA 案例】请求解密的私钥
 #    response-key: MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDh/CHyBcS/zEfVyINVA7+c9Xxl0CPdxPMK1OIjxaLy/7BLfbkoEpI8onQtjuzfpuxCraDem9bu3BMF0pMH95HytI3Vi0kGjaV+WLIalwgc2w37oA2sbsmKzQOP7SDLO5s2QJNAD7kVwd+Q5rqaLu2MO0xVv+0IUJhn83hClC0L5wIDAQAB # 【RSA 案例】响应加密的公钥
+  data-encrypt:
+    enable: false # 是否开启响应 data 加密（客户端未发布解密逻辑前请置为 false）
+    client-salt: Vq7mKe2XpZ9rCs4TnB8fLw3yHd6uGa5J # 会话密钥派生盐，与 money-ui、小程序内常量一致，改动需三端同步
+    grace-seconds: 300 # 轮换后旧版本主密钥保留秒数
+    debug-secret: dbg-Mn26-kQ9x # 调试密钥：请求头 X-Data-Encrypt-Debug 带上它则该请求返回明文；置空禁用，生产建议定期更换
+    ignore-urls: # 不加密的接口：第三方交互、登录前、文件流
+      - /admin-api/wechat/** # 微信小程序登录/绑定
+      - /admin-api/api/faceAuth/** # 百度人脸核身全链路
+      - /admin-api/api/mini/callback/** # 微信 webview 回调
+      - /admin-api/offcial/** # 微信公众号菜单/回调
+      - /admin-api/mp/** # 公众号模块（含 /mp/open/** 微信回调）
+      - /admin-api/pay/notify/** # 支付渠道回调
+      - /admin-api/custom/contract/dashboard/updateContractHadConfirm # 支付内部通知回调
+      - /admin-api/custom/contract/dashboard/bindmini2user # 登录前绑定接口
+      - /admin-api/system/auth/** # 登录/刷新令牌
+      - /admin-api/system/captcha/** # 验证码（anji 自带加解密）
+      - /admin-api/infra/file/** # 文件上传/下载（wx.uploadFile 不走统一请求封装）
+      - /admin-api/custom/contract/export-* # 合同 Excel/PDF 导出（文件流，避免内存缓冲）
+      - /admin-api/custom/audit-log/export-excel # 审计日志导出
+      - /admin-api/files/** # 合同文件上传
+      - /admin-api/custom/data-key/** # 数据密钥接口本身
   websocket:
     enable: true # websocket的开关
     path: /infra/ws # 路径
@@ -371,9 +392,33 @@ yudao:
       distinct-limit-enabled: true
       distinct-window-seconds: 86400
       distinct-max-per-window: 20
+  # SQL 自动迁移开关：true=启动时自动执行 classpath:db/migration/*.sql 里未执行过的脚本；false=关闭
+  sql-migration:
+    enabled: true
+  # 人脸实名认证相关
+  face-auth:
+    expire-months: 2                 # 已认证用户超过 N 个月未登录则改回未认证
+    expire-job-cron: 0 0 3 * * ?     # 过期扫描定时任务 cron（默认每天03:00），Spring @Scheduled 启动即生效
+    required-check-enabled: false    # 是否对"需登录的接口"强制实名认证（戏耍优先）。默认关：兼容未升级的旧版小程序；发新版小程序并验证后再设 true 开启
+    # 额外豁免端点（逗号分隔）：内置已豁免 人脸认证/登录登出/个人资料；下面是结合小程序分析出的"认证前必调"接口
+    #   model=版本安全模式检查、check-selected=维护窗口、device-module-access=登录设备校验、bindmini2user=登录后微信绑定
+    exempt-urls: /custom/contract/dashboard/model,/custom/time-window/check-selected,/custom/device-module-access/enabled,/custom/contract/dashboard/bindmini2user
+  # 服务端 nginx 日志查看/统计（只读指定文件；路径按你线上实际填写，通常在 prod/tmp 覆盖）
+  nginx-log:
+    enabled: true
+    access-path: /var/log/nginx/access.log   # combined 格式；自定义 log_format 需相应调整解析
+    error-path: /var/log/nginx/error.log
+    scan-bytes: 10485760                      # 仅读文件尾部字节数(默认10MB)，与文件大小无关
+    tail-lines: 500                           # 查看原文默认返回尾部行数
+    top-n: 100                                # IP/接口/状态码 各取 Top N
 
 # 时间窗口重合校验阈值（小时），见 docs/feature-time-window
 time-window:
   overlap-threshold-hours: 1
+
+# 注册邀请码总开关：true=注册必须邀请码；false/缺省=不需要（web+小程序均由后端强制）
+system:
+  user:
+    invite-register-required: false
 
 debug: false

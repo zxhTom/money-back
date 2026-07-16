@@ -81,4 +81,16 @@ public class UserRespVO{
     @ExcelProperty("证件号(脱敏)")
     private String idNoDisplay;
 
+    @Schema(description = "是否禁止用户自主修改密码")
+    @ExcelIgnore
+    private Boolean disablePwdChange;
+
+    @Schema(description = "是否对该用户开启戏耍模式（合同类查询返回确定性假数据）")
+    @ExcelIgnore
+    private Boolean teaseEnabled;
+
+    @Schema(description = "是否允许该用户生成邀请码")
+    @ExcelIgnore
+    private Boolean inviteEnabled;
+
 }

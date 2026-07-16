@@ -42,7 +42,14 @@ public class ContractHoneypotFactory {
     static ContractDO generate(Long requestedId) {
         // 种子固定 → 同 ID 同数据
         Random rng = new Random(requestedId * 2654435769L ^ 0xCAFEBABEDEADL);
+        return generateWithRandom(rng, requestedId, HONEYPOT_CREATOR_MARKER);
+    }
 
+    /**
+     * 供 {@link ContractTeaseFactory} 复用同一套"外观逼真的假合同"生成逻辑，
+     * 只是种子来源和 creator 标记不同（戏耍数据不打蜜罐标记，避免污染安全监控面板）。
+     */
+    static ContractDO generateWithRandom(Random rng, Long requestedId, String creatorMarker) {
         ContractDO fake = new ContractDO();
         fake.setId(requestedId);
         fake.setIndebtedName(randomName(rng, true));
@@ -70,7 +77,7 @@ public class ContractHoneypotFactory {
         fake.setRefund(0.0);
 
         // 内部标记，供 Controller 识别并记录额外安全日志；最终不对外暴露
-        fake.setCreator(HONEYPOT_CREATOR_MARKER);
+        fake.setCreator(creatorMarker);
 
         return fake;
     }

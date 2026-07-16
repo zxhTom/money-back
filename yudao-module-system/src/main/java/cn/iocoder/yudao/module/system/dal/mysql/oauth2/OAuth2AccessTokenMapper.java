@@ -40,11 +40,28 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
             "GROUP BY t.user_id, u.username ORDER BY tokenCount DESC LIMIT #{limit}")
     List<UserTokenStatVO> selectTopUsersByTokenCount(@Param("limit") int limit);
 
-    @Select("<script>SELECT user_id AS userId, COUNT(*) AS tokenCount " +
-            "FROM system_oauth2_access_token WHERE deleted=0 AND expires_time > NOW() " +
-            "AND user_id IN <foreach collection='userIds' item='id' open='(' separator=',' close=')'>#{id}</foreach> " +
-            "GROUP BY user_id</script>")
-    List<UserTokenStatVO> selectTokenCountsByUserIds(@Param("userIds") List<Long> userIds);
+    /** 批量查询用户当前有效令牌数（内存聚合，避免注解动态 SQL） */
+    @TenantIgnore
+    default List<UserTokenStatVO> selectTokenCountsByUserIds(java.util.Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        List<OAuth2AccessTokenDO> tokens = selectList(new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
+                .in(OAuth2AccessTokenDO::getUserId, userIds)
+                .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now()));
+        java.util.Map<Long, Long> countMap = new java.util.LinkedHashMap<>();
+        for (OAuth2AccessTokenDO t : tokens) {
+            countMap.merge(t.getUserId(), 1L, Long::sum);
+        }
+        List<UserTokenStatVO> result = new java.util.ArrayList<>();
+        countMap.forEach((uid, cnt) -> {
+            UserTokenStatVO vo = new UserTokenStatVO();
+            vo.setUserId(uid);
+            vo.setTokenCount(cnt);
+            result.add(vo);
+        });
+        return result;
+    }
 
     default PageResult<OAuth2AccessTokenDO> selectPage(OAuth2AccessTokenPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
@@ -53,6 +70,42 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
                 .likeIfPresent(OAuth2AccessTokenDO::getClientId, reqVO.getClientId())
                 .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now())
                 .orderByDesc(OAuth2AccessTokenDO::getId));
+    }
+
+    /** 某 IP 下当前有效令牌涉及的不同用户ID（用于"一IP多用户"检测） */
+    @TenantIgnore
+    @Select("SELECT DISTINCT user_id FROM system_oauth2_access_token " +
+            "WHERE deleted=0 AND expires_time > NOW() AND ip = #{ip}")
+    List<Long> selectDistinctUserIdsByIp(@Param("ip") String ip);
+
+    /** 某用户当前有效令牌涉及的不同 IP（用于"一用户多IP"检测） */
+    @TenantIgnore
+    @Select("SELECT DISTINCT ip FROM system_oauth2_access_token " +
+            "WHERE deleted=0 AND expires_time > NOW() AND user_id = #{userId} AND ip IS NOT NULL AND ip <> ''")
+    List<String> selectDistinctIpsByUserId(@Param("userId") Long userId);
+
+    /** 给定一批用户，取其当前有效（未过期、有 IP）的令牌；聚合在 Service 层做，避免动态 SQL */
+    @TenantIgnore
+    default List<OAuth2AccessTokenDO> selectActiveByUserIds(java.util.Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return selectList(new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
+                .in(OAuth2AccessTokenDO::getUserId, userIds)
+                .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now())
+                .isNotNull(OAuth2AccessTokenDO::getIp)
+                .ne(OAuth2AccessTokenDO::getIp, ""));
+    }
+
+    /** 给定一批 IP，取其上当前有效的令牌 */
+    @TenantIgnore
+    default List<OAuth2AccessTokenDO> selectActiveByIps(java.util.Collection<String> ips) {
+        if (ips == null || ips.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return selectList(new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
+                .in(OAuth2AccessTokenDO::getIp, ips)
+                .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now()));
     }
 
 }

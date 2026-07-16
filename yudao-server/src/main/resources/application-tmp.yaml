@@ -15,7 +15,7 @@ spring:
       web-stat-filter:
         enabled: true
       stat-view-servlet:
-        enabled: true
+        enabled: false # 安全：关闭 Druid 监控页(/druid/*)，避免泄露SQL/数据源信息
         allow:
         url-pattern: /druid/*
         login-username:
@@ -158,6 +158,8 @@ wx:
   miniapp:
     appid: wx7641cb883b4fa670
     secret: 8ce4493f9481e2f2cc9153331a19b094
+    token: PPA6ObJRA6XDnawajQ1YbT3rODXG8ZXr
+    aes-key: arT5WmfoiSxRstTvH7lkvgrRP9K06wworshVsCg5MO5
     config-storage:
       type: RedisTemplate
       key-prefix: wa
@@ -166,10 +168,18 @@ wx:
 --- #################### 芋道相关配置 ####################
 
 yudao:
+  file-cleanup:
+    enabled: true
+    retention-days: 7
+    cron: 0 30 3 * * ?
+  wechat-callback-ip-sync:
+    enabled: true
+    cron: 0 15 4 * * ?
   captcha:
     enable: true
   security:
     mock-enable: false
+    mockSecret: aK7xQ2mP9vL4nR8sT3wY5zB6cE1hJ0uX
   pay:
     order-notify-url: https://org.zxhtom.store/admin-api/pay/notify/order
     refund-notify-url: https://org.zxhtom.store/admin-api/pay/notify/refund
@@ -232,3 +242,18 @@ custom:
     ssl-enable: true
     starttls-enable: false
     nickname: 系统通知
+
+# 注册邀请码总开关：true=注册必须邀请码；false/缺省=不需要（web+小程序均由后端强制）
+system:
+  user:
+    invite-register-required: false
+
+# 安全：生产环境关闭接口文档，避免暴露全部接口清单（Swagger/knife4j/OpenAPI）
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+knife4j:
+  enable: false
+  production: true

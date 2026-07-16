@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
+import cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter;
+import cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.UserRateLimiterKeyResolver;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.*;
 import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditLog;
@@ -13,6 +15,7 @@ import cn.iocoder.yudao.module.custom.framework.audit.annotation.AuditOperationT
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.service.contract.ConfirmPdfService;
 import cn.iocoder.yudao.module.custom.service.contract.ContractHoneypotFactory;
+import cn.iocoder.yudao.module.custom.service.contract.ContractQueryRiskControlGuard;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
 import cn.iocoder.yudao.module.custom.util.ContractRespIdCardEnricher;
 import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
@@ -56,6 +59,10 @@ public class ContractController {
     private IdCardCipherService idCardCipherService;
     @Resource
     private DataAccessMonitorService dataAccessMonitorService;
+    @Resource
+    private ContractQueryRiskControlGuard riskControlGuard;
+    @Resource
+    private cn.iocoder.yudao.module.custom.service.contract.ContractPageRateLimiter contractPageRateLimiter;
 
     @PostMapping("/create")
     @Operation(summary = "创建合同")
@@ -130,17 +137,24 @@ public class ContractController {
     }
 
     @GetMapping("/page")
-    @Operation(summary = "获得合同分页")
+    @Operation(summary = "获得合同分页（精简字段，供小程序信用查询等按身份证查询场景使用）")
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    @RateLimiter(keyResolver = UserRateLimiterKeyResolver.class, count = 30, time = 60,
+            message = "查询请求过于频繁，请稍后再试")
     @cn.iocoder.yudao.module.system.framework.monitor.annotation.DataAccessMonitor(module = "合同管理", entityType = "contract")
     @ApiAccessLog(responseEnable = false)
-    public CommonResult<PageResult<ContractRespVO>> getContractPage(@Valid ContractPageReqVO pageReqVO) {
-        PageResult<ContractDO> pageResult = contractService.getContractPage(pageReqVO);
-        PageResult<ContractRespVO> voPage = BeanUtils.toBean(pageResult, ContractRespVO.class);
-        for (int i = 0; i < voPage.getList().size(); i++) {
-            ContractRespIdCardEnricher.enrich(voPage.getList().get(i), pageResult.getList().get(i), idCardCipherService);
+    public CommonResult<PageResult<ContractPageRespVO>> getContractPage(@Valid ContractPageReqVO pageReqVO) {
+        // /page 是信用查询专用，必须按身份证（欠款人/债权人）查询；不带身份证一律拒绝，防止有人恶意拉全量
+        if (cn.hutool.core.util.StrUtil.isBlank(pageReqVO.getIndebtedId())
+                && cn.hutool.core.util.StrUtil.isBlank(pageReqVO.getCreditorId())) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
+                    .exception(cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_QUERY_NEED_IDCARD);
         }
-        return success(voPage);
+        // 多时间窗口限速（3/5/10/15/30/60 分钟），超限直接拒绝"请勿频繁访问"
+        contractPageRateLimiter.check(SecurityFrameworkUtils.getLoginUserId());
+        riskControlGuard.beforeQuery(SecurityFrameworkUtils.getLoginUserId());
+        PageResult<ContractDO> pageResult = contractService.getContractPageForListing(pageReqVO);
+        return success(BeanUtils.toBean(pageResult, ContractPageRespVO.class));
     }
 
     @GetMapping("/selfPage")
@@ -165,7 +179,9 @@ public class ContractController {
     public void exportContractExcel(@Valid ContractPageReqVO pageReqVO,
               HttpServletResponse response) throws IOException {
         pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
-        List<ContractDO> list = contractService.getContractPage(pageReqVO).getList();
+        // 安全：与 /page 一致的归属限定——未带当事人筛选时只导出"自己创建的"，超管/合同管理员不受限；
+        //       避免有导出权限就能拉全库合同（原先直接 getContractPage 无归属限制）。
+        List<ContractDO> list = contractService.getContractPageForListing(pageReqVO).getList();
         List<ContractRespVO> voList = BeanUtils.toBean(list, ContractRespVO.class);
         for (int i = 0; i < voList.size(); i++) {
             ContractRespIdCardEnricher.enrich(voList.get(i), list.get(i), idCardCipherService);

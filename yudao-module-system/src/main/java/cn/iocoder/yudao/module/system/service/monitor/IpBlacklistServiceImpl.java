@@ -34,6 +34,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     @Resource private IpBlacklistMapper    ipBlacklistMapper;
     @Resource private IpBlacklistLogMapper ipBlacklistLogMapper;
     @Resource private StringRedisTemplate  stringRedisTemplate;
+    @Resource private IpWhitelistService   ipWhitelistService;
 
     @PostConstruct
     public void init() {
@@ -47,12 +48,29 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     @Override
     public boolean isBlacklisted(String ip) {
         if (ip == null) return false;
-        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(String.format(IP_KEY, ip)))) return true;
-        return ipBlacklistMapper.countActiveByIp(ip) > 0;
+        if (ipWhitelistService.isWhitelisted(ip)) return false; // 白名单 IP 永不视为黑名单
+        // 只查 Redis：启动 + 定时 refreshCache 从库重建，增删黑名单实时维护 Redis key；
+        // 不再每请求回查数据库，避免正常流量对 DB 造成"每请求一次查询"的压力（SecurityDetectFilter 每请求都会调）。
+        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(String.format(IP_KEY, ip)));
+    }
+
+    /** 定时从库重建 Redis 缓存：兜底 Redis 重启/驱逐导致的丢失（默认5分钟一次） */
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelayString = "${yudao.ip-blacklist.refresh-ms:300000}")
+    public void scheduledRefresh() {
+        try {
+            refreshCache();
+        } catch (Exception e) {
+            log.warn("[IpBlacklist] 定时刷新缓存失败：{}", e.getMessage());
+        }
     }
 
     @Override
     public void addToBlacklist(String ip, String reason, boolean autoAdded, LocalDateTime expireTime) {
+        // 白名单 IP 躲过所有封禁
+        if (ipWhitelistService.isWhitelisted(ip)) {
+            log.info("[IpBlacklist] IP {} 在白名单，跳过封禁（原因: {}）", ip, reason);
+            return;
+        }
         IpBlacklistDO existing = ipBlacklistMapper.selectOne(
                 new LambdaQueryWrapper<IpBlacklistDO>().eq(IpBlacklistDO::getIp, ip));
 
@@ -113,6 +131,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     public PageResult<IpBlacklistDO> getPage(PageParam pageParam) {
         return ipBlacklistMapper.selectPage(pageParam, new LambdaQueryWrapperX<IpBlacklistDO>()
                 .eq(IpBlacklistDO::getStatus, 0)
+                .orderByDesc(IpBlacklistDO::getUpdateTime)
                 .orderByDesc(IpBlacklistDO::getId));
     }
 

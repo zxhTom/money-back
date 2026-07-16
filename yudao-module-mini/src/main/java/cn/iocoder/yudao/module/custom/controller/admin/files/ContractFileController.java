@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.infra.service.file.FileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +31,7 @@ public class ContractFileController {
     FileService fileService;
     @PostMapping("/upload")
     @Operation(summary = "上传文件", description = "模式一：后端上传文件")
+    @PreAuthorize("@ss.hasPermission('custom:contract:update')")
     public CommonResult<String> uploadFile(@Valid FileUploadReqVO uploadReqVO) throws Exception {
         MultipartFile file = uploadReqVO.getFile();
         byte[] content = IoUtil.readBytes(file.getInputStream());

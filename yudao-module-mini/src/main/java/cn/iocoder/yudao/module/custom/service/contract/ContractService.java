@@ -62,6 +62,17 @@ public interface ContractService {
     PageResult<ContractDO> getContractPage(ContractPageReqVO pageReqVO);
 
     /**
+     * 获得合同分页（供 /page 交互式查询接口使用）
+     *
+     * 与 {@link #getContractPage(ContractPageReqVO)} 的区别：未指定 indebtedId/creditorId 时，
+     * 不会无限定地列出全库合同，会退化为"只看自己创建的"（超管/合同管理员除外）
+     *
+     * @param pageReqVO 分页查询
+     * @return 合同分页
+     */
+    PageResult<ContractDO> getContractPageForListing(ContractPageReqVO pageReqVO);
+
+    /**
      * 获得当前登录用户创建的合同分页
      *
      * @param pageReqVO 分页查询

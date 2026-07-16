@@ -102,6 +102,35 @@ public interface AdminUserService {
     void updateUserDisablePwdChange(Long id, Boolean disable);
 
     /**
+     * 切换"戏耍模式"开关：开启后该用户的合同类查询接口返回确定性伪造数据，本人 profile 信息不受影响
+     */
+    void updateUserTeaseEnabled(Long id, Boolean enabled);
+
+    /**
+     * 切换"邀请功能"开关：开启后该用户可生成邀请码，别人凭码注册
+     */
+    void updateUserInviteEnabled(Long id, Boolean enabled);
+
+    /**
+     * 安全处置：逻辑删除用户并剔除其所有 token（风控自动触发用）。
+     * 超级管理员账号不执行删除，仅返回，避免误伤。
+     *
+     * @return 是否真的删除了（超管或用户不存在返回 false）
+     */
+    boolean deleteUserForSecurity(Long id);
+
+    /**
+     * 安全处置：重置用户密码并剔除其所有 token（风控自动触发用）。
+     * 严格顺序：先改密码，再踢 token（避免踢完的瞬间攻击者用旧密码重新登录拿新 token）。
+     * 超级管理员账号不执行，仅返回 false，避免误伤。
+     *
+     * @param id            用户编号
+     * @param plainPassword 新密码明文（由复杂密码生成器产生）
+     * @return 是否真的执行了（超管或用户不存在返回 false）
+     */
+    boolean resetPasswordAndKickForSecurity(Long id, String plainPassword);
+
+    /**
      * 修改状态
      *
      * @param id     用户编号

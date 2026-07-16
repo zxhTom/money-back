@@ -101,8 +101,11 @@ public class CustomDefineController {
     }
 
     @GetMapping("/creditSearch")
-    @Operation(summary = "借用统计")
-    @PreAuthorize("@ss.hasPermission('custom:contract:credit')")
+    @Operation(summary = "信用查询")
+    @PreAuthorize("@ss.hasPermission('custom:contract:credit-query')")
+    @RateLimiter(time = 60, count = 20,
+            keyResolver = cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.UserRateLimiterKeyResolver.class,
+            message = "信用查询过于频繁，请稍后再试")
     public CommonResult<Page<CreditSearchVO>> creditSearch(CreditPageReqVO creditPageReqVO) {
         return success(customDefineService.creditSearch(creditPageReqVO));
     }
@@ -171,7 +174,7 @@ public class CustomDefineController {
 
     @PostMapping("/updateContractHadConfirm")
     @Operation(summary = "将合同状态更新为已确认")
-    @PermitAll
+    @PreAuthorize("@ss.hasPermission('custom:contract:update')")
     public CommonResult<Boolean> updateContractHadConfirm(@RequestBody PayOrderNotifyReqDTO notifyReqDTO) {
         customDefineService.updateContractConfirmedStatus(notifyReqDTO);
         return success(true);
@@ -200,28 +203,37 @@ public class CustomDefineController {
         customDefineService.register(adminUserDO);
         return success(true);
     }
+
+    @GetMapping("/register-policy")
+    @Operation(summary = "获取注册严格等级策略（进注册页调用，小程序据此动态控制）")
+    @PermitAll
+    public CommonResult<java.util.Map<String, Object>> registerPolicy() {
+        return success(new java.util.HashMap<>());
+    }
     @PutMapping("/update")
     @Operation(summary = "有效更新")
-//    @PermitAll
+    @PreAuthorize("@ss.hasPermission('custom:contract:update')")
     public CommonResult<Boolean> update(@RequestBody ContractSaveReqVO contractSaveReqVO) {
         customDefineService.update(contractSaveReqVO);
         return success(true);
     }
     @PutMapping("/updateStatus")
     @Operation(summary = "更新状态")
-    @PermitAll
+    @PreAuthorize("@ss.hasPermission('custom:contract:update')")
     public CommonResult<Boolean> updateStatus(@RequestBody ContractSaveReqVO contractSaveReqVO) {
         customDefineService.updateStatus(contractSaveReqVO);
         return success(true);
     }
     @PutMapping("/debt")
     @Operation(summary = "销账")
+    @PreAuthorize("@ss.hasPermission('custom:contract:update')")
     public CommonResult<Boolean> debt(@RequestBody DebtVO debtVO) {
         customDefineService.debt(debtVO);
         return success(true);
     }
     @PutMapping("/extension")
     @Operation(summary = "展期")
+    @PreAuthorize("@ss.hasPermission('custom:contract:update')")
     public CommonResult<Boolean> extension(@RequestBody ContractSaveReqVO contractSaveReqVO) {
         customDefineService.extension(contractSaveReqVO);
         return success(true);
@@ -281,6 +293,7 @@ public class CustomDefineController {
 
     @GetMapping("/business-dimension")
     @Operation(summary = "demo")
+    @PreAuthorize("@ss.hasPermission('custom:contract:statics')")
     public CommonResult<StaticsContractPeriodRespVO> dimension() {
         return success(customDefineService.staticsContractByTimePeriod());
     }

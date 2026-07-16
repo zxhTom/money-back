@@ -42,7 +42,8 @@
         -- 日期信息
         CURDATE() AS stat_date,
         DATE_FORMAT(CURDATE(), '%Y-%m-01') AS month_start_date
-        FROM custom_contract;
+        FROM custom_contract
+        WHERE deleted = 0;
     </select>
     <select id="userDimension"
             resultType="cn.iocoder.yudao.module.custom.controller.admin.custom.vo.UserDimensionRespVO">
@@ -87,6 +88,7 @@
             FROM custom_contract cc
             LEFT JOIN system_users su ON su.id_no = cc.indebted_id
             <where>
+                cc.deleted = 0
                 <if test="idNo!=null and idNo!=''">
                     and cc.creditor_id =#{idNo}
                 </if>
@@ -101,6 +103,7 @@
         FROM custom_contract cc
         LEFT JOIN system_users su ON su.id_no = cc.creditor_id
         <where>
+            cc.deleted = 0
             <if test="idNo!=null and idNo!=''">
                 and cc.indebted_id =#{idNo}
             </if>

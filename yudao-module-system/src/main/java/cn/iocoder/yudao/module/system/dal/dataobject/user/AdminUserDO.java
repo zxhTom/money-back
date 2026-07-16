@@ -53,6 +53,13 @@ public class AdminUserDO extends TenantBaseDO {
     private String idCard;
 
     /**
+     * 仅接口入参：小程序注册时携带的邀请码；不落库
+     */
+    @TableField(exist = false)
+    @Schema(description = "邀请码（注册必填）")
+    private String inviteCode;
+
+    /**
      * 真实姓名
      */
     private String realname;
@@ -149,5 +156,17 @@ public class AdminUserDO extends TenantBaseDO {
      * 为 true 时用户调用个人中心改密接口会被拒绝，管理员重置不受限制
      */
     private Boolean disablePwdChange;
+
+    /**
+     * 是否对该用户开启"戏耍模式"：0-否，1-是
+     * 为 true 时该用户所有合同类查询接口返回确定性伪造数据，本人 profile 信息不受影响
+     */
+    private Boolean teaseEnabled;
+
+    /**
+     * 是否允许该用户生成邀请码：0-否，1-是
+     * 为 true 时该用户可在小程序生成邀请码，别人凭码注册
+     */
+    private Boolean inviteEnabled;
 
 }

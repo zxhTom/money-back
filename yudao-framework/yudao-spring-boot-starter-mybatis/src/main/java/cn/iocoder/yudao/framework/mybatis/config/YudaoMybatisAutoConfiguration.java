@@ -86,15 +86,22 @@ public class YudaoMybatisAutoConfiguration {
         throw new IllegalArgumentException(StrUtil.format("DbType{} 找不到合适的 IKeyGenerator 实现类", dbType));
     }
 
+    /**
+     * 仅设置 JacksonTypeHandler 的静态 ObjectMapper；不返回 TypeHandler Bean。
+     *
+     * 若返回 JacksonTypeHandler 实例，mybatis-spring 会把它注册成全局 (Object) 处理器，
+     * 导致 Map&lt;String, Object&gt; 查询中的 varchar 列被当作 JSON 解析（如 ip "172.18.0.1" 报错）。
+     * 使用 @TableField(typeHandler = JacksonTypeHandler.class) 的 JSON 字段依旧走各自实例，不受影响。
+     */
     @Bean
-    public JacksonTypeHandler jacksonTypeHandler(List<ObjectMapper> objectMappers) {
-        // 特殊：设置 JacksonTypeHandler 的 ObjectMapper！
-        ObjectMapper objectMapper = CollUtil.getFirst(objectMappers);
-        if (objectMapper == null) {
-            objectMapper = JsonUtils.getObjectMapper();
-        }
-        JacksonTypeHandler.setObjectMapper(objectMapper);
-        return new JacksonTypeHandler(Object.class);
+    public org.springframework.beans.factory.InitializingBean jacksonTypeHandlerObjectMapperInitializer(List<ObjectMapper> objectMappers) {
+        return () -> {
+            ObjectMapper objectMapper = CollUtil.getFirst(objectMappers);
+            if (objectMapper == null) {
+                objectMapper = JsonUtils.getObjectMapper();
+            }
+            JacksonTypeHandler.setObjectMapper(objectMapper);
+        };
     }
 
 }

@@ -1,32 +1,42 @@
 package cn.iocoder.yudao.module.custom.controller.admin.baidu;
 
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.baidu.vo.BaiduUserInfo;
 import cn.iocoder.yudao.module.custom.service.face.baidu.BaiduFaceAuthService;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
+import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import com.anji.captcha.util.StringUtils;
 import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.security.PermitAll;
-import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.PrintWriter;
+import javax.annotation.Resource;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.FACE_AUTH_IDCARD_NOT_SELF;
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.FACE_AUTH_NEED_LOGIN;
 
 
 @RestController
 @RequestMapping("/api/faceAuth")
 public class FaceAuthController {
+
+    /** 人脸回调一次性 nonce 的 Redis key 前缀，值=归一明文身份证 */
+    public static final String CALLBACK_NONCE_PREFIX = "face:callback:nonce:";
+    private static final long NONCE_TTL_MINUTES = 30;
 
     @Autowired
     private BaiduFaceAuthService baiduFaceAuthService;
@@ -36,6 +46,10 @@ public class FaceAuthController {
 
     @Autowired
     private IdCardCipherService idCardCipherService;
+    @Resource
+    private AdminUserService adminUserService;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
     // 你的小程序服务器域名，用于构造回调地址
     @Value("${server.domain}")
     private String serverDomain;
@@ -47,8 +61,10 @@ public class FaceAuthController {
     @GetMapping("/start")
     public CommonResult<Map<String, Object>> startFaceAuth(
             @Parameter(description = "身份证：明文或密文（与 profile.idNo 一致），服务端自动识别") @RequestParam String idCard) throws Exception {
+        // 注意：brain.toms.chat 核身完成后重定向到 successUrl/failUrl 时，只回传 status+idCard，
+        // 不会透传我们追加的任何自定义参数（nonce/verify_token 都拿不回来），
+        // 因此回调只能以 status 为准（配合"只允许成功、绝不降级"的策略）。不要在这里再加 nonce。
         String idCardEnc = URLEncoder.encode(idCard, StandardCharsets.UTF_8.name());
-        // 回调地址仅携带编码后的证件参数；页面与回传小程序仅展示脱敏串、业务字段用密文
         String successUrl = serverDomain + "/api/mini/callback?status=success&idCard=" + idCardEnc;
         String failUrl = serverDomain + "/api/mini/callback?status=failed&idCard=" + idCardEnc;
 //        successUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=success");
@@ -79,6 +95,7 @@ public class FaceAuthController {
         }
         String name = baiduUserInfo.getName();
         String idCard = idCardCipherService.decryptForExternalApi(baiduUserInfo.getIdCard());
+        wechatService.updateVerify(idCard, 1);
         boolean success = baiduFaceAuthService.reportUserInfo(verifyToken, name, idCard);
         Map<String, Object> result = new HashMap<>();
         result.put("success", success);
@@ -94,74 +111,6 @@ public class FaceAuthController {
     public CommonResult<Map<String, Object>> queryFaceAuthResult(@RequestParam String verifyToken) throws Exception {
         return success(baiduFaceAuthService.queryFaceAuthResult(verifyToken));
     }
-    /**
-     * 接收百度云人脸核身回调，并返回引导页面
-     * 访问示例：/api/faceAuth/callback?status=success&verify_token=xxx&user_id=xxx
-     */
-    @GetMapping(value = "/callback", produces = MediaType.TEXT_HTML_VALUE)
-    @PermitAll
-    public void handleCallback(
-            @RequestParam String status,
-            @RequestParam String idCard,
-            @RequestParam(required = false) String user_id,
-            HttpServletResponse response) throws IOException {
 
-        // 1. 【关键】在此处保存核验凭证并关联用户 (例如存入数据库或缓存)
-        // 您的业务逻辑：saveAuthResult(verify_token, status, user_id);
-        wechatService.updateVerify(idCard, "success".equals(status) ? 1 : 0);
-        // 2. 构建并输出一个友好的HTML引导页
-        buildHtmlResponse(response, status, idCardCipherService.maskFromStored(idCard));
-    }
-
-    private void buildHtmlResponse(HttpServletResponse response, String status, String idCardMasked) throws IOException {
-        // 设置响应内容类型为HTML
-        response.setContentType("text/html; charset=utf-8");
-        PrintWriter out = response.getWriter();
-
-        // 根据状态设置页面内容
-        String title;
-        String message;
-        String icon;
-
-        if ("success".equalsIgnoreCase(status)) {
-            title = "验证成功！";
-            message = String.format("人脸核身流程已完成 (凭证：%s)。请返回小程序查看结果。", idCardMasked);
-            icon = "✅";
-        } else {
-            title = "验证未完成";
-            message = String.format("人脸核身流程中断或失败 (凭证：%s)。请返回小程序重新尝试。", idCardMasked);
-            icon = "⏸️";
-        }
-
-        // 输出一个简洁美观的HTML页面
-        out.println("<!DOCTYPE html>");
-        out.println("<html lang=\"zh-CN\">");
-        out.println("<head>");
-        out.println("    <meta charset=\"UTF-8\">");
-        out.println("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">");
-        out.println("    <title>" + title + "</title>");
-        out.println("    <style>");
-        out.println("        * { margin: 0; padding: 0; box-sizing: border-box; }");
-        out.println("        body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }");
-        out.println("        .card { background: white; border-radius: 24px; padding: 40px 30px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1); text-align: center; max-width: 500px; width: 100%; }");
-        out.println("        .icon { font-size: 80px; margin-bottom: 25px; line-height: 1; }");
-        out.println("        .title { font-size: 28px; font-weight: 700; color: #333; margin-bottom: 15px; }");
-        out.println("        .message { font-size: 16px; color: #666; line-height: 1.6; margin-bottom: 30px; word-break: break-all; }");
-        out.println("        .tip { font-size: 14px; color: #999; padding: 15px; background-color: #f8f9fa; border-radius: 12px; margin-top: 25px; }");
-        out.println("        .token { font-size: 12px; color: #aaa; margin-top: 20px; word-break: break-all; }");
-        out.println("    </style>");
-        out.println("</head>");
-        out.println("<body>");
-        out.println("    <div class=\"card\">");
-        out.println("        <div class=\"icon\">" + icon + "</div>");
-        out.println("        <h1 class=\"title\">" + title + "</h1>");
-        out.println("        <p class=\"message\">" + message + "</p>");
-        out.println("        <div class=\"tip\">💡 请手动关闭此页面，或从微信聊天列表/最近使用中重新进入您的小程序。</div>");
-        out.println("        <div class=\"token\">核验凭证：" + idCardMasked + "</div>");
-        out.println("    </div>");
-        out.println("</body>");
-        out.println("</html>");
-
-        out.flush();
-    }
+    // 真正生效的百度回调地址是 MiniCallbackController（/api/mini/callback），这里的 /callback 是未接线的遗留代码，已删除。
 }

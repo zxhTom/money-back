@@ -71,5 +71,9 @@ public class OAuth2AccessTokenDO extends TenantBaseDO {
      * 过期时间
      */
     private LocalDateTime expiresTime;
+    /**
+     * 登录/签发令牌时的来源IP（可信真实IP）
+     */
+    private String ip;
 
 }

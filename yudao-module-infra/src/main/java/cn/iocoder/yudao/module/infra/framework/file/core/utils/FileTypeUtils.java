@@ -78,14 +78,20 @@ public class FileTypeUtils {
      * @param filename 文件名
      * @param content  附件内容
      */
+    /** 浏览器可执行脚本的类型，下载时强制降级为 octet-stream，防存储型 XSS */
+    private static final String[] ACTIVE_CONTENT_TYPES = {
+            "text/html", "application/xhtml", "image/svg", "text/xml", "application/xml",
+            "javascript", "ecmascript", "application/x-sh", "application/hta"};
+
     public static void writeAttachment(HttpServletResponse response, String filename, byte[] content) throws IOException {
-        // 设置 header 和 contentType
         String mineType = getMineType(content, filename);
-        response.setContentType(mineType);
-        // 设置内容显示、下载文件名：https://www.cnblogs.com/wq-9/articles/12165056.html
-        if (isImage(mineType)) {
-            // 参见 https://github.com/YunaiV/ruoyi-vue-pro/issues/692 讨论
+        boolean active = StrUtil.containsAnyIgnoreCase(mineType, ACTIVE_CONTENT_TYPES);
+        response.setContentType(active ? "application/octet-stream" : mineType);
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        // 仅无脚本能力的位图允许内联预览，其余（含 svg/html）一律强制附件下载
+        if (!active && isImage(mineType)) {
             response.setHeader("Content-Disposition", "inline;filename=" + HttpUtils.encodeUtf8(filename));
+            response.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
         } else {
             response.setHeader("Content-Disposition", "attachment;filename=" + HttpUtils.encodeUtf8(filename));
         }

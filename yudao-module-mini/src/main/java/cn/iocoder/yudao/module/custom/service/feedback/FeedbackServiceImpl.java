@@ -29,6 +29,8 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     @Override
     public FeedbackSubmitRespVO submitFeedback(FeedbackSubmitReqVO reqVO) {
+        // 0. 文本内容安全检测 (FileContentAuditor unavailable)
+
         // 1. 验证反馈类型
         String[] validTypes = {"功能问题", "体验建议", "内容问题", "其他反馈"};
         boolean isValidType = false;

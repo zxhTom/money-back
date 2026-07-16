@@ -11,26 +11,14 @@ public class IpUtils {
     private static final String UNKNOWN = "unknown";
 
     /**
-     * 获取外网IP：从代理头中取第一个非 unknown 的 IP
+     * 获取客户端真实 IP（可信取法）。
+     *
+     * 统一委托给 {@link cn.iocoder.yudao.framework.common.util.servlet.ServletUtils#getClientRealIp}：
+     * 优先 X-Real-IP、其次 X-Forwarded-For 最右一跳，避免最左 XFF 被伪造成内网IP。
+     * 原先“取 XFF 最左值”的写法可被客户端伪造，已废弃。
      */
     public static String getExternalIp(HttpServletRequest request) {
-        String[] headers = {
-                "X-Forwarded-For",
-                "X-Original-Forwarded-For",
-                "X-Real-IP",
-                "Proxy-Client-IP",
-                "WL-Proxy-Client-IP",
-                "HTTP_CLIENT_IP",
-                "HTTP_X_FORWARDED_FOR"
-        };
-        for (String header : headers) {
-            String ip = request.getHeader(header);
-            if (StrUtil.isNotBlank(ip) && !UNKNOWN.equalsIgnoreCase(ip)) {
-                // X-Forwarded-For 可能包含多个 IP，取第一个
-                return ip.split(",")[0].trim();
-            }
-        }
-        return request.getRemoteAddr();
+        return cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientRealIp(request);
     }
 
     /**

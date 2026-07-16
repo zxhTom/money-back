@@ -96,6 +96,14 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Autowired
     private AdminUserMapper adminUserMapper;
     @Autowired
+    private cn.iocoder.yudao.module.custom.service.contract.ContractOwnershipGuard ownershipGuard;
+    @Autowired
+    private cn.iocoder.yudao.module.custom.service.contract.ContractTeaseGuard teaseGuard;
+    @Autowired
+    private cn.iocoder.yudao.module.custom.service.invite.InviteCodeService inviteCodeService;
+    @Autowired
+    private cn.iocoder.yudao.module.custom.service.invite.RegisterRiskControlGuard registerRiskControlGuard;
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -103,11 +111,19 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public StaticsContractPeriodRespVO staticsContractByTimePeriod() {
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        if (teaseGuard.isTeasing(loginUserId)) {
+            return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory.generateStaticsContractPeriod(loginUserId);
+        }
         return customDefineMapper.staticsContractByTimePeriod();
     }
 
     @Override
     public DimensionCombineRespVo userDimension() {
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        if (teaseGuard.isTeasing(loginUserId)) {
+            return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory.generateUserDimension(loginUserId);
+        }
         DimensionCombineRespVo respVo = new DimensionCombineRespVo();
         UserDimensionRespVO userDimensionRespVO = customDefineMapper.userDimension();
         respVo.setData(userDimensionRespVO);
@@ -136,6 +152,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public List<RecentContractVO> rencentContractList() {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
+        if (teaseGuard.isTeasing(loginUser.getId())) {
+            return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory.generateRecentContractList(loginUser.getId());
+        }
         AdminUserDO user = adminUserService.getUser(loginUser.getId());
         List<RecentContractVO> list = customDefineMapper.rencentContractList(user.getIdNo());
         for (RecentContractVO vo : list) {
@@ -154,6 +173,11 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         if (StrUtil.isNotBlank(pageReqVO.getIdNo())) {
             pageReqVO.setIdNo(idCardCipherService.normalizeRequestToCipher(pageReqVO.getIdNo()));
         }
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        log.info("[creditSearch][信用查询审计] operator={} idNoCipher={}", loginUserId, pageReqVO.getIdNo());
+        if (teaseGuard.isTeasing(loginUserId)) {
+            return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory.generateCreditSearchPage(loginUserId, pageReqVO);
+        }
         Page<CreditPageReqVO> objectPage = new Page<>(pageReqVO.getPageNo(), pageReqVO.getPageSize());
         Page<CreditSearchVO> pageList = customDefineMapper.creditSearch(objectPage,pageReqVO);
          return pageList;
@@ -163,6 +187,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     public Integer edit(ContractSaveReqVO contractSaveReqVO) {
         normalizeContractIdNos(contractSaveReqVO);
         ContractDO contractDO = contractMapper.selectById(contractSaveReqVO.getId());
+        ownershipGuard.checkOrThrow(contractDO, SecurityFrameworkUtils.getLoginUserId());
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
 
         BeanUtil.copyProperties(updateObj, contractDO, true);
@@ -177,6 +202,10 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public TotalInfosRespVO totalInfos(ContractPageReqVO reqVO) {
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        if (teaseGuard.isTeasing(loginUserId)) {
+            return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory.generateTotalInfos(loginUserId, reqVO);
+        }
         LambdaQueryWrapperX<ContractDO> contractDOLambdaQueryWrapperX = new LambdaQueryWrapperX<ContractDO>()
                 .likeIfPresent(ContractDO::getIndebtedName, reqVO.getIndebtedName())
                 .eqIfPresent(ContractDO::getIndebtedId, reqVO.getIndebtedId())
@@ -204,6 +233,10 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public List<ContractDO> page(ContractPageReqDtoVO reqVO) {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
+        if (teaseGuard.isTeasing(loginUser.getId())) {
+            return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory
+                    .generateContractList(loginUser.getId(), reqVO, 8);
+        }
         AdminUserDO user = adminUserService.getUser(loginUser.getId());
         if (StringUtils.isEmpty(user.getRealname()) || StringUtils.isEmpty(user.getIdNo())) {
             throw new RuntimeException("请完善个人信息");
@@ -325,6 +358,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public Integer update(ContractSaveReqVO contractSaveReqVO) {
         normalizeContractIdNos(contractSaveReqVO);
+        ownershipGuard.checkOrThrow(contractMapper.selectById(contractSaveReqVO.getId()), SecurityFrameworkUtils.getLoginUserId());
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         AdminUserDO user = userService.getUser(loginUser.getId());
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
@@ -364,6 +398,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             throw exception(USER_PASSWORD_FAILED);
         }
         ContractDO contractDO = contractMapper.selectById(debtVO.getId());
+        ownershipGuard.checkOrThrow(contractDO, loginUserId);
         if (contractDO.getInterest() == null) {
             contractDO.setInterest(0D);
         }
@@ -412,6 +447,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         TemplateVO templateVO = new TemplateVO();
         ContractDO contractDO = contractMapper.selectById(contractSaveReqVO.getId());
+        ownershipGuard.checkOrThrow(contractDO, SecurityFrameworkUtils.getLoginUserId());
         templateVO.setIdNo(contractDO.getCreditorId());
         templateVO.setTemplateId("yFKV3NQHSKccb4kaTnp5Sxv0VJtinn0GdjoQYb2rM4Y");
         templateVO.setDatas(new HashMap<String, Object>() {
@@ -436,6 +472,17 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Integer register(AdminUserDO adminUserDO) {
+        // 0. 注册频率风控（超阈值直接拒绝本次并拉黑IP）——始终生效，与邀请码开关无关
+        String registerIp = getClientIP();
+        registerRiskControlGuard.beforeRegister(registerIp);
+        // 0.1 邀请码校验：仅当全局开关开启时才强制；关闭则完全不校验、不记录
+        cn.iocoder.yudao.module.custom.dal.dataobject.invite.InviteCodeDO inviteCode = null;
+        if (inviteCodeService.isRegisterInviteRequired()) {
+            if (org.apache.commons.lang3.StringUtils.isBlank(adminUserDO.getInviteCode())) {
+                throw exception(cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.INVITE_CODE_REQUIRED);
+            }
+            inviteCode = inviteCodeService.validate(adminUserDO.getInviteCode());
+        }
 
         AdminUserDO user = BeanUtils.toBean(adminUserDO, AdminUserDO.class);
         if (org.apache.commons.lang3.StringUtils.isBlank(user.getIdNo())
@@ -443,6 +490,8 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             user.setIdNo(user.getIdCard().trim());
         }
         user.setIdCard(null);
+        // 明文身份证（转密文前）：middle 等级下支付密码=身份证后6位需要它
+        String plainIdNo = org.apache.commons.lang3.StringUtils.trimToNull(user.getIdNo());
         if (org.apache.commons.lang3.StringUtils.isNotBlank(user.getIdNo())) {
             user.setIdNo(idCardCipherService.normalizeRequestToCipher(user.getIdNo()));
         }
@@ -456,8 +505,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         }
         String resolvedUsername = resolveUsernameForRegister(user);
         user.setUsername(resolvedUsername);
-        // password 与 payPassword：两都有值则各存各的，只有一个有值则另一个取该值，都为空则用默认 123456
-        normalizePasswordAndPayPassword(user);
+        // TODO: 按注册严格等级校验登录密码 + 解析支付密码（后端权威校验，不完全信任前端）
+        // RegisterPolicyService not available, using defaults
+        user.setPayPassword(user.getPassword());
 //            user.setUserCode(openId.hashCode());
         DeptDO deptDO = deptService.getDeptByName("合同管理部");
         if (deptDO != null) {
@@ -471,6 +521,10 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             userRoleMapper.insert(userRoleDO);
         }
         userService.insertUserSimply(user);
+        // 记录邀请注册（仅当开关开启且校验出有效邀请码时）
+        if (inviteCode != null) {
+            inviteCodeService.recordRegistration(inviteCode, user, registerIp);
+        }
         return 1;
     }
 

@@ -56,3 +56,4 @@ application-my.yaml
 # 模拟用户生成物（含身份证、手机等敏感信息）
 /script/out/
 /script/mock_users_ledger/
+.superpowers/

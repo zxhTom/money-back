@@ -21,4 +21,6 @@ public class IpBlacklistDO {
     private Boolean autoAdded;
     private LocalDateTime expireTime;
     private LocalDateTime createTime;
+    /** 最近封禁时间：新封/再次封禁都会刷新 */
+    private LocalDateTime updateTime;
 }

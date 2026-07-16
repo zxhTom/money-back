@@ -15,6 +15,9 @@ public interface AlertRuleService {
     /** 按 alertType 获取有效规则（走缓存） */
     AlertRuleDO getCachedRule(String alertType);
 
+    /** 获取所有启用的 URL 监控规则（走缓存，支持配置多个不同 URL） */
+    List<AlertRuleDO> getUrlMonitorRules();
+
     Long create(AlertRuleDO rule, List<AlertRuleNotifyDO> notifies);
 
     void update(AlertRuleDO rule, List<AlertRuleNotifyDO> notifies);

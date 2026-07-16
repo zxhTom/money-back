@@ -4,14 +4,24 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserPageReqVO;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.Collection;
 import java.util.List;
 
 @Mapper
 public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
+
+    /** 安全互查：按 用户名/昵称/真实姓名/身份证号 模糊匹配用户ID */
+    @TenantIgnore
+    @Select("<script>SELECT id FROM system_users WHERE deleted = 0 AND (" +
+            "username LIKE CONCAT('%', #{kw}, '%') OR nickname LIKE CONCAT('%', #{kw}, '%') " +
+            "OR realname LIKE CONCAT('%', #{kw}, '%') OR id_no = #{kw}) LIMIT 100</script>")
+    List<Long> selectIdsByKeyword(@Param("kw") String kw);
 
     default AdminUserDO selectByUsername(String username) {
         List<AdminUserDO> list = selectListByUsername(username);

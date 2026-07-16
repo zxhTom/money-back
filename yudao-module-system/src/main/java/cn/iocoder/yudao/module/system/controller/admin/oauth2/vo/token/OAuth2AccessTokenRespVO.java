@@ -37,4 +37,7 @@ public class OAuth2AccessTokenRespVO {
     @Schema(description = "过期时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime expiresTime;
 
+    @Schema(description = "登录来源IP", example = "1.2.3.4")
+    private String ip;
+
 }

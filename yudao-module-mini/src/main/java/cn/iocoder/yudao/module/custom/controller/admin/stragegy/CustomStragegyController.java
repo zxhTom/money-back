@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.fee.service.strategy.FeeCalculationService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +33,7 @@ public class CustomStragegyController {
      * 计算单笔费用
      */
     @PostMapping("/calculate")
+    @PreAuthorize("@ss.hasPermission('fee:strategy:query')")
     public CommonResult<FeeCalculationResult> calculateFee(@Valid @RequestBody FeeCalculateRequest request) {
         try {
             FeeCalculationResult result;
@@ -51,6 +53,7 @@ public class CustomStragegyController {
      * 批量计算费用
      */
     @PostMapping("/batch-calculate")
+    @PreAuthorize("@ss.hasPermission('fee:strategy:query')")
     public CommonResult<List<FeeCalculationResult>> batchCalculate(@RequestBody List<BigDecimal> amounts) {
         try {
             List<FeeCalculationResult> results = feeCalculationService.batchCalculate(amounts);
@@ -65,6 +68,7 @@ public class CustomStragegyController {
      * 测试不同金额的费用
      */
     @GetMapping("/test")
+    @PreAuthorize("@ss.hasPermission('fee:strategy:query')")
     public CommonResult<List<FeeCalculationResult>> testFeeCalculation() {
         List<BigDecimal> testAmounts = Arrays.asList(
                 BigDecimal.valueOf(1000),

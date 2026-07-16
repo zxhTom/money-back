@@ -97,7 +97,7 @@ public class UserController {
 
     @PutMapping("/update-pay-password")
     @Operation(summary = "重置用户支付密码")
-    @PreAuthorize("@ss.hasPermission('system:user:update-password')")
+    @PreAuthorize("@ss.hasPermission('system:user:reset-pay-password')")
     public CommonResult<Boolean> updateUserPayPassword(@Valid @RequestBody UserUpdatePayPasswordReqVO reqVO) {
         userService.updateUserPayPassword(reqVO.getId(), reqVO.getPayPassword());
         return success(true);
@@ -105,10 +105,28 @@ public class UserController {
 
     @PutMapping("/toggle-disable-pwd-change")
     @Operation(summary = "切换用户禁止自主修改密码开关")
-    @PreAuthorize("@ss.hasPermission('system:user:update')")
+    @PreAuthorize("@ss.hasPermission('system:user:disable-pwd')")
     public CommonResult<Boolean> toggleDisablePwdChange(@RequestParam("id") Long id,
                                                          @RequestParam("disable") Boolean disable) {
         userService.updateUserDisablePwdChange(id, disable);
+        return success(true);
+    }
+
+    @PutMapping("/toggle-tease")
+    @Operation(summary = "切换用户戏耍模式开关")
+    @PreAuthorize("@ss.hasPermission('system:user:tease')")
+    public CommonResult<Boolean> toggleTease(@RequestParam("id") Long id,
+                                              @RequestParam("enabled") Boolean enabled) {
+        userService.updateUserTeaseEnabled(id, enabled);
+        return success(true);
+    }
+
+    @PutMapping("/toggle-invite")
+    @Operation(summary = "切换用户邀请功能开关")
+    @PreAuthorize("@ss.hasPermission('system:user:invite')")
+    public CommonResult<Boolean> toggleInvite(@RequestParam("id") Long id,
+                                              @RequestParam("enabled") Boolean enabled) {
+        userService.updateUserInviteEnabled(id, enabled);
         return success(true);
     }
 
@@ -160,6 +178,7 @@ public class UserController {
     @GetMapping({"/list-all-simple", "/simple-list"})
     @Operation(summary = "获取用户精简信息列表", description = "只包含被开启的用户，主要用于前端的下拉选项；传 ids 时按 id 批量查询")
     @Parameter(name = "ids", description = "用户编号列表，不传则返回所有启用用户")
+    @PreAuthorize("@ss.hasPermission('system:user:query')")
     public CommonResult<List<UserSimpleRespVO>> getSimpleUserList(
             @RequestParam(value = "ids", required = false) List<Long> ids) {
         return success(buildSimpleUserList(ids));
@@ -167,6 +186,7 @@ public class UserController {
 
     @PostMapping({"/list-all-simple", "/simple-list"})
     @Operation(summary = "获取用户精简信息列表（POST）", description = "与 GET simple-list 功能一致，请求体传 ids 批量查询")
+    @PreAuthorize("@ss.hasPermission('system:user:query')")
     public CommonResult<List<UserSimpleRespVO>> postSimpleUserList(
             @RequestBody(required = false) UserSimpleListReqVO reqVO) {
         List<Long> ids = reqVO != null ? reqVO.getIds() : null;

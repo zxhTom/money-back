@@ -29,12 +29,23 @@ public class AlertRuleServiceImpl implements AlertRuleService {
     @Resource private AdminUserService adminUserService;
 
     private final Map<String, AlertRuleDO> ruleCache = new ConcurrentHashMap<>();
+    /** URL 监控规则可有多条（不同 URL），单独缓存成列表 */
+    private volatile List<AlertRuleDO> urlMonitorRules = Collections.emptyList();
 
     @PostConstruct
     public void loadCache() {
         List<AlertRuleDO> all = alertRuleMapper.selectList(null);
         ruleCache.clear();
         all.forEach(r -> ruleCache.put(r.getAlertType(), r));
+        urlMonitorRules = all.stream()
+                .filter(r -> "URL_MONITOR".equals(r.getAlertType())
+                        && r.getEnabled() != null && r.getEnabled() == 1)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<AlertRuleDO> getUrlMonitorRules() {
+        return urlMonitorRules;
     }
 
     @Override

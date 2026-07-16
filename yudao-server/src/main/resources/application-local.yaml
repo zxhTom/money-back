@@ -215,6 +215,8 @@ wx:
 #    secret: 6f270509224a7ae1296bbf1c8cb97aed
     appid: wx7641cb883b4fa670 # 测试号（Kongdy 提供的）
     secret: 8ce4493f9481e2f2cc9153331a19b094
+    token: PPA6ObJRA6XDnawajQ1YbT3rODXG8ZXr
+    aes-key: arT5WmfoiSxRstTvH7lkvgrRP9K06wworshVsCg5MO5
 #    appid: wx66186af0759f47c9 # 测试号（puhui 提供的）
 #    secret: 3218bcbd112cbc614c7264ceb20144ac
     config-storage:
@@ -226,6 +228,10 @@ wx:
 
 # 芋道配置项，设置当前项目所有自定义的配置
 yudao:
+  file-cleanup:
+    enabled: true
+    retention-days: 7
+    cron: 0 30 3 * * ?
   captcha:
     enable: false # 本地环境，暂时关闭图片验证码，方便登录等接口的测试；
   security:
@@ -295,3 +301,8 @@ custom:
     ssl-enable: true # 是否启用SSL
     starttls-enable: false # 是否启用STARTTLS
     nickname: 系统通知 # 发送方昵称
+
+# 注册邀请码总开关：true=注册必须邀请码；false/缺省=不需要（web+小程序均由后端强制）
+system:
+  user:
+    invite-register-required: false

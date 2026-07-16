@@ -32,6 +32,9 @@ public class AuthRegisterReqVO extends CaptchaVerificationReqVO {
     @Schema(description = "身份证：用户手输多为明文，亦可传密文；服务端自动识别", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     @Length(max = 512, message = "证件参数过长")
     private String idNo;
+    @Schema(description = "邀请码（是否必填由后端开关 system.user.invite-register-required 决定）", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Length(max = 64, message = "邀请码过长")
+    private String inviteCode;
     @Schema(description = "生日", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")
     private Date birthDate;
     @Schema(description = "居住地址", requiredMode = Schema.RequiredMode.NOT_REQUIRED, example = "yudao")

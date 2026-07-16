@@ -27,4 +27,31 @@ public interface CustomErrorCodeConstants {
     /** 欠款人与债权人为同一人（身份证号相同） */
     ErrorCode CONTRACT_PARTY_SAME = new ErrorCode(10008, "欠款人与债权人不能为同一人，请核对双方身份证号");
 
+    /** 注册缺少邀请码 */
+    ErrorCode INVITE_CODE_REQUIRED = new ErrorCode(10009, "请填写邀请码");
+
+    /** 邀请码无效（不存在/已过期/已失效/邀请人未开启邀请功能） */
+    ErrorCode INVITE_CODE_INVALID = new ErrorCode(10010, "邀请码无效或已过期");
+
+    /** 当前用户未开启邀请功能，无法生成邀请码 */
+    ErrorCode INVITE_NOT_ENABLED = new ErrorCode(10011, "当前账号未开启邀请功能");
+
+    /** 注册过于频繁，触发风控 */
+    ErrorCode REGISTER_TOO_FREQUENT = new ErrorCode(10012, "注册过于频繁，请稍后再试");
+
+    /** 发起人脸认证需登录 */
+    ErrorCode FACE_AUTH_NEED_LOGIN = new ErrorCode(10013, "请先登录再发起人脸认证");
+
+    /** 只能对本人身份证发起人脸认证 */
+    ErrorCode FACE_AUTH_IDCARD_NOT_SELF = new ErrorCode(10014, "只能对本人身份证发起人脸认证");
+
+    /** 未完成实名认证，禁止访问 */
+    ErrorCode USER_NOT_REAL_NAME_VERIFIED = new ErrorCode(10015, "请先完成实名认证后再使用");
+
+    /** 信用查询必须提供身份证 */
+    ErrorCode CONTRACT_QUERY_NEED_IDCARD = new ErrorCode(10016, "请提供身份证号进行查询");
+
+    /** 信用查询过于频繁 */
+    ErrorCode CONTRACT_QUERY_TOO_FREQUENT = new ErrorCode(10017, "请勿频繁访问");
+
 }

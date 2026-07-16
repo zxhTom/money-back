@@ -75,6 +75,8 @@ public class PostController {
 
     @GetMapping(value = {"/list-all-simple", "simple-list"})
     @Operation(summary = "获取岗位全列表", description = "只包含被开启的岗位，主要用于前端的下拉选项")
+    // 注意：同 DeptController#getSimpleDeptList，不能加 system:post:query——
+    // contract-manager 角色没有该权限，但 UserForm.vue 创建/编辑用户时依赖此接口渲染岗位下拉框
     public CommonResult<List<PostSimpleRespVO>> getSimplePostList() {
         // 获得岗位列表，只要开启状态的
         List<PostDO> list = postService.getPostList(null, Collections.singleton(CommonStatusEnum.ENABLE.getStatus()));

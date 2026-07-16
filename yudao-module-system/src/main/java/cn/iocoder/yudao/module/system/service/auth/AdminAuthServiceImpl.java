@@ -74,6 +74,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     @Resource
     private IdCardCipherService idCardCipherService;
+    @Resource
+    private cn.iocoder.yudao.module.system.service.monitor.LoginFailRiskChecker loginFailRiskChecker;
 
     /**
      * 验证码的开关，默认为 true
@@ -95,10 +97,12 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         AdminUserDO user = resolveLoginUser(identifier, idNo);
         if (user == null) {
             createLoginLog(null, identifier, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
+            loginFailRiskChecker.onLoginFailure(identifier); // 失败风控：按IP累计，超阈值封IP+告警，不锁账号
             throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
         }
         if (!userService.isPasswordMatch(password, user.getPassword())) {
             createLoginLog(user.getId(), identifier, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
+            loginFailRiskChecker.onLoginFailure(identifier); // 失败风控：按IP累计，超阈值封IP+告警，不锁账号
             throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
         }
         // 校验是否禁用

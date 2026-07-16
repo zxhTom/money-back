@@ -10,6 +10,7 @@ import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstant
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.date.DateUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
@@ -21,6 +22,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2AccessTokenMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2RefreshTokenMapper;
 import cn.iocoder.yudao.module.system.dal.redis.oauth2.OAuth2AccessTokenRedisDAO;
+import cn.iocoder.yudao.module.system.service.monitor.MultiLoginRiskChecker;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -56,6 +58,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     @Resource
     @Lazy // 懒加载，避免循环依赖
     private AdminUserService adminUserService;
+    @Resource
+    @Lazy // 懒加载，避免循环依赖（checker 会回调 removeAllTokensByUserId）
+    private MultiLoginRiskChecker multiLoginRiskChecker;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -178,10 +183,29 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
                 .setRefreshToken(refreshTokenDO.getRefreshToken())
                 .setExpiresTime(LocalDateTime.now().plusSeconds(clientDO.getAccessTokenValiditySeconds()));
         accessTokenDO.setTenantId(TenantContextHolder.getTenantId()); // 手动设置租户编号，避免缓存到 Redis 的时候，无对应的租户编号
+        // 记录登录来源 IP（可信真实IP），用于令牌管理展示与多登录风控
+        String ip = currentRequestIp();
+        accessTokenDO.setIp(ip);
         oauth2AccessTokenMapper.insert(accessTokenDO);
         // 记录到 Redis 中
         oauth2AccessTokenRedisDAO.set(accessTokenDO);
+        // 多登录风控（一IP多用户 / 一用户多IP），失败绝不影响登录
+        try {
+            multiLoginRiskChecker.check(accessTokenDO.getUserId(), ip);
+        } catch (Exception ignored) {
+        }
         return accessTokenDO;
+    }
+
+    private String currentRequestIp() {
+        try {
+            org.springframework.web.context.request.ServletRequestAttributes attrs =
+                    (org.springframework.web.context.request.ServletRequestAttributes)
+                            org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            return attrs != null ? ServletUtils.getClientRealIp(attrs.getRequest()) : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private OAuth2RefreshTokenDO createOAuth2RefreshToken(Long userId, Integer userType, OAuth2ClientDO clientDO, List<String> scopes) {

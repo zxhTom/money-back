@@ -93,6 +93,7 @@ public class RoleController {
     @GetMapping({"/list-all-simple", "/simple-list"})
     @Operation(summary = "获取角色精简信息列表", description = "只包含被开启的角色，主要用于前端的下拉选项；传 ids 时按 id 批量查询")
     @Parameter(name = "ids", description = "角色编号列表，不传则返回所有启用角色")
+    @PreAuthorize("@ss.hasPermission('system:role:query')")
     public CommonResult<List<RoleRespVO>> getSimpleRoleList(
             @RequestParam(value = "ids", required = false) List<Long> ids) {
         return success(buildSimpleRoleList(ids));
@@ -100,6 +101,7 @@ public class RoleController {
 
     @PostMapping({"/list-all-simple", "/simple-list"})
     @Operation(summary = "获取角色精简信息列表（POST）", description = "与 GET simple-list 功能一致，请求体传 ids 批量查询")
+    @PreAuthorize("@ss.hasPermission('system:role:query')")
     public CommonResult<List<RoleRespVO>> postSimpleRoleList(
             @RequestBody(required = false) RoleSimpleListReqVO reqVO) {
         List<Long> ids = reqVO != null ? reqVO.getIds() : null;

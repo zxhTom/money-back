@@ -53,5 +53,13 @@ public class FileDO extends BaseDO {
      * 文件大小
      */
     private Integer size;
+    /**
+     * 内容审核状态：0审核中 1通过 2违规
+     */
+    private Integer auditStatus;
+    /**
+     * 微信内容检测 trace_id
+     */
+    private String auditTraceId;
 
 }

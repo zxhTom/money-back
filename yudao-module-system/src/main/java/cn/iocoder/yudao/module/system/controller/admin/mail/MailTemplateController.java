@@ -82,6 +82,7 @@ public class MailTemplateController {
 
     @GetMapping({"/list-all-simple", "simple-list"})
     @Operation(summary = "获得邮件模版精简列表")
+    @PreAuthorize("@ss.hasPermission('system:mail-template:query')")
     public CommonResult<List<MailTemplateSimpleRespVO>> getSimpleTemplateList() {
         List<MailTemplateDO> list = mailTempleService.getMailTemplateList();
         return success(BeanUtils.toBean(list, MailTemplateSimpleRespVO.class));

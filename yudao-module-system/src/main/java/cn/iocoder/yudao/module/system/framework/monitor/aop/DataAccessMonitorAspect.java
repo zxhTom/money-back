@@ -165,10 +165,7 @@ public class DataAccessMonitorAspect {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
+        // 统一走可信取法：优先 X-Real-IP、其次 XFF 最右一跳，避免最左 XFF 被伪造成内网IP
+        return cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getClientRealIp(request);
     }
 }

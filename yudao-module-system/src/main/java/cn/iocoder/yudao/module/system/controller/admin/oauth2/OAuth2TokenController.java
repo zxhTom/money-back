@@ -64,7 +64,7 @@ public class OAuth2TokenController {
 
     @GetMapping("/batch-count")
     @Operation(summary = "批量查询指定用户的在用 Token 数")
-    @PreAuthorize("@ss.hasPermission('system:oauth2-token:page')")
+    @PreAuthorize("@ss.hasPermission('system:user:token-view')")
     public CommonResult<List<UserTokenStatVO>> batchCountByUserIds(
             @RequestParam List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {

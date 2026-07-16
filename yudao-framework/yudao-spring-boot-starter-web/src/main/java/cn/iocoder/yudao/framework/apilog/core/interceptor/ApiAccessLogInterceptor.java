@@ -44,7 +44,16 @@ public class ApiAccessLogInterceptor implements HandlerInterceptor {
         // 打印 request 日志
         if (!SpringUtils.isProd()) {
             Map<String, String> queryString = ServletUtils.getParamMap(request);
-            String requestBody = ServletUtils.isJsonRequest(request) ? ServletUtils.getBody(request) : null;
+            // 读取 body 仅用于日志展示。鉴权失败等场景会触发 Spring Boot 内部 /error 转发重新进入拦截器，
+            // 此时请求未经过 CacheRequestBodyFilter 重新包装、原始 body 流已被消费过，getReader() 会抛
+            // IllegalStateException——不能让这里的日志读取失败顶掉本该返回给客户端的真实错误响应
+            String requestBody;
+            try {
+                requestBody = ServletUtils.isJsonRequest(request) ? ServletUtils.getBody(request) : null;
+            } catch (Exception ex) {
+                log.warn("[preHandle][读取请求体日志失败，忽略]", ex);
+                requestBody = null;
+            }
             if (CollUtil.isEmpty(queryString) && StrUtil.isEmpty(requestBody)) {
                 log.info("[preHandle][开始请求 URL({}) 无参数]", request.getRequestURI());
             } else {

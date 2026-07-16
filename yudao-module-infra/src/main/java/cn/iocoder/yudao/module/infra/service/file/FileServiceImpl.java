@@ -13,10 +13,13 @@ import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePageReqVO
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePresignedUrlRespVO;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
 import cn.iocoder.yudao.module.infra.dal.mysql.file.FileMapper;
+import cn.iocoder.yudao.module.infra.framework.file.core.audit.FileContentAuditor;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.FileClient;
 import cn.iocoder.yudao.module.infra.framework.file.core.utils.FileTypeUtils;
 import com.google.common.annotations.VisibleForTesting;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -32,6 +35,7 @@ import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EX
  * @author 芋道源码
  */
 @Service
+@Slf4j
 public class FileServiceImpl implements FileService {
 
     /**
@@ -54,14 +58,57 @@ public class FileServiceImpl implements FileService {
     @Resource
     private FileMapper fileMapper;
 
+    @Resource
+    private ObjectProvider<FileContentAuditor> auditorProvider;
+
     @Override
     public PageResult<FileDO> getFilePage(FilePageReqVO pageReqVO) {
         return fileMapper.selectPage(pageReqVO);
     }
 
+    /** 禁止上传的危险扩展名（服务端可执行 / 浏览器可执行脚本 / 可部署包 / 可执行程序） */
+    private static final java.util.Set<String> BLOCKED_UPLOAD_EXT = new java.util.HashSet<>(java.util.Arrays.asList(
+            "jsp", "jspx", "jspf", "jspa", "jsv", "jsw", "jhtml", "jtml",
+            "php", "php3", "php4", "php5", "php7", "phtml", "pht", "phar",
+            "asp", "aspx", "ashx", "asmx", "ascx", "cer", "cshtml",
+            "war", "jar", "ear", "class", "cgi", "pl", "py", "rb",
+            "sh", "bash", "ksh", "bat", "cmd", "com", "exe", "dll", "msi", "scr",
+            "vbs", "vbe", "js", "mjs", "wsf", "wsh", "ps1", "psm1", "hta",
+            "svg", "html", "htm", "xhtml", "shtml", "dhtml", "swf"));
+    private static final long MAX_UPLOAD_SIZE_BYTES = 30L * 1024 * 1024;
+
+    /** 上传安全校验：危险扩展名黑名单 + 内容签名 + 大小 + 文件名净化，拦截 jsp/html/war 等上传攻击。 */
+    private void validateUploadSecurity(byte[] content, String name) {
+        if (content == null || content.length == 0) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "文件内容为空");
+        }
+        if (content.length > MAX_UPLOAD_SIZE_BYTES) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "文件超过大小限制(30MB)");
+        }
+        String fname = name == null ? "" : name.trim();
+        if (fname.contains("/") || fname.contains("\\") || fname.contains("..")
+                || fname.chars().anyMatch(c -> c < 0x20)) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "非法文件名");
+        }
+        String ext = cn.hutool.core.io.FileUtil.extName(fname).toLowerCase();
+        if (BLOCKED_UPLOAD_EXT.contains(ext)) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "不允许上传该类型文件：." + ext);
+        }
+        // 内容签名：即便改了后缀，内容以脚本/网页开头也拒绝（挡改名绕过）
+        String head = new String(content, 0, Math.min(content.length, 512),
+                java.nio.charset.StandardCharsets.ISO_8859_1).trim().toLowerCase();
+        for (String sig : new String[]{"<script", "<%", "<?php", "<?=", "<!doctype html", "<html", "<svg", "<iframe"}) {
+            if (head.startsWith(sig)) {
+                throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "文件内容疑似脚本/网页，已拒绝上传");
+            }
+        }
+    }
+
     @Override
     @SneakyThrows
     public String createFile(byte[] content, String name, String directory, String type) {
+        // 0. 上传安全校验（防 jsp/html/war/exe 等上传攻击）
+        validateUploadSecurity(content, name);
         // 1.1 处理 type 为空的情况
         if (StrUtil.isEmpty(type)) {
             type = FileTypeUtils.getMineType(content, name);
@@ -86,10 +133,60 @@ public class FileServiceImpl implements FileService {
         String url = client.upload(content, path, type);
 
         // 3. 保存到数据库
-        fileMapper.insert(new FileDO().setConfigId(client.getId())
+        FileDO file = new FileDO().setConfigId(client.getId())
                 .setName(name).setPath(path).setUrl(url)
-                .setType(type).setSize(content.length));
+                .setType(type).setSize(content.length);
+        fileMapper.insert(file);
+
+        // 4. 图片内容安全检测（微信 mediaCheckAsync，异步回调更新状态）
+        submitContentAudit(file, content, type);
         return url;
+    }
+
+    private void submitContentAudit(FileDO file, byte[] content, String type) {
+        if (type == null || !StrUtil.startWithIgnoreCase(type, "image/")) {
+            return;
+        }
+        FileContentAuditor auditor = auditorProvider.getIfAvailable();
+        if (auditor == null) {
+            return;
+        }
+        try {
+            String traceId = auditor.submitImageCheck(file.getUrl(), content);
+            if (StrUtil.isNotBlank(traceId)) {
+                fileMapper.updateById(new FileDO().setId(file.getId())
+                        .setAuditStatus(0).setAuditTraceId(traceId));
+            }
+        } catch (Exception ex) {
+            log.error("[submitContentAudit][file({}) 提交内容检测失败]", file.getId(), ex);
+        }
+    }
+
+    @Override
+    public void updateAuditByTraceId(String traceId, boolean pass) {
+        if (StrUtil.isBlank(traceId)) {
+            return;
+        }
+        FileDO file = fileMapper.selectByTraceId(traceId);
+        if (file == null) {
+            log.warn("[updateAuditByTraceId][traceId({}) 未匹配到文件]", traceId);
+            return;
+        }
+        if (pass) {
+            fileMapper.updateById(new FileDO().setId(file.getId()).setAuditStatus(1));
+            return;
+        }
+        // 违规：删除存储中的文件 + 标记违规
+        try {
+            FileClient client = fileConfigService.getFileClient(file.getConfigId());
+            if (client != null) {
+                client.delete(file.getPath());
+            }
+        } catch (Exception ex) {
+            log.error("[updateAuditByTraceId][file({}) 删除违规文件失败]", file.getId(), ex);
+        }
+        fileMapper.updateById(new FileDO().setId(file.getId()).setAuditStatus(2));
+        log.warn("[updateAuditByTraceId][file({}) path({}) 内容违规，已删除]", file.getId(), file.getPath());
     }
 
     @VisibleForTesting

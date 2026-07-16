@@ -168,6 +168,10 @@ wx: # 参见 https://github.com/Wechat-Group/WxJava/blob/develop/spring-boot-sta
 
 # 芋道配置项，设置当前项目所有自定义的配置
 yudao:
+  file-cleanup:
+    enabled: true
+    retention-days: 7
+    cron: 0 30 3 * * ?
   pay:
     order-notify-url: http://yunai.natapp1.cc/admin-api/pay/notify/order # 支付渠道的【支付】回调地址
     refund-notify-url: http://yunai.natapp1.cc/admin-api/pay/notify/refund # 支付渠道的【退款】回调地址
@@ -201,3 +205,8 @@ justauth:
     type: REDIS
     prefix: 'social_auth_state:' # 缓存前缀，目前只对 Redis 缓存生效，默认 JUSTAUTH::STATE::
     timeout: 24h # 超时时长，目前只对 Redis 缓存生效，默认 3 分钟
+
+# 注册邀请码总开关：true=注册必须邀请码；false/缺省=不需要（web+小程序均由后端强制）
+system:
+  user:
+    invite-register-required: false

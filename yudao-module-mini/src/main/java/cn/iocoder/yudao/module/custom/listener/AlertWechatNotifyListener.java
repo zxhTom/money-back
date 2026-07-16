@@ -85,6 +85,12 @@ public class AlertWechatNotifyListener {
             case "XSS":           return "XSS 攻击";
             case "DATA_LEAKAGE":  return "数据泄露";
             case "IP_RISK":       return "IP 风险";
+            case "REGISTER_ABUSE": return "注册频率风控";
+            case "FACE_AUTH_UNCOMPLETED": return "人脸未认证";
+            case "SIMULATED_REQUEST": return "模拟/伪造请求";
+            case "URL_MONITOR": return "URL访问监控";
+            case "IP_MULTI_USER": return "多夫多妻(一IP多用户)";
+            case "USER_MULTI_IP": return "一用户多IP";
             default:              return type;
         }
     }

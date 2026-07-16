@@ -77,6 +77,10 @@ public class ContractServiceImpl implements ContractService {
 
     @Resource
     private IdCardCipherService idCardCipherService;
+    @Resource
+    private ContractOwnershipGuard ownershipGuard;
+    @Resource
+    private ContractTeaseGuard teaseGuard;
 
     @Override
     public Long createContract(ContractSaveReqVO createReqVO) {
@@ -133,8 +137,8 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     public void updateContract(ContractSaveReqVO updateReqVO) {
-        // 校验存在
-        validateContractExists(updateReqVO.getId());
+        // 校验存在 + 归属（创建者/当事人/超管/合同管理员）
+        ownershipGuard.checkOrThrow(contractMapper.selectById(updateReqVO.getId()), SecurityFrameworkUtils.getLoginUserId());
         // 更新
         ContractDO updateObj = BeanUtils.toBean(updateReqVO, ContractDO.class);
         if (StrUtil.isNotBlank(updateObj.getIndebtedId())) {
@@ -148,23 +152,21 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     public void deleteContract(Long id) {
-        // 校验存在
-        validateContractExists(id);
+        // 校验存在 + 归属
+        ownershipGuard.checkOrThrow(contractMapper.selectById(id), SecurityFrameworkUtils.getLoginUserId());
         // 删除
         contractMapper.deleteById(id);
     }
 
     @Override
-        public void deleteContractListByIds(List<Long> ids) {
+    public void deleteContractListByIds(List<Long> ids) {
+        // 逐条校验归属，任意一条不通过则整批拒绝，不做部分删除
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        for (Long id : ids) {
+            ownershipGuard.checkOrThrow(contractMapper.selectById(id), loginUserId);
+        }
         // 删除
         contractMapper.deleteByIds(ids);
-        }
-
-
-    private void validateContractExists(Long id) {
-        if (contractMapper.selectById(id) == null) {
-            throw exception(CONTRACT_NOT_EXISTS);
-        }
     }
 
     @Override
@@ -187,29 +189,11 @@ public class ContractServiceImpl implements ContractService {
             return null;
         }
 
-        // 创建者快速放行
-        if (String.valueOf(loginUserId).equals(contract.getCreator())) {
-            return contract;
-        }
-
-        // 当事人身份证匹配放行（用 sameIdCard 兼容明文/密文两种存储）
-        AdminUserDO user = adminUserService.getUser(loginUserId);
-        if (user != null && StrUtil.isNotBlank(user.getIdNo())) {
-            if (idCardCipherService.sameIdCard(user.getIdNo(), contract.getIndebtedId())
-                    || idCardCipherService.sameIdCard(user.getIdNo(), contract.getCreditorId())) {
-                return contract;
+        if (ownershipGuard.isAuthorized(contract, loginUserId)) {
+            // 戏耍模式：本人是合同的合法归属方，但账号被标记为戏耍 → 也只能看到确定性假数据
+            if (teaseGuard.isTeasing(loginUserId)) {
+                return ContractTeaseFactory.generateContract(id, loginUserId);
             }
-        }
-
-        // 管理员 / 合同管理员放行
-        List<Long> roleIdList = userRoleMapper.selectListByUserId(loginUserId)
-                .stream().map(UserRoleDO::getRoleId).collect(Collectors.toList());
-        if (roleService.hasAnySuperAdmin(roleIdList)) {
-            return contract;
-        }
-        boolean isContractManager = roleService.getRoleList(roleIdList).stream()
-                .map(RoleDO::getCode).anyMatch("contract-manager"::equals);
-        if (isContractManager) {
             return contract;
         }
 
@@ -233,6 +217,29 @@ public class ContractServiceImpl implements ContractService {
     @Override
     public PageResult<ContractDO> getContractPage(ContractPageReqVO pageReqVO) {
         normalizeContractPageIds(pageReqVO);
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        if (teaseGuard.isTeasing(loginUserId)) {
+            return ContractTeaseFactory.generateContractPage(loginUserId, pageReqVO);
+        }
+        return contractMapper.selectPage(pageReqVO);
+    }
+
+    @Override
+    public PageResult<ContractDO> getContractPageForListing(ContractPageReqVO pageReqVO) {
+        normalizeContractPageIds(pageReqVO);
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        if (teaseGuard.isTeasing(loginUserId)) {
+            return ContractTeaseFactory.generateContractPage(loginUserId, pageReqVO);
+        }
+        // 安全兜底：未指定具体查询对象（indebtedId/creditorId）时，禁止无限定地列出全库合同，
+        // 退化为"只看自己创建的"（超管/合同管理员按 getSelfContractPage 里的规则不受限）。
+        // 小程序信用查询等按身份证查某人明细的场景始终会带 indebtedId/creditorId，不受影响。
+        // 仅用于 /page 这个交互式查询接口；/export-excel 走的是原始 getContractPage，权限更高（custom:contract:export），保持不变。
+        boolean hasPartyFilter = StrUtil.isNotBlank(pageReqVO.getIndebtedId())
+                || StrUtil.isNotBlank(pageReqVO.getCreditorId());
+        if (!hasPartyFilter) {
+            return getSelfContractPage(pageReqVO);
+        }
         return contractMapper.selectPage(pageReqVO);
     }
 
@@ -256,6 +263,9 @@ public class ContractServiceImpl implements ContractService {
         if (loginUserId == null) {
             throw new RuntimeException("当前未登录，无法查询自己创建的合同");
         }
+        if (teaseGuard.isTeasing(loginUserId)) {
+            return ContractTeaseFactory.generateContractPage(loginUserId, pageReqVO);
+        }
         // 将 Long 类型转换为 String 类型（creator 字段是 String 类型）
 
         String creator = String.valueOf(loginUserId);
@@ -272,8 +282,13 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     public void exportContractProtocolPdf(Long id, HttpServletResponse response) throws IOException {
-        // 1. 校验合同是否存在
+        // 1. 校验合同存在 + 归属（此前直接 selectById，绕过了归属校验，任何有导出权限的人都能导出任意合同）
         ContractDO contract = contractMapper.selectById(id);
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        ownershipGuard.checkOrThrow(contract, loginUserId);
+        if (teaseGuard.isTeasing(loginUserId)) {
+            contract = ContractTeaseFactory.generateContract(id, loginUserId);
+        }
         extracted(response, contract);
     }
 

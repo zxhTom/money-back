@@ -82,6 +82,7 @@ public class SmsChannelController {
 
     @GetMapping({"/list-all-simple", "/simple-list"})
     @Operation(summary = "获得短信渠道精简列表", description = "包含被禁用的短信渠道")
+    @PreAuthorize("@ss.hasPermission('system:sms-channel:query')")
     public CommonResult<List<SmsChannelSimpleRespVO>> getSimpleSmsChannelList() {
         List<SmsChannelDO> list = smsChannelService.getSmsChannelList();
         list.sort(Comparator.comparing(SmsChannelDO::getId));

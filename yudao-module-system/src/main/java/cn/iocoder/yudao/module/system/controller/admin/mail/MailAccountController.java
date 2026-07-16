@@ -82,6 +82,7 @@ public class MailAccountController {
 
     @GetMapping({"/list-all-simple", "simple-list"})
     @Operation(summary = "获得邮箱账号精简列表")
+    @PreAuthorize("@ss.hasPermission('system:mail-account:query')")
     public CommonResult<List<MailAccountSimpleRespVO>> getSimpleMailAccountList() {
         List<MailAccountDO> list = mailAccountService.getMailAccountList();
         return success(BeanUtils.toBean(list, MailAccountSimpleRespVO.class));

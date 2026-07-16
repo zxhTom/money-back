@@ -85,4 +85,12 @@ public interface FileService {
      */
     byte[] getFileContent(Long configId, String path) throws Exception;
 
+    /**
+     * 内容审核回调：按 traceId 更新审核结果，违规则删除文件。
+     *
+     * @param traceId 微信内容检测 traceId
+     * @param pass    是否通过
+     */
+    void updateAuditByTraceId(String traceId, boolean pass);
+
 }

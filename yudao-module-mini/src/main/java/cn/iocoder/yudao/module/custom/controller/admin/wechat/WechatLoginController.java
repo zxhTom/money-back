@@ -69,18 +69,7 @@ public class WechatLoginController {
     public String send(@RequestBody TemplateVO templateVO) throws Exception {
         return wechatService.send(templateVO);
     }
-    @PostMapping("/auto")
-    public ApiResponse auto(@RequestBody WechatLoginRequest request) {
-
-        AuthLoginReqVO loginRequest = new AuthLoginReqVO();
-        loginRequest.setUsername(request.getUserInfo().getUsername());
-        AuthLoginRespVO loginResponse = authService.authenticateUserNameOnly(loginRequest);
-
-        // 3. 生成自定义登录态 (Token)
-        String token = String.format("%s", loginResponse.getAccessToken());
-
-        return ApiResponse.success(loginResponse);
-    }
+    // /auto 接口已删除：不需要密码/微信code，凭用户名就能签发合法 token，全仓库也查不到调用方，属于未接线的遗留代码。
 
     @PostMapping("/generator")
     public ApiResponse generator(@RequestBody MiniAppPath miniAppPath) {

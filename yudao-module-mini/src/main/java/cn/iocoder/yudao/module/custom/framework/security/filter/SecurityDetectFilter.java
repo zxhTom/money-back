@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import javax.annotation.Nullable;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -73,17 +74,32 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
     private final StringRedisTemplate redisTemplate;
     private final IpRiskCheckService ipRiskCheckService;
     private final AlertRuleService alertRuleService;
+    @Nullable
+    private final Object ipAccessLogService;
 
     public SecurityDetectFilter(IpBlacklistService ipBlacklistService,
                                 SecurityAlertService securityAlertService,
                                 StringRedisTemplate redisTemplate,
                                 IpRiskCheckService ipRiskCheckService,
-                                AlertRuleService alertRuleService) {
+                                AlertRuleService alertRuleService,
+                                @Nullable Object ipAccessLogService) {
         this.ipBlacklistService = ipBlacklistService;
         this.securityAlertService = securityAlertService;
         this.redisTemplate = redisTemplate;
         this.ipRiskCheckService = ipRiskCheckService;
         this.alertRuleService = alertRuleService;
+        this.ipAccessLogService = ipAccessLogService;
+    }
+
+    /** 记录一次可疑/被拦截的访问尝试（UA 从请求头取） */
+    private void recordAttempt(HttpServletRequest request, String ip, String uri, String method, String reason) {
+        if (ipAccessLogService == null) return;
+        try {
+            java.lang.reflect.Method methodRef = ipAccessLogService.getClass().getMethod("record", String.class, String.class, String.class, String.class, String.class, Long.class);
+            methodRef.invoke(ipAccessLogService, ip, uri, method, request.getHeader("User-Agent"), reason, getUserId(request));
+        } catch (Exception e) {
+            log.warn("Failed to record access log", e);
+        }
     }
 
     @Override
@@ -96,6 +112,7 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
         // 1. IP 黑名单检查
         if (ipBlacklistService.isBlacklisted(ip)) {
             log.warn("[SecurityDetect] 黑名单IP请求被拦截: {} {}", ip, uri);
+            recordAttempt(request, ip, uri, method, "BLACKLIST_BLOCK"); // 记录被封IP仍在试探
             block(response, "Access denied");
             return;
         }
@@ -106,6 +123,7 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
         // 4. 暴力破解检测
         if (isBruteForcePath(uri)) {
             if (checkBruteForce(ip, uri, response)) {
+                recordAttempt(request, ip, uri, method, "BRUTE_FORCE");
                 return;
             }
         }
@@ -118,6 +136,7 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
             String sqlMatch = detectSqlInjection(suspiciousContent);
             if (sqlMatch != null) {
                 handleSqlInjection(ip, getUserId(request), uri, method, sqlMatch, response);
+                recordAttempt(request, ip, uri, method, "SQL_INJECT");
                 return;
             }
 
@@ -126,6 +145,7 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
             if (xssMatch != null) {
                 securityAlertService.saveAsync("XSS", 2, ip, null, uri, method,
                         truncate(xssMatch, 500), "检测到 XSS 攻击特征");
+                recordAttempt(request, ip, uri, method, "XSS");
             }
         }
 
