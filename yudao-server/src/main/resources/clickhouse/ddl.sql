@@ -1,3 +1,7 @@
+-- ClickHouse 增量建表脚本。应用启动时由 ClickHouseMigrationRunner 自动检测并执行（仅当 yudao.clickhouse.enabled=true）。
+-- 语句务必幂等（CREATE TABLE IF NOT EXISTS / ALTER TABLE ... ADD COLUMN IF NOT EXISTS），重复启动会自动跳过已存在对象。
+-- 注：日志归档表 arc_* 结构统一 (id, log_time, data)，由 ArchiveTableRegistry 自动生成，无需在此声明；本文件只放 contract_recycle 及后续增量。
+
 CREATE TABLE IF NOT EXISTS contract_recycle (
     id UInt64,
     indebted_name Nullable(String),

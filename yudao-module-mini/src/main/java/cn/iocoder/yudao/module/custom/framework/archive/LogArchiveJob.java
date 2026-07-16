@@ -41,10 +41,14 @@ public class LogArchiveJob {
         }
     }
 
-    /** 单表归档：分批 先写CH成功→再删MySQL；返回归档总条数（供测试） */
+    /**
+     * 单表归档：分批 先写CH成功→再删MySQL；返回归档总条数（供测试）。
+     * CH 归档表统一为 (id, log_time, data)，整行以 JSON 存入 data —— 无需与源表逐列对齐，源表加列免改。
+     */
     public int archiveTable(ArchiveTableRegistry.ArchiveTable t) {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         String cutoff = "NOW() - INTERVAL " + t.getRetentionDays() + " DAY";
+        List<String> cols = Arrays.asList("id", "log_time", "data");
         int total = 0;
         for (int round = 0; round < MAX_ROUNDS; round++) {
             List<Map<String, Object>> rows = jdbc.queryForList(
@@ -54,16 +58,15 @@ public class LogArchiveJob {
             if (rows.isEmpty()) {
                 break;
             }
-            List<String> cols = new ArrayList<>(rows.get(0).keySet());
             List<Object[]> data = new ArrayList<>();
             List<Object> ids = new ArrayList<>();
             for (Map<String, Object> r : rows) {
-                Object[] arr = new Object[cols.size()];
-                for (int i = 0; i < cols.size(); i++) {
-                    arr[i] = r.get(cols.get(i));
-                }
-                data.add(arr);
-                ids.add(r.get("id"));
+                Object id = r.get("id");
+                Object logTime = r.get(t.getTimeColumn());
+                String json = com.alibaba.fastjson.JSON.toJSONStringWithDateFormat(
+                        r, "yyyy-MM-dd HH:mm:ss");
+                data.add(new Object[]{id, logTime, json});
+                ids.add(id);
             }
             ch.insertRows(t.getChTable(), cols, data); // 先写 CH，失败则抛出、不删 MySQL
             String ph = String.join(",", Collections.nCopies(ids.size(), "?"));

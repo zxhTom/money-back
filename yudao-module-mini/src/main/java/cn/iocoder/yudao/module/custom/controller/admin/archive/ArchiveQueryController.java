@@ -55,15 +55,15 @@ public class ArchiveQueryController {
         }
         List<Object> args = new ArrayList<>();
         StringBuilder where = new StringBuilder(" WHERE 1=1");
-        if (start != null && !start.isEmpty()) { where.append(" AND create_time >= ?"); args.add(start); }
-        if (end != null && !end.isEmpty()) { where.append(" AND create_time <= ?"); args.add(end); }
+        if (start != null && !start.isEmpty()) { where.append(" AND log_time >= ?"); args.add(start); }
+        if (end != null && !end.isEmpty()) { where.append(" AND log_time <= ?"); args.add(end); }
         Long total = ((Number) ch.query("SELECT count() c FROM " + table + where, args.toArray())
                 .get(0).get("c")).longValue();
         List<Object> qArgs = new ArrayList<>(args);
         qArgs.add(pageSize);
         qArgs.add((pageNo - 1) * pageSize);
         List<Map<String, Object>> list = ch.query(
-                "SELECT * FROM " + table + where + " ORDER BY create_time DESC LIMIT ? OFFSET ?", qArgs.toArray());
+                "SELECT * FROM " + table + where + " ORDER BY log_time DESC LIMIT ? OFFSET ?", qArgs.toArray());
         res.put("list", list);
         res.put("total", total);
         return success(res);
