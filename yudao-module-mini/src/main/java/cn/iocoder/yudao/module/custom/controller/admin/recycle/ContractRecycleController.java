@@ -79,13 +79,21 @@ public class ContractRecycleController {
                 continue; // 原 id 已存在，跳过
             }
             Map<String, Object> r = rows.get(0);
-            jdbc.update("INSERT INTO custom_contract(id,indebted_name,indebted_id,creditor_name,creditor_id,"
-                            + "description,status,start_date,end_date,return_type,reason_type,create_time,update_time,deleted)"
-                            + " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0)",
-                    r.get("id"), r.get("indebted_name"), r.get("indebted_id"), r.get("creditor_name"),
-                    r.get("creditor_id"), r.get("description"), r.get("status"), r.get("start_date"),
-                    r.get("end_date"), r.get("return_type"), r.get("reason_type"),
-                    r.get("create_time"), r.get("update_time"));
+            List<String> cols = new java.util.ArrayList<>();
+            List<Object> vals = new java.util.ArrayList<>();
+            for (Map.Entry<String, Object> e : r.entrySet()) {
+                String col = e.getKey();
+                if ("archive_time".equals(col) || "deleted".equals(col)) {
+                    continue;
+                }
+                cols.add(col);
+                vals.add(e.getValue());
+            }
+            cols.add("deleted");
+            vals.add(0);
+            String colSql = String.join(",", cols);
+            String ph = String.join(",", java.util.Collections.nCopies(cols.size(), "?"));
+            jdbc.update("INSERT INTO custom_contract (" + colSql + ") VALUES (" + ph + ")", vals.toArray());
             ch.execute("DELETE FROM contract_recycle WHERE id=?", id);
             restored++;
         }
