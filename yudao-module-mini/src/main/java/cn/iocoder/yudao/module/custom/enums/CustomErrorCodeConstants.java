@@ -66,4 +66,10 @@ public interface CustomErrorCodeConstants {
     /** 自定义 CSS 文本格式非法 */
     ErrorCode SKIN_PROFILE_CSS_TEXT_INVALID = new ErrorCode(10021, "自定义CSS格式非法，仅支持 --token: value; 形式的声明");
 
+    /** 文案套不存在 */
+    ErrorCode TEXT_PROFILE_NOT_EXISTS = new ErrorCode(10022, "文案套不存在");
+
+    /** 当前生效的文案套不允许删除 */
+    ErrorCode TEXT_PROFILE_ACTIVE_CANNOT_DELETE = new ErrorCode(10023, "当前生效的文案套不允许删除");
+
 }
