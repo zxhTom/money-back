@@ -64,13 +64,14 @@ public class TextProfileServiceImpl implements TextProfileService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteTextProfile(Long id) {
         TextProfileDO existing = validateTextProfileExists(id);
         if (Boolean.TRUE.equals(existing.getIsActive())) {
             throw exception(TEXT_PROFILE_ACTIVE_CANNOT_DELETE);
         }
-        textProfileMapper.deleteById(id);
         textItemMapper.deleteByProfileId(id);
+        textProfileMapper.deleteById(id);
     }
 
     @Override

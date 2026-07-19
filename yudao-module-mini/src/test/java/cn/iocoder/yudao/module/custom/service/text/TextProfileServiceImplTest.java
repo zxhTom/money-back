@@ -98,6 +98,11 @@ public class TextProfileServiceImplTest {
         service.deleteTextProfile(3L);
         verify(textProfileMapper).deleteById(3L);
         verify(textItemMapper).deleteByProfileId(3L);
+
+        // 先删子表 items 再删父表 profile，即使无事务保护也不会留下孤儿数据
+        InOrder inOrder = inOrder(textItemMapper, textProfileMapper);
+        inOrder.verify(textItemMapper).deleteByProfileId(3L);
+        inOrder.verify(textProfileMapper).deleteById(3L);
     }
 
     // ── updateTextProfile ───────────────────────────────────────
