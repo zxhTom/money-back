@@ -11,7 +11,7 @@ public class CssVarDeclarationValidator {
     private static final Pattern LINE_PATTERN = Pattern.compile("^--[a-zA-Z0-9-]+\\s*:\\s*[^;{}<>@]+;$");
 
     public static boolean isValid(String cssText) {
-        if (cssText == null || cssText.isBlank()) {
+        if (cssText == null || cssText.trim().isEmpty()) {
             return true; // 允许为空
         }
         String[] lines = cssText.split("\\r?\\n");
