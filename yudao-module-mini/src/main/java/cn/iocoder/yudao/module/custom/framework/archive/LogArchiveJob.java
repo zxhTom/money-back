@@ -41,6 +41,24 @@ public class LogArchiveJob {
         }
     }
 
+    /** 手动立即归档全部表（不看 log-archive.enabled 定时开关，仍要求 CH 已启用）；返回归档总条数。 */
+    public int archiveAllNow() {
+        if (!ch.isEnabled()) {
+            log.info("[LogArchive] 手动触发跳过：ClickHouse 未启用");
+            return 0;
+        }
+        int total = 0;
+        for (ArchiveTableRegistry.ArchiveTable t : ArchiveTableRegistry.tables()) {
+            try {
+                total += archiveTable(t);
+            } catch (Exception e) {
+                log.error("[LogArchive] 表 {} 归档失败，跳过", t.getMysqlTable(), e);
+            }
+        }
+        log.info("[LogArchive] 手动触发归档完成，共 {} 条", total);
+        return total;
+    }
+
     /**
      * 单表归档：分批 先写CH成功→再删MySQL；返回归档总条数（供测试）。
      * CH 归档表统一为 (id, log_time, data)，整行以 JSON 存入 data —— 无需与源表逐列对齐，源表加列免改。

@@ -232,6 +232,19 @@ yudao:
     enabled: true
     retention-days: 7
     cron: 0 30 3 * * ?
+  clickhouse:
+    enabled: false   # 总开关：false 时归档/查询全部降级，绝不动 MySQL 数据
+    url: jdbc:clickhouse://127.0.0.1:8123/default
+    username:
+    password:
+    database: default
+  log-archive:
+    enabled: false   # 日志归档任务开关（false 不查不删 MySQL）
+    cron: 0 0 4 * * ?      # 每天 04:00
+  contract-recycle:
+    enabled: false   # 合同回收任务开关（开启后首次会物理删除6个月前软删合同）
+    cron: 0 30 4 * * ?     # 每天 04:30
+    months: 6             # 软删多少月后回收
   captcha:
     enable: false # 本地环境，暂时关闭图片验证码，方便登录等接口的测试；
   security:

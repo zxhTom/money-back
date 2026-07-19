@@ -178,6 +178,19 @@ yudao:
   wechat-callback-ip-sync:
     enabled: true
     cron: 0 15 4 * * ?
+  clickhouse:
+    enabled: true   # 总开关：未上线保持 false，归档/回收全部休眠，绝不动 MySQL 数据；上线联调时再改 true
+    url: jdbc:clickhouse://127.0.0.1:8123/default
+    username: tomsly
+    password: rN5gT7kD3wF9
+    database: default
+  log-archive:
+    enabled: true   # 日志归档任务开关（false 不查不删 MySQL）
+    cron: 0 0 4 * * ?      # 每天 04:00
+  contract-recycle:
+    enabled: false   # 上线后再开：首次会物理删除6个月前已软删合同，确认数量后再改 true
+    cron: 0 30 4 * * ?     # 每天 04:30
+    months: 6             # 软删多少月后回收
   captcha:
     enable: true
   security:

@@ -61,6 +61,9 @@ public class UserProfileRespVO {
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED, example = "时间戳格式")
     private LocalDateTime createTime;
 
+    @Schema(description = "是否允许该用户生成邀请码")
+    private Boolean inviteEnabled;
+
     /**
      * 所属角色
      */

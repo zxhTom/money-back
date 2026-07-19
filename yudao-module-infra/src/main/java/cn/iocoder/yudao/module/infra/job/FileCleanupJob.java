@@ -10,8 +10,8 @@ import javax.annotation.Resource;
 import java.time.LocalDateTime;
 
 /**
- * 文件记录清理：删除早于保留天数的 infra_file 记录，控制表膨胀。
- * MinIO 物理对象由存储侧策略清理，本任务只负责数据库记录对账。
+ * 临时文件记录清理：仅删除 demo/ 目录下早于保留天数的 infra_file 记录。
+ * demo/ 的物理对象由 MinIO 生命周期策略清理；avatar/contract/feedback 等永久目录不清理。
  */
 @Component
 @Slf4j

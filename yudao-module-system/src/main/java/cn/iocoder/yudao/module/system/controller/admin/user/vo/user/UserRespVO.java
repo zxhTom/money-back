@@ -29,6 +29,10 @@ public class UserRespVO{
     @ExcelProperty("用户昵称")
     private String nickname;
 
+    @Schema(description = "真实姓名", example = "张三")
+    @ExcelProperty("真实姓名")
+    private String realname;
+
     @Schema(description = "备注", example = "我是一个用户")
     private String remark;
 

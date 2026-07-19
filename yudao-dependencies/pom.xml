@@ -308,7 +308,11 @@
                 <groupId>com.clickhouse</groupId>
                 <artifactId>clickhouse-jdbc</artifactId>
                 <version>${clickhouse.version}</version>
-                <classifier>all</classifier>
+            </dependency>
+            <dependency>
+                <groupId>com.clickhouse</groupId>
+                <artifactId>clickhouse-http-client</artifactId>
+                <version>${clickhouse.version}</version>
             </dependency>
 
             <!-- Job 定时任务相关 -->

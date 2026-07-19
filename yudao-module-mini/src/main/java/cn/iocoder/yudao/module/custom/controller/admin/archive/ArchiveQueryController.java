@@ -2,14 +2,17 @@ package cn.iocoder.yudao.module.custom.controller.admin.archive;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.custom.framework.archive.ArchiveTableRegistry;
+import cn.iocoder.yudao.module.custom.framework.archive.LogArchiveJob;
 import cn.iocoder.yudao.module.custom.framework.clickhouse.core.ClickHouseArchiveService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -17,10 +20,15 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @Tag(name = "管理后台 - 归档查询")
 @RestController
 @RequestMapping("/custom/security/archive")
+@Slf4j
 public class ArchiveQueryController {
 
     @Resource
     private ClickHouseArchiveService ch;
+    @Resource
+    private LogArchiveJob logArchiveJob;
+
+    private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
 
     private static final Set<String> ALLOWED = ArchiveTableRegistry.tables().stream()
             .map(ArchiveTableRegistry.ArchiveTable::getChTable).collect(Collectors.toSet());
@@ -30,6 +38,28 @@ public class ArchiveQueryController {
     @PreAuthorize("@ss.hasPermission('custom:security:archive')")
     public CommonResult<List<String>> tables() {
         return success(new ArrayList<>(ALLOWED));
+    }
+
+    @PostMapping("/run-now")
+    @Operation(summary = "立即执行日志归档（不等每天04:00定时）")
+    @PreAuthorize("@ss.hasPermission('custom:security:archive')")
+    public CommonResult<String> runNow() {
+        if (!ch.isEnabled()) {
+            return success("ClickHouse 未启用（yudao.clickhouse.enabled=false），已忽略");
+        }
+        if (!RUNNING.compareAndSet(false, true)) {
+            return success("归档正在执行中，请勿重复触发");
+        }
+        new Thread(() -> {
+            try {
+                logArchiveJob.archiveAllNow();
+            } catch (Exception e) {
+                log.error("[LogArchive] 手动归档异常", e);
+            } finally {
+                RUNNING.set(false);
+            }
+        }, "log-archive-manual").start();
+        return success("已触发后台归档，稍后在“归档查询”页查看数据");
     }
 
     @GetMapping("/query")
