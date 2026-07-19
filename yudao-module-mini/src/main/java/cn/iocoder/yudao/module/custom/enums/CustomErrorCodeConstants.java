@@ -54,4 +54,16 @@ public interface CustomErrorCodeConstants {
     /** 信用查询过于频繁 */
     ErrorCode CONTRACT_QUERY_TOO_FREQUENT = new ErrorCode(10017, "请勿频繁访问");
 
+    /** 皮肤配置不存在 */
+    ErrorCode SKIN_PROFILE_NOT_EXISTS = new ErrorCode(10018, "皮肤配置不存在");
+
+    /** 预设皮肤不允许修改核心配置（tokens/customCssText 等） */
+    ErrorCode SKIN_PROFILE_PRESET_CANNOT_MODIFY = new ErrorCode(10019, "预设皮肤不允许修改核心配置");
+
+    /** 预设皮肤或当前生效皮肤不允许删除 */
+    ErrorCode SKIN_PROFILE_CANNOT_DELETE = new ErrorCode(10020, "预设皮肤或当前生效皮肤不允许删除");
+
+    /** 自定义 CSS 文本格式非法 */
+    ErrorCode SKIN_PROFILE_CSS_TEXT_INVALID = new ErrorCode(10021, "自定义CSS格式非法，仅支持 --token: value; 形式的声明");
+
 }
