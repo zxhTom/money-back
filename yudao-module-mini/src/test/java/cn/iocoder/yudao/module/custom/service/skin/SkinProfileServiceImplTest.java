@@ -129,6 +129,7 @@ public class SkinProfileServiceImplTest {
         reqVO.setId(1L);
         reqVO.setName("新名字");
         reqVO.setSort(9);
+        reqVO.setThumbnailUrl("https://example.com/new-thumbnail.png");
         reqVO.setConfigMode(existing.getConfigMode());
         reqVO.setTokens(new HashMap<>(existing.getTokens())); // 未变化
         reqVO.setCustomCssText(existing.getCustomCssText());
@@ -138,6 +139,7 @@ public class SkinProfileServiceImplTest {
         verify(skinProfileMapper).updateById(ArgumentMatchers.<SkinProfileDO>argThat(d ->
                 d.getId().equals(1L) && "新名字".equals(d.getName())
                         && d.getSort().equals(9)
+                        && "https://example.com/new-thumbnail.png".equals(d.getThumbnailUrl())
                         && d.getTokens() == null // 预设不重写 tokens 字段
                         && d.getConfigMode() == null));
     }

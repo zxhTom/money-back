@@ -73,11 +73,11 @@ public class SkinProfileServiceImpl implements SkinProfileService {
         updateObj.setName(reqVO.getName());
         updateObj.setSort(reqVO.getSort());
         updateObj.setRemark(reqVO.getRemark());
+        updateObj.setThumbnailUrl(reqVO.getThumbnailUrl());
         if (!isPreset) {
             updateObj.setConfigMode(reqVO.getConfigMode());
             updateObj.setTokens(reqVO.getTokens());
             updateObj.setCustomCssText(reqVO.getCustomCssText());
-            updateObj.setThumbnailUrl(reqVO.getThumbnailUrl());
         }
         skinProfileMapper.updateById(updateObj);
     }
