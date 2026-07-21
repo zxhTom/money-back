@@ -16,7 +16,7 @@ public class PageCatalog {
     public static List<PageCatalogNodeVO> getCatalogTree() {
         List<PageCatalogNodeVO> tree = new ArrayList<>();
         tree.add(group("root", "主包", "index", "首页", "contract", "合同",
-                "credit", "征信", "profile", "我的"));
+                "credit", "征信", "profile", "我的", "tab", "底部导航"));
         tree.add(group("auth", "登录注册",
                 "auth.login", "登录", "auth.register", "注册"));
         tree.add(group("contract", "合同业务",
