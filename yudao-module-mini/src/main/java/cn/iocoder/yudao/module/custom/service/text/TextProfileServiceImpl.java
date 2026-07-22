@@ -48,6 +48,7 @@ public class TextProfileServiceImpl implements TextProfileService {
         entity.setRemark(reqVO.getRemark());
         entity.setCode(generateCode());
         entity.setSeedFrom("safe");
+        entity.setTextMode(reqVO.getTextMode());
         entity.setIsActive(false);
         textProfileMapper.insert(entity);
         return entity.getId();
@@ -77,8 +78,8 @@ public class TextProfileServiceImpl implements TextProfileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void useTextProfile(Long id) {
-        validateTextProfileExists(id);
-        textProfileMapper.clearActive();
+        TextProfileDO existing = validateTextProfileExists(id);
+        textProfileMapper.clearActive(existing.getTextMode());
         TextProfileDO updateObj = new TextProfileDO();
         updateObj.setId(id);
         updateObj.setIsActive(true);
@@ -94,6 +95,7 @@ public class TextProfileServiceImpl implements TextProfileService {
         entity.setName(newName);
         entity.setCode(generateCode());
         entity.setSeedFrom(source.getCode());
+        entity.setTextMode(source.getTextMode());
         entity.setIsActive(false);
         textProfileMapper.insert(entity);
 
@@ -116,8 +118,8 @@ public class TextProfileServiceImpl implements TextProfileService {
     }
 
     @Override
-    public TextProfileDO getActiveTextProfile() {
-        return textProfileMapper.selectActive();
+    public TextProfileDO getActiveTextProfile(String textMode) {
+        return textProfileMapper.selectActive(textMode);
     }
 
     private TextProfileDO validateTextProfileExists(Long id) {

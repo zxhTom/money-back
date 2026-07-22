@@ -17,7 +17,9 @@ public class TextProfileRespVO {
     private String code;
     @Schema(description = "种子来源", requiredMode = Schema.RequiredMode.REQUIRED, example = "safe")
     private String seedFrom;
-    @Schema(description = "是否生效：全表仅一条应为 true", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "文案套类型：safe=安全模式基准 offcial=正式模式基准，创建后不可变", requiredMode = Schema.RequiredMode.REQUIRED, example = "safe")
+    private String textMode;
+    @Schema(description = "是否生效：同一 textMode 内仅一条应为 true", requiredMode = Schema.RequiredMode.REQUIRED)
     private Boolean isActive;
     @Schema(description = "排序")
     private Integer sort;

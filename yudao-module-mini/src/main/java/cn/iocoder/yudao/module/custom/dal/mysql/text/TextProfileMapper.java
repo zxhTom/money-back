@@ -20,18 +20,22 @@ public interface TextProfileMapper extends BaseMapperX<TextProfileDO> {
                 .orderByDesc(TextProfileDO::getId));
     }
 
-    default TextProfileDO selectActive() {
-        return selectOne(TextProfileDO::getIsActive, true);
+    /** 获取指定 textMode 内当前生效的文案套 */
+    default TextProfileDO selectActive(String textMode) {
+        return selectOne(new LambdaQueryWrapperX<TextProfileDO>()
+                .eq(TextProfileDO::getIsActive, true)
+                .eq(TextProfileDO::getTextMode, textMode));
     }
 
     default TextProfileDO selectByCode(String code) {
         return selectOne(TextProfileDO::getCode, code);
     }
 
-    /** 将当前生效的文案套全部清空为未生效，供切换生效时使用 */
-    default void clearActive() {
+    /** 将指定 textMode 内当前生效的文案套清空为未生效（不影响其他 textMode），供切换生效时使用 */
+    default void clearActive(String textMode) {
         update(null, new LambdaUpdateWrapper<TextProfileDO>()
                 .eq(TextProfileDO::getIsActive, true)
+                .eq(TextProfileDO::getTextMode, textMode)
                 .set(TextProfileDO::getIsActive, false));
     }
 

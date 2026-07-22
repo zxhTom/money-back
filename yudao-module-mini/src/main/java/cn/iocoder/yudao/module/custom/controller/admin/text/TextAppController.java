@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
@@ -37,8 +38,10 @@ public class TextAppController {
     @GetMapping("/current")
     @Operation(summary = "获取当前生效的文案配置")
     @PermitAll
-    public CommonResult<TextAppRespVO> getCurrentText() {
-        TextProfileDO active = textProfileService.getActiveTextProfile();
+    public CommonResult<TextAppRespVO> getCurrentText(
+            @RequestParam(required = false, defaultValue = "safe") String mode) {
+        String textMode = "offcial".equals(mode) ? "offcial" : "safe"; // 非 safe/offcial 的非法值或缺失一律 fail-closed 到 safe
+        TextProfileDO active = textProfileService.getActiveTextProfile(textMode);
         if (active == null) {
             TextAppRespVO vo = new TextAppRespVO();
             vo.setProfileCode(null);

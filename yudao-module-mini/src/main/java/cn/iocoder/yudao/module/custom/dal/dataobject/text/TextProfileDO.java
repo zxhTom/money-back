@@ -22,7 +22,9 @@ public class TextProfileDO extends BaseDO {
     private String code;
     /** 种子来源：初始固定为 safe，克隆时记录来源 profile 的 code */
     private String seedFrom;
-    /** 是否生效：全表仅一条应为 true */
+    /** 文案套类型：safe=安全模式基准 offcial=正式模式基准，创建后不可变 */
+    private String textMode;
+    /** 是否生效：同一 textMode 内仅一条应为 true（safe/offcial 各自互斥） */
     private Boolean isActive;
     /** 排序 */
     private Integer sort;
