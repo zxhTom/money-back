@@ -26,6 +26,7 @@ import cn.iocoder.yudao.module.custom.service.contract.ContractService;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
 import cn.iocoder.yudao.module.fee.controller.admin.strategy.vo.FeeCalculationResult;
 import cn.iocoder.yudao.module.fee.service.strategy.FeeCalculationService;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
@@ -108,6 +109,11 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Autowired
     private IdCardCipherService idCardCipherService;
+
+    @Resource
+    private ConfigApi configApi;
+
+    public static final String CONFIG_KEY_DEFAULT_MODEL = "custom.contract.default-model";
 
     @Override
     public StaticsContractPeriodRespVO staticsContractByTimePeriod() {
@@ -599,10 +605,21 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public String selectModel(String appVersion) {
         String version = customDefineMapper.selectModel(appVersion);
-        if (org.apache.commons.lang3.StringUtils.isEmpty(version)) {
-            return "safe";
+        if (org.apache.commons.lang3.StringUtils.isNotEmpty(version)) {
+            return version;
         }
-        return version;
+        // 没有精确版本匹配时，改为读取系统参数（管理端"参数管理"页可配置），不再硬编码
+        String defaultModel;
+        try {
+            defaultModel = configApi.getConfigValueByKey(CONFIG_KEY_DEFAULT_MODEL);
+        } catch (Exception e) {
+            defaultModel = null;
+        }
+        if ("safe".equals(defaultModel) || "offcial".equals(defaultModel)) {
+            return defaultModel;
+        }
+        // 未配置或配置了非法值，最终兜底safe（最保守，避免误配置导致审核风险）
+        return "safe";
     }
 
     @Override
