@@ -50,6 +50,7 @@ import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.common.error.WxErrorException;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -112,6 +113,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Resource
     private ConfigApi configApi;
+
+    @Autowired
+    private CreditQueryAccessChecker creditQueryAccessChecker;
 
     public static final String CONFIG_KEY_DEFAULT_MODEL = "custom.contract.default-model";
 
@@ -178,6 +182,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     public Page<CreditSearchVO> creditSearch(CreditPageReqVO pageReqVO) {
         if (StrUtil.isNotBlank(pageReqVO.getIdNo())) {
             pageReqVO.setIdNo(idCardCipherService.normalizeRequestToCipher(pageReqVO.getIdNo()));
+        }
+        if (!creditQueryAccessChecker.canQueryCredit(pageReqVO.getIdNo())) {
+            throw new AccessDeniedException("无权限查询该用户信用信息");
         }
         Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
         log.info("[creditSearch][信用查询审计] operator={} idNoCipher={}", loginUserId, pageReqVO.getIdNo());
@@ -281,6 +288,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Boolean checkUserInfo(UserReqVO userReqVO) {
+        if (!creditQueryAccessChecker.canQueryCredit(userReqVO.getIdNo())) {
+            throw new AccessDeniedException("无权限查询该用户信用信息");
+        }
         List<AdminUserDO> users = adminUserService.getUserListByRealname(userReqVO.getRealname());
         if (CollectionUtil.isEmpty(users)) {
             return false;

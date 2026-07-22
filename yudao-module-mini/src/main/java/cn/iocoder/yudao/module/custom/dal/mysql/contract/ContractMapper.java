@@ -95,4 +95,15 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
                 .orderByDesc(ContractDO::getId));
     }
 
+    /**
+     * 判断两个（明文归一化）身份证号之间是否存在合同往来（互为甲乙方，不区分方向）。
+     * 用于信用互查场景：无独立credit-query权限时，允许查询与自己有合同关系的对方。
+     */
+    default boolean existsContractRelation(String idNoA, String idNoB) {
+        Long count = selectCount(new LambdaQueryWrapperX<ContractDO>()
+                .and(w -> w.eq(ContractDO::getIndebtedId, idNoA).eq(ContractDO::getCreditorId, idNoB))
+                .or(w -> w.eq(ContractDO::getIndebtedId, idNoB).eq(ContractDO::getCreditorId, idNoA)));
+        return count != null && count > 0;
+    }
+
 }

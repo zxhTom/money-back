@@ -102,7 +102,8 @@ public class CustomDefineController {
 
     @GetMapping("/creditSearch")
     @Operation(summary = "信用查询")
-    @PreAuthorize("@ss.hasPermission('custom:contract:credit-query')")
+    // 权限判断改为CreditQueryAccessChecker内手动检查(需支持"有合同往来即可互查"的OR条件，
+    // 单纯@PreAuthorize字符串权限表达不了)，见CustomDefineServiceImpl#creditSearch
     @RateLimiter(time = 60, count = 20,
             keyResolver = cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.UserRateLimiterKeyResolver.class,
             message = "信用查询过于频繁，请稍后再试")
@@ -152,7 +153,7 @@ public class CustomDefineController {
     }
     @PostMapping("/checkUserInfo")
     @Operation(summary = "校验用户是否匹配")
-    @PreAuthorize("@ss.hasPermission('custom:contract:query')")
+    // 权限判断改为CreditQueryAccessChecker内手动检查，见CustomDefineServiceImpl#checkUserInfo
     public CommonResult<Boolean> checkUserInfo(@Valid @RequestBody UserReqVO userReqVO) {
         Boolean valid = customDefineService.checkUserInfo(userReqVO);
         return success(valid);
