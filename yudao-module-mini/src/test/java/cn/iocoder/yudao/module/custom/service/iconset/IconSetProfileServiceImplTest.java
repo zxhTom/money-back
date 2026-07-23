@@ -115,7 +115,7 @@ public class IconSetProfileServiceImplTest {
         reqVO.setIcons(icons);
         ServiceException ex = assertThrows(ServiceException.class, () -> service.updateIconSetProfile(reqVO));
         assertEquals(10025, ex.getCode());
-        verify(iconSetProfileMapper, never()).updateById(any());
+        verify(iconSetProfileMapper, never()).updateById(any(IconSetProfileDO.class));
     }
 
     @Test
@@ -129,7 +129,7 @@ public class IconSetProfileServiceImplTest {
         icons.put("plus", "<svg>plus</svg>"); // 与既有值相同，非核心字段变更
         reqVO.setIcons(icons);
         service.updateIconSetProfile(reqVO);
-        verify(iconSetProfileMapper).updateById(any());
+        verify(iconSetProfileMapper).updateById(any(IconSetProfileDO.class));
     }
 
     @Test
@@ -169,7 +169,7 @@ public class IconSetProfileServiceImplTest {
         reqVO.setIcons(icons);
         ServiceException ex = assertThrows(ServiceException.class, () -> service.createIconSetProfile(reqVO));
         assertEquals(10027, ex.getCode());
-        verify(iconSetProfileMapper, never()).insert(any());
+        verify(iconSetProfileMapper, never()).insert(any(IconSetProfileDO.class));
     }
 
     // ── cloneAsCustom ─────────────────────────────────────────────
