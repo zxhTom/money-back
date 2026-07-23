@@ -72,4 +72,16 @@ public interface CustomErrorCodeConstants {
     /** 当前生效的文案套不允许删除 */
     ErrorCode TEXT_PROFILE_ACTIVE_CANNOT_DELETE = new ErrorCode(10023, "当前生效的文案套不允许删除");
 
+    /** 图标集配置不存在 */
+    ErrorCode ICON_SET_PROFILE_NOT_EXISTS = new ErrorCode(10024, "图标集配置不存在");
+
+    /** 预设图标集不允许修改核心配置（icons） */
+    ErrorCode ICON_SET_PROFILE_PRESET_CANNOT_MODIFY = new ErrorCode(10025, "预设图标集不允许修改核心配置");
+
+    /** 预设图标集或当前生效图标集不允许删除 */
+    ErrorCode ICON_SET_PROFILE_CANNOT_DELETE = new ErrorCode(10026, "预设图标集或当前生效图标集不允许删除");
+
+    /** 图标 SVG 源码格式非法 */
+    ErrorCode ICON_SET_PROFILE_SVG_INVALID = new ErrorCode(10027, "图标SVG源码格式非法，需为完整的<svg>...</svg>标签且不含script/事件属性");
+
 }
