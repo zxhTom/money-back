@@ -26,8 +26,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
- * 人脸核身回调：brain 回调只回传 status+idCard，不可信任，服务端主动向百度查询权威结果
- * （通过 idCard -> verify_token 映射反查）后才决定是否写库。
+ * 人脸核身回调：2026-07-29 应产品明确要求恢复了"status 快速路径"——
+ * status=success 时立即 updateVerify(idCard,1)，不等百度查询，接受这意味着
+ * 免登录回调地址可被伪造 status=success 抢先置位任意 idCard 的 verified。
+ * 服务端查百度权威结果（通过 idCard -> verify_token 映射反查）仍然保留，
+ * 用于渲染真实结果页状态、以及在快速路径之外也能最终确认 PASSED（幂等重复写，不撤销）。
  */
 @ExtendWith(MockitoExtension.class)
 public class MiniCallbackControllerTest {
@@ -71,13 +74,15 @@ public class MiniCallbackControllerTest {
     }
 
     @Test
-    public void testNoTokenMapping_doesNotWriteVerified() throws Exception {
-        // 找不到待验证会话（过期/伪造请求的典型特征）——即使伪造 status=success 也不写库
+    public void testNoTokenMapping_statusSuccess_fastPathStillWritesVerified() throws Exception {
+        // 找不到待验证会话（过期/伪造请求的典型特征）——这正是快速路径接受的代价：
+        // 即使从没有发起过真实核身会话，伪造 status=success 也会立即写 verified=1。
+        // 百度查询这条权威链路仍然会跑（用于渲染结果页），但结果不影响已经写入的 verified。
         when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn(null);
 
         controller.handleCallback("success", "idCardPlain", null, response);
 
-        verify(wechatService, never()).updateVerify(anyString(), anyInt());
+        verify(wechatService, times(1)).updateVerify("idCardPlain", 1);
         verify(baiduFaceAuthService, never()).queryFaceAuthResult(anyString());
     }
 
@@ -88,42 +93,46 @@ public class MiniCallbackControllerTest {
 
         controller.handleCallback("success", "idCardPlain", null, response);
 
-        verify(wechatService).updateVerify("idCardPlain", 1);
+        // 快速路径（status=success）先写一次，百度确认 PASSED 后再幂等写一次，共两次
+        verify(wechatService, times(2)).updateVerify("idCardPlain", 1);
     }
 
     @Test
-    public void testTokenMapping_baiduConfirmsNotPassed_doesNotWriteVerified() throws Exception {
+    public void testTokenMapping_baiduConfirmsNotPassed_fastPathAlreadyWroteVerified() throws Exception {
         when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
         when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenReturn(queryResult(true, false));
 
         controller.handleCallback("success", "idCardPlain", null, response);
 
         verify(baiduFaceAuthService, times(1)).queryFaceAuthResult("verifyTokenAbc");
-        verify(wechatService, never()).updateVerify(anyString(), anyInt());
+        // 百度确认未通过不会再写，但快速路径已经因为 status=success 写过一次——
+        // 这正是恢复快速路径要接受的代价：百度事后确认不通过，也无法撤销已经写入的 verified。
+        verify(wechatService, times(1)).updateVerify("idCardPlain", 1);
     }
 
     @Test
-    public void testTokenMapping_baiduQueryThrows_doesNotWriteVerified() throws Exception {
+    public void testTokenMapping_baiduQueryThrows_fastPathAlreadyWroteVerified() throws Exception {
         when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
         when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenThrow(new RuntimeException("网络异常"));
 
         controller.handleCallback("success", "idCardPlain", null, response);
 
-        verify(wechatService, never()).updateVerify(anyString(), anyInt());
-        // 异常按 INCONCLUSIVE 处理，会重试到用完 3 次
+        // 快速路径已经写过一次；百度查询异常按 INCONCLUSIVE 处理不会再写，但也不会重试少于3次
+        verify(wechatService, times(1)).updateVerify("idCardPlain", 1);
         verify(baiduFaceAuthService, times(3)).queryFaceAuthResult("verifyTokenAbc");
     }
 
     @Test
-    public void testForgedStatusFailed_withRealMapping_stillTrustsBaiduNotStatus() throws Exception {
-        // status 里伪造成 failed，但百度权威结果其实是通过的——服务端应以百度为准，仍然写库
-        // （体现"不再直接信任回调里的 status"这个核心设计目标）
+    public void testFailedStatus_fastPathDoesNotFire_butBaiduPassedStillWrites() throws Exception {
+        // 快速路径只在 status=success 时触发；status=failed 时不触发快速路径写入，
+        // 但百度权威结果如果确实通过，resolveVerificationOutcome 仍然会写库一次
+        // （体现快速路径只是"加速"，不是替代百度查询，且不会因 status=failed 而拒绝写入）
         when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
         when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenReturn(queryResult(true, true));
 
         controller.handleCallback("failed", "idCardPlain", null, response);
 
-        verify(wechatService).updateVerify("idCardPlain", 1);
+        verify(wechatService, times(1)).updateVerify("idCardPlain", 1);
     }
 
     @Test
@@ -136,7 +145,8 @@ public class MiniCallbackControllerTest {
 
         controller.handleCallback("success", "idCardPlain", null, response);
 
-        verify(wechatService).updateVerify("idCardPlain", 1);
+        // 快速路径（status=success）先写一次，重试到第3次百度确认 PASSED 后再幂等写一次，共两次
+        verify(wechatService, times(2)).updateVerify("idCardPlain", 1);
         verify(baiduFaceAuthService, times(3)).queryFaceAuthResult("verifyTokenAbc");
     }
 
