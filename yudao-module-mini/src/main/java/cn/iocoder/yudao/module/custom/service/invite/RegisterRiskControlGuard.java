@@ -69,6 +69,12 @@ public class RegisterRiskControlGuard {
                 ipBlacklistService.addToBlacklist(ip, "自动封禁：注册频率超限", true,
                         LocalDateTime.now().plusSeconds(banDuration));
             }
+            boolean exposeReason = rule != null && Integer.valueOf(1).equals(rule.getExposeReason());
+            if (exposeReason) {
+                throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(
+                        REGISTER_TOO_FREQUENT.getCode(),
+                        "注册过于频繁，{}秒内已达{}次，超过上限{}次，请稍后再试", window, count, threshold);
+            }
             throw exception(REGISTER_TOO_FREQUENT);
         }
     }
