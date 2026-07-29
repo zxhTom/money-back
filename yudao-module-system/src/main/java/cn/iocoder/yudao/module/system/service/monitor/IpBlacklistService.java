@@ -24,4 +24,7 @@ public interface IpBlacklistService {
     List<IpBlacklistLogDO> getBanLogs(String ip);
 
     void refreshCache();
+
+    /** 查询某 IP 当前生效（status=0，未解封）的黑名单记录，用于展示具体封禁原因；找不到返回 null */
+    IpBlacklistDO getActiveEntry(String ip);
 }

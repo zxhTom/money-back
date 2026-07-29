@@ -54,6 +54,12 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
         return Boolean.TRUE.equals(stringRedisTemplate.hasKey(String.format(IP_KEY, ip)));
     }
 
+    @Override
+    public IpBlacklistDO getActiveEntry(String ip) {
+        return ipBlacklistMapper.selectOne(new LambdaQueryWrapper<IpBlacklistDO>()
+                .eq(IpBlacklistDO::getIp, ip).eq(IpBlacklistDO::getStatus, 0));
+    }
+
     /** 定时从库重建 Redis 缓存：兜底 Redis 重启/驱逐导致的丢失（默认5分钟一次） */
     @org.springframework.scheduling.annotation.Scheduled(fixedDelayString = "${yudao.ip-blacklist.refresh-ms:300000}")
     public void scheduledRefresh() {
