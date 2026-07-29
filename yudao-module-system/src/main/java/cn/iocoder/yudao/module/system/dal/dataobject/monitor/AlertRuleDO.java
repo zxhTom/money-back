@@ -21,6 +21,8 @@ public class AlertRuleDO {
     private Integer threshold;
     private Integer windowSeconds;
     private Integer autoBan;
+    /** 触发后是否在响应里暴露具体原因（次数/阈值等）：0-否 1-是 */
+    private Integer exposeReason;
     private Long banDurationSeconds;
     /** 触发后是否逻辑删除用户并剔除其所有 token：0-否 1-是（仅对能定位到账号的规则生效） */
     private Integer autoDeleteUser;

@@ -26,6 +26,8 @@ public interface AlertRuleService {
 
     void setEnabled(Long id, boolean enabled);
 
+    void setExposeReason(Long id, boolean exposeReason);
+
     List<AlertRuleNotifyDO> listNotifies(Long ruleId);
 
     /** 展开通知对象，返回需要发送站内信的 userId 集合 */

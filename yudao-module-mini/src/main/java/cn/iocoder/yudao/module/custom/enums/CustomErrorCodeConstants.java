@@ -84,4 +84,13 @@ public interface CustomErrorCodeConstants {
     /** 图标值格式非法 */
     ErrorCode ICON_SET_PROFILE_SVG_INVALID = new ErrorCode(10027, "图标值格式非法，须为完整<svg>标签(不含script/事件)、http(s)图片URL、或以/开头的小程序本地路径");
 
+    /** 请求过于频繁（暴力破解检测拦截），迁移自 SecurityDetectFilter 原来的裸 403 */
+    ErrorCode BRUTE_FORCE_BLOCKED = new ErrorCode(10028, "请求过于频繁，请稍后再试");
+
+    /** 请求内容可疑被拦截（SQL 注入检测），迁移自 SecurityDetectFilter 原来的裸 403 */
+    ErrorCode SUSPICIOUS_REQUEST_BLOCKED = new ErrorCode(10029, "请求被拦截");
+
+    /** IP 命中黑名单被拒绝访问，迁移自 SecurityDetectFilter 原来的裸 403 */
+    ErrorCode IP_BLACKLISTED = new ErrorCode(10030, "访问被拒绝");
+
 }

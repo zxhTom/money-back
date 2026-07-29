@@ -1,8 +1,10 @@
 package cn.iocoder.yudao.module.custom.framework.security.filter;
 
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 import cn.iocoder.yudao.module.custom.framework.audit.util.IpUtils;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.AlertRuleDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO;
 import cn.iocoder.yudao.module.system.service.monitor.AlertRuleService;
 import cn.iocoder.yudao.module.system.service.monitor.IpBlacklistService;
 import cn.iocoder.yudao.module.system.service.monitor.IpRiskCheckService;
@@ -22,9 +24,14 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.BRUTE_FORCE_BLOCKED;
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.IP_BLACKLISTED;
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.SUSPICIOUS_REQUEST_BLOCKED;
 
 /**
  * 安全检测过滤器：检测 SQL 注入、XSS、暴力破解、IP 黑名单
@@ -113,7 +120,12 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
         if (ipBlacklistService.isBlacklisted(ip)) {
             log.warn("[SecurityDetect] 黑名单IP请求被拦截: {} {}", ip, uri);
             recordAttempt(request, ip, uri, method, "BLACKLIST_BLOCK"); // 记录被封IP仍在试探
-            block(response, "Access denied");
+            AlertRuleDO blacklistRule = alertRuleService.getCachedRule("IP_BLACKLIST_BLOCK");
+            String detail = null;
+            if (blacklistRule != null && Integer.valueOf(1).equals(blacklistRule.getExposeReason())) {
+                detail = buildBlacklistReasonMessage(ip);
+            }
+            writeResult(response, IP_BLACKLISTED, detail);
             return;
         }
 
@@ -182,7 +194,11 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
                 ipBlacklistService.addToBlacklist(ip, "自动封禁：暴力破解检测", true,
                         LocalDateTime.now().plusSeconds(banDuration));
             }
-            block(response, "Too many requests");
+            boolean exposeReason = rule != null && Integer.valueOf(1).equals(rule.getExposeReason());
+            String detail = exposeReason
+                    ? window + "秒内请求次数达 " + count + " 次，已超过阈值 " + threshold + "，请稍后再试"
+                    : null;
+            writeResult(response, BRUTE_FORCE_BLOCKED, detail);
             return true;
         }
         return false;
@@ -250,16 +266,38 @@ public class SecurityDetectFilter extends OncePerRequestFilter {
             ipBlacklistService.addToBlacklist(ip, "自动封禁：多次SQL注入尝试", true,
                     LocalDateTime.now().plusSeconds(banDuration));
         }
-        block(response, "Forbidden");
+        // 安全红线：无论开关是否打开，都不能把命中的具体攻击特征回显给请求方，
+        // 开关打开时只换一句更明确但依然安全的固定提示，不拼接 content/matched pattern。
+        boolean exposeReason = rule != null && Integer.valueOf(1).equals(rule.getExposeReason());
+        writeResult(response, SUSPICIOUS_REQUEST_BLOCKED,
+                exposeReason ? "检测到您的请求包含可疑内容，已被拦截" : null);
     }
 
-    private void block(HttpServletResponse response, String message) throws IOException {
-        response.setStatus(HttpStatus.FORBIDDEN.value());
+    private void writeResult(HttpServletResponse response, ErrorCode errorCode, String detailedMsg) throws IOException {
+        response.setStatus(HttpStatus.OK.value()); // 按 yudao 约定：业务错误用 HTTP 200 + code 承载
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        String msg = detailedMsg != null ? detailedMsg : errorCode.getMsg();
         try (PrintWriter writer = response.getWriter()) {
-            writer.write("{\"code\":403,\"msg\":\"" + message + "\"}");
+            writer.write("{\"code\":" + errorCode.getCode() + ",\"msg\":\"" + escapeJson(msg) + "\",\"data\":null}");
         }
+    }
+
+    private String escapeJson(String s) {
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private String buildBlacklistReasonMessage(String ip) {
+        IpBlacklistDO entry = ipBlacklistService.getActiveEntry(ip);
+        if (entry == null) {
+            return null; // 极端竞态：查询瞬间已被解封，退回通用提示
+        }
+        String reason = entry.getReason() != null ? entry.getReason() : "触发安全规则";
+        if (entry.getExpireTime() == null) {
+            return "您的IP因【" + reason + "】被限制访问（永久）";
+        }
+        return "您的IP因【" + reason + "】被限制访问，解封时间：" +
+                entry.getExpireTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
     private String sanitizeForKey(String uri) {
