@@ -91,4 +91,11 @@ public interface FileConfigService {
      */
     FileClient getMasterFileClient();
 
+    /**
+     * 获得 Master 文件配置 ID
+     *
+     * @return 文件配置 ID
+     */
+    Long getMasterFileConfigId();
+
 }

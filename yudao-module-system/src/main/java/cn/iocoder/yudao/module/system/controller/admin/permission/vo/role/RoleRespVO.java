@@ -56,4 +56,10 @@ public class RoleRespVO {
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED, example = "时间戳格式")
     private LocalDateTime createTime;
 
+    @Schema(description = "是否开启戏耍模式", example = "false")
+    private Boolean teaseEnabled;
+
+    @Schema(description = "是否允许邀请", example = "false")
+    private Boolean inviteEnabled;
+
 }

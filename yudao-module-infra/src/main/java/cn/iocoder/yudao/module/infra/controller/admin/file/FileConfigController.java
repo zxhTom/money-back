@@ -95,4 +95,11 @@ public class FileConfigController {
         String url = fileConfigService.testFileConfig(id);
         return success(url);
     }
+
+    @GetMapping("/get-master-id")
+    @Operation(summary = "获得 Master 文件配置 ID")
+    @io.swagger.v3.oas.annotations.Parameters({})
+    public CommonResult<Long> getMasterFileConfigId() {
+        return success(fileConfigService.getMasterFileConfigId());
+    }
 }

@@ -131,4 +131,20 @@ public class RoleController {
                 BeanUtils.toBean(list, RoleRespVO.class));
     }
 
+    @PutMapping("/toggle-tease")
+    @Operation(summary = "切换角色的戏耍模式开关")
+    @PreAuthorize("@ss.hasPermission('system:role:update')")
+    public CommonResult<Boolean> toggleTease(@RequestParam("id") Long id, @RequestParam("teaseEnabled") Boolean teaseEnabled) {
+        roleService.updateRoleTeaseEnabled(id, teaseEnabled);
+        return success(true);
+    }
+
+    @PutMapping("/toggle-invite")
+    @Operation(summary = "切换角色的邀请功能开关")
+    @PreAuthorize("@ss.hasPermission('system:role:update')")
+    public CommonResult<Boolean> toggleInvite(@RequestParam("id") Long id, @RequestParam("inviteEnabled") Boolean inviteEnabled) {
+        roleService.updateRoleInviteEnabled(id, inviteEnabled);
+        return success(true);
+    }
+
 }

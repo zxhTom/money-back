@@ -271,6 +271,26 @@ public class RoleServiceImpl implements RoleService {
         return roleMapper.selectOne(roleDOQueryWrapper);
     }
 
+    @Override
+    @CacheEvict(value = RedisKeyConstants.ROLE, key = "#id")
+    public void updateRoleTeaseEnabled(Long id, Boolean teaseEnabled) {
+        validateRoleForUpdate(id);
+        RoleDO updateObj = new RoleDO();
+        updateObj.setId(id);
+        updateObj.setTeaseEnabled(teaseEnabled);
+        roleMapper.updateById(updateObj);
+    }
+
+    @Override
+    @CacheEvict(value = RedisKeyConstants.ROLE, key = "#id")
+    public void updateRoleInviteEnabled(Long id, Boolean inviteEnabled) {
+        validateRoleForUpdate(id);
+        RoleDO updateObj = new RoleDO();
+        updateObj.setId(id);
+        updateObj.setInviteEnabled(inviteEnabled);
+        roleMapper.updateById(updateObj);
+    }
+
     /**
      * 获得自身的代理对象，解决 AOP 生效问题
      *

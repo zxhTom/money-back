@@ -45,4 +45,12 @@ public class RoleSaveReqVO {
     @DiffLogField(name = "备注")
     private String remark;
 
+    @Schema(description = "是否开启戏耍模式", example = "false")
+    @DiffLogField(name = "戏耍模式")
+    private Boolean teaseEnabled;
+
+    @Schema(description = "是否允许邀请", example = "false")
+    @DiffLogField(name = "邀请功能")
+    private Boolean inviteEnabled;
+
 }

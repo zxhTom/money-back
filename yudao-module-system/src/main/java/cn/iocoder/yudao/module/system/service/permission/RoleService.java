@@ -129,4 +129,20 @@ public interface RoleService {
     void validateRoleList(Collection<Long> ids);
 
     RoleDO getRoleByName(String roleName);
+
+    /**
+     * 更新角色的戏耍模式开关
+     *
+     * @param id 角色编号
+     * @param teaseEnabled 是否开启
+     */
+    void updateRoleTeaseEnabled(Long id, Boolean teaseEnabled);
+
+    /**
+     * 更新角色的邀请功能开关
+     *
+     * @param id 角色编号
+     * @param inviteEnabled 是否开启
+     */
+    void updateRoleInviteEnabled(Long id, Boolean inviteEnabled);
 }

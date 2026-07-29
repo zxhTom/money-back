@@ -35,6 +35,7 @@ import java.util.function.Supplier;
 
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString;
+import static java.util.Collections.singleton;
 
 /**
  * 权限 Service 实现类
@@ -224,6 +225,28 @@ public class PermissionServiceImpl implements PermissionService {
         }
         if (!CollectionUtil.isEmpty(deleteMenuIds)) {
             userRoleMapper.deleteListByUserIdAndRoleIdIds(userId, deleteMenuIds);
+        }
+    }
+
+    @Override
+    @DSTransactional
+    @CacheEvict(value = RedisKeyConstants.USER_ROLE_ID_LIST, allEntries = true)
+    public void assignRoleUsers(Long roleId, Set<Long> userIds) {
+        Set<Long> dbUserIds = convertSet(userRoleMapper.selectListByRoleIds(singleton(roleId)),
+                UserRoleDO::getUserId);
+        Set<Long> userIdList = CollUtil.emptyIfNull(userIds);
+        Collection<Long> createUserIds = CollUtil.subtract(userIdList, dbUserIds);
+        Collection<Long> deleteUserIds = CollUtil.subtract(dbUserIds, userIdList);
+        if (!CollectionUtil.isEmpty(createUserIds)) {
+            userRoleMapper.insertBatch(CollectionUtils.convertList(createUserIds, userId -> {
+                UserRoleDO entity = new UserRoleDO();
+                entity.setUserId(userId);
+                entity.setRoleId(roleId);
+                return entity;
+            }));
+        }
+        if (!CollectionUtil.isEmpty(deleteUserIds)) {
+            userRoleMapper.deleteListByRoleIdAndUserIds(roleId, deleteUserIds);
         }
     }
 

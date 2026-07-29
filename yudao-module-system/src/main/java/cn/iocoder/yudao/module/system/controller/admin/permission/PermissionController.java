@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.system.controller.admin.permission.vo.permission.PermissionAssignRoleDataScopeReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.permission.vo.permission.PermissionAssignRoleMenuReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.permission.vo.permission.PermissionAssignRoleUsersReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.permission.vo.permission.PermissionAssignUserRoleReqVO;
 import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.system.service.tenant.TenantService;
@@ -19,6 +20,7 @@ import javax.validation.Valid;
 import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static java.util.Collections.singleton;
 
 /**
  * 权限 Controller，提供赋予用户、角色的权限的 API 接口
@@ -77,6 +79,22 @@ public class PermissionController {
     public CommonResult<Boolean> assignUserRole(@Validated @RequestBody PermissionAssignUserRoleReqVO reqVO) {
         permissionService.assignUserRole(reqVO.getUserId(), reqVO.getRoleIds());
         return success(true);
+    }
+
+    @Operation(summary = "赋予角色用户")
+    @PostMapping("/assign-role-users")
+    @PreAuthorize("@ss.hasPermission('system:permission:assign-user-role')")
+    public CommonResult<Boolean> assignRoleUsers(@Validated @RequestBody PermissionAssignRoleUsersReqVO reqVO) {
+        permissionService.assignRoleUsers(reqVO.getRoleId(), reqVO.getUserIds());
+        return success(true);
+    }
+
+    @Operation(summary = "获得角色拥有的用户编号列表")
+    @Parameter(name = "roleId", description = "角色编号", required = true)
+    @GetMapping("/list-role-users")
+    @PreAuthorize("@ss.hasPermission('system:permission:assign-user-role')")
+    public CommonResult<Set<Long>> listRoleUsers(@RequestParam("roleId") Long roleId) {
+        return success(permissionService.getUserRoleIdListByRoleId(singleton(roleId)));
     }
 
 }

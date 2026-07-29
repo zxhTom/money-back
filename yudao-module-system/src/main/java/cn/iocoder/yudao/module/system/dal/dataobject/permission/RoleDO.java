@@ -75,4 +75,14 @@ public class RoleDO extends TenantBaseDO {
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Set<Long> dataScopeDeptIds;
 
+    /**
+     * 是否开启戏耍模式
+     */
+    private Boolean teaseEnabled;
+
+    /**
+     * 是否允许邀请
+     */
+    private Boolean inviteEnabled;
+
 }

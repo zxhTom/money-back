@@ -81,7 +81,7 @@ public interface CustomErrorCodeConstants {
     /** 预设图标集或当前生效图标集不允许删除 */
     ErrorCode ICON_SET_PROFILE_CANNOT_DELETE = new ErrorCode(10026, "预设图标集或当前生效图标集不允许删除");
 
-    /** 图标 SVG 源码格式非法 */
-    ErrorCode ICON_SET_PROFILE_SVG_INVALID = new ErrorCode(10027, "图标SVG源码格式非法，需为完整的<svg>...</svg>标签且不含script/事件属性");
+    /** 图标值格式非法 */
+    ErrorCode ICON_SET_PROFILE_SVG_INVALID = new ErrorCode(10027, "图标值格式非法，须为完整<svg>标签(不含script/事件)、http(s)图片URL、或以/开头的小程序本地路径");
 
 }

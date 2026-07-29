@@ -204,4 +204,10 @@ public class FileConfigServiceImpl implements FileConfigService {
         return clientCache.getUnchecked(CACHE_MASTER_ID);
     }
 
+    @Override
+    public Long getMasterFileConfigId() {
+        FileConfigDO config = fileConfigMapper.selectByMaster();
+        return config != null ? config.getId() : null;
+    }
+
 }

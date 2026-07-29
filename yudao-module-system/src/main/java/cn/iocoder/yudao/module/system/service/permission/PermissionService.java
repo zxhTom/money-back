@@ -94,6 +94,14 @@ public interface PermissionService {
     void assignUserRole(Long userId, Set<Long> roleIds);
 
     /**
+     * 设置角色用户
+     *
+     * @param roleId  角色编号
+     * @param userIds 用户编号集合
+     */
+    void assignRoleUsers(Long roleId, Set<Long> userIds);
+
+    /**
      * 处理用户删除时，删除关联授权数据
      *
      * @param userId 用户编号

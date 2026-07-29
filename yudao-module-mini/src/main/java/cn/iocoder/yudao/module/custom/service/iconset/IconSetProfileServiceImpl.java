@@ -130,8 +130,8 @@ public class IconSetProfileServiceImpl implements IconSetProfileService {
         if (icons == null) {
             return;
         }
-        for (String svg : icons.values()) {
-            if (!SvgIconValidator.isValid(svg)) {
+        for (String value : icons.values()) {
+            if (!SvgIconValidator.isValid(value)) {
                 throw exception(ICON_SET_PROFILE_SVG_INVALID);
             }
         }

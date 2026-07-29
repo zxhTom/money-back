@@ -64,4 +64,29 @@ public class SvgIconValidatorTest {
         assertFalse(SvgIconValidator.isValid("<svg onload=\"alert(1)\"><path/></svg>"));
     }
 
+    @Test
+    public void testIsValid_httpImageUrl_returnsTrue() {
+        assertTrue(SvgIconValidator.isValid("http://example.com/icon.png"));
+    }
+
+    @Test
+    public void testIsValid_httpsImageUrl_returnsTrue() {
+        assertTrue(SvgIconValidator.isValid("https://cdn.example.com/icons/user.png"));
+    }
+
+    @Test
+    public void testIsValid_randomText_returnsFalse() {
+        assertFalse(SvgIconValidator.isValid("just some text"));
+    }
+
+    @Test
+    public void testIsImageUrl_validUrl_returnsTrue() {
+        assertTrue(SvgIconValidator.isImageUrl("https://cdn.example.com/icon.png"));
+    }
+
+    @Test
+    public void testIsImageUrl_svgValue_returnsFalse() {
+        assertFalse(SvgIconValidator.isImageUrl("<svg><path/></svg>"));
+    }
+
 }
