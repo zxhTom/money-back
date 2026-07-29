@@ -39,22 +39,28 @@ public class FaceAuthCallbackTokenStoreTest {
     }
 
     @Test
-    public void testConsumeAndGet_returnsValueAndDeletesKey() {
+    public void testGet_returnsValueWithoutDeleting() {
         when(valueOperations.get("face:verify:token:by:idcard:idCardPlain")).thenReturn("verifyTokenAbc");
 
-        String result = tokenStore.consumeAndGet("idCardPlain");
+        String result = tokenStore.get("idCardPlain");
 
         assertEquals("verifyTokenAbc", result);
-        verify(stringRedisTemplate).delete("face:verify:token:by:idcard:idCardPlain");
+        verify(stringRedisTemplate, never()).delete(anyString());
     }
 
     @Test
-    public void testConsumeAndGet_missingKey_returnsNullAndDoesNotDelete() {
+    public void testGet_missingKey_returnsNull() {
         when(valueOperations.get("face:verify:token:by:idcard:idCardPlain")).thenReturn(null);
 
-        String result = tokenStore.consumeAndGet("idCardPlain");
+        String result = tokenStore.get("idCardPlain");
 
         assertNull(result);
-        verify(stringRedisTemplate, never()).delete(anyString());
+    }
+
+    @Test
+    public void testDelete_removesKey() {
+        tokenStore.delete("idCardPlain");
+
+        verify(stringRedisTemplate).delete("face:verify:token:by:idcard:idCardPlain");
     }
 }

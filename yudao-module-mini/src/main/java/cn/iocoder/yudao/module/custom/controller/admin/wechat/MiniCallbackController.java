@@ -90,11 +90,13 @@ public class MiniCallbackController {
     }
 
     /**
-     * 服务端权威校验：消费 idCard -> verify_token 映射，向百度查询这次核身的真实结果，
-     * 只有确认通过才写 verified=1。返回值用于渲染结果页（"success"/"failed"/"pending"）。
+     * 服务端权威校验：查出 idCard -> verify_token 映射，向百度查询这次核身的真实结果，
+     * 只有确认通过才写 verified=1。映射只在拿到确定结果（通过/不通过）时才删除，
+     * 仍不确定时保留映射靠 TTL 自然过期，避免抢先伪造的回调把真实会话状态提前清空。
+     * 返回值用于渲染结果页（"success"/"failed"/"pending"）。
      */
     private String resolveVerificationOutcome(String idCard, String idNoDisplay) {
-        String pendingVerifyToken = faceAuthCallbackTokenStore.consumeAndGet(idCard);
+        String pendingVerifyToken = faceAuthCallbackTokenStore.get(idCard);
         if (pendingVerifyToken == null) {
             log.warn("[FaceAuth] 回调时找不到对应的待验证会话（可能是伪造请求或已过期），不写库。idCard(脱敏)={}", idNoDisplay);
             return "failed";
@@ -116,13 +118,17 @@ public class MiniCallbackController {
         }
 
         if (outcome == QueryOutcome.PASSED) {
+            faceAuthCallbackTokenStore.delete(idCard);
             wechatService.updateVerify(idCard, 1);
             return "success";
         } else if (outcome == QueryOutcome.NOT_PASSED) {
+            faceAuthCallbackTokenStore.delete(idCard);
             log.warn("[FaceAuth] 百度权威结果未通过，不写库。idCard(脱敏)={}", idNoDisplay);
             return "failed";
         } else {
-            log.warn("[FaceAuth] 重试后仍无法确认结果，不写库、不判定失败。idCard(脱敏)={}", idNoDisplay);
+            // 重试耗尽仍不确定：不删映射，留给 30 分钟 TTL 自然过期——避免网络抖动或抢先伪造的回调
+            // 提前烧掉这次真实核身会话的 token，导致后续真实回调被误判为失败。
+            log.warn("[FaceAuth] 重试后仍无法确认结果，不写库、不判定失败、不删除映射。idCard(脱敏)={}", idNoDisplay);
             return "pending";
         }
     }

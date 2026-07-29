@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
  * 人脸核身回调防伪：idCard <-> verify_token 的一次性映射。
  * 写入方：FaceAuthController#startFaceAuth（此时同时持有 idCard 和刚生成的 verify_token）。
  * 消费方：MiniCallbackController#handleCallback（回调时只有 idCard，反查 verify_token 后拿去问百度权威结果）。
- * 一次性消费（读取即删除），防止同一个 verify_token 被重放触发多次写库判断。
+ * get 只读不删；delete 需由调用方在拿到确定结果（通过/不通过）后显式调用，避免结果不确定时误删映射。
  */
 @Component
 public class FaceAuthCallbackTokenStore {
@@ -25,12 +25,11 @@ public class FaceAuthCallbackTokenStore {
         stringRedisTemplate.opsForValue().set(KEY_PREFIX + idCard, verifyToken, TTL_MINUTES, TimeUnit.MINUTES);
     }
 
-    public String consumeAndGet(String idCard) {
-        String key = KEY_PREFIX + idCard;
-        String verifyToken = stringRedisTemplate.opsForValue().get(key);
-        if (verifyToken != null) {
-            stringRedisTemplate.delete(key);
-        }
-        return verifyToken;
+    public String get(String idCard) {
+        return stringRedisTemplate.opsForValue().get(KEY_PREFIX + idCard);
+    }
+
+    public void delete(String idCard) {
+        stringRedisTemplate.delete(KEY_PREFIX + idCard);
     }
 }

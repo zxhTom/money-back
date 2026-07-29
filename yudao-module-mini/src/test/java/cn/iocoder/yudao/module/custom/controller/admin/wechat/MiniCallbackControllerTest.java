@@ -73,7 +73,7 @@ public class MiniCallbackControllerTest {
     @Test
     public void testNoTokenMapping_doesNotWriteVerified() throws Exception {
         // 找不到待验证会话（过期/伪造请求的典型特征）——即使伪造 status=success 也不写库
-        when(faceAuthCallbackTokenStore.consumeAndGet("idCardPlain")).thenReturn(null);
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn(null);
 
         controller.handleCallback("success", "idCardPlain", null, response);
 
@@ -83,7 +83,7 @@ public class MiniCallbackControllerTest {
 
     @Test
     public void testTokenMapping_baiduConfirmsPassed_writesVerified() throws Exception {
-        when(faceAuthCallbackTokenStore.consumeAndGet("idCardPlain")).thenReturn("verifyTokenAbc");
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
         when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenReturn(queryResult(true, true));
 
         controller.handleCallback("success", "idCardPlain", null, response);
@@ -93,7 +93,7 @@ public class MiniCallbackControllerTest {
 
     @Test
     public void testTokenMapping_baiduConfirmsNotPassed_doesNotWriteVerified() throws Exception {
-        when(faceAuthCallbackTokenStore.consumeAndGet("idCardPlain")).thenReturn("verifyTokenAbc");
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
         when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenReturn(queryResult(true, false));
 
         controller.handleCallback("success", "idCardPlain", null, response);
@@ -104,7 +104,7 @@ public class MiniCallbackControllerTest {
 
     @Test
     public void testTokenMapping_baiduQueryThrows_doesNotWriteVerified() throws Exception {
-        when(faceAuthCallbackTokenStore.consumeAndGet("idCardPlain")).thenReturn("verifyTokenAbc");
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
         when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenThrow(new RuntimeException("网络异常"));
 
         controller.handleCallback("success", "idCardPlain", null, response);
@@ -118,7 +118,7 @@ public class MiniCallbackControllerTest {
     public void testForgedStatusFailed_withRealMapping_stillTrustsBaiduNotStatus() throws Exception {
         // status 里伪造成 failed，但百度权威结果其实是通过的——服务端应以百度为准，仍然写库
         // （体现"不再直接信任回调里的 status"这个核心设计目标）
-        when(faceAuthCallbackTokenStore.consumeAndGet("idCardPlain")).thenReturn("verifyTokenAbc");
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
         when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenReturn(queryResult(true, true));
 
         controller.handleCallback("failed", "idCardPlain", null, response);
@@ -128,7 +128,7 @@ public class MiniCallbackControllerTest {
 
     @Test
     public void testRetry_firstTwoInconclusive_thirdPassed_writesVerified() throws Exception {
-        when(faceAuthCallbackTokenStore.consumeAndGet("idCardPlain")).thenReturn("verifyTokenAbc");
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
         when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc"))
                 .thenReturn(queryResult(false, null))
                 .thenReturn(queryResult(false, null))
@@ -142,11 +142,41 @@ public class MiniCallbackControllerTest {
 
     @Test
     public void testRendersHtml() throws Exception {
-        when(faceAuthCallbackTokenStore.consumeAndGet("idCardPlain")).thenReturn(null);
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn(null);
 
         controller.handleCallback("success", "idCardPlain", null, response);
 
         verify(response).setContentType("text/html; charset=utf-8");
         verify(templateEngine).process(eq("mini-callback"), any());
+    }
+
+    @Test
+    public void testInconclusive_doesNotDeleteMapping_letsTTLExpireNaturally() throws Exception {
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
+        when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenReturn(queryResult(false, null));
+
+        controller.handleCallback("success", "idCardPlain", null, response);
+
+        verify(faceAuthCallbackTokenStore, never()).delete(anyString());
+    }
+
+    @Test
+    public void testPassed_deletesMapping() throws Exception {
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
+        when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenReturn(queryResult(true, true));
+
+        controller.handleCallback("success", "idCardPlain", null, response);
+
+        verify(faceAuthCallbackTokenStore).delete("idCardPlain");
+    }
+
+    @Test
+    public void testNotPassed_deletesMapping() throws Exception {
+        when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
+        when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc")).thenReturn(queryResult(true, false));
+
+        controller.handleCallback("success", "idCardPlain", null, response);
+
+        verify(faceAuthCallbackTokenStore).delete("idCardPlain");
     }
 }
