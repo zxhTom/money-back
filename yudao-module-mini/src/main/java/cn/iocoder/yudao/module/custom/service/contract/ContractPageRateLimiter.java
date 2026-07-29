@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
+import cn.iocoder.yudao.module.system.dal.dataobject.monitor.AlertRuleDO;
+import cn.iocoder.yudao.module.system.service.monitor.AlertRuleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -39,6 +41,8 @@ public class ContractPageRateLimiter {
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Resource
+    private AlertRuleService alertRuleService;
 
     /** 每个元素 [窗口秒数, 最大次数] */
     private List<int[]> windows;
@@ -71,6 +75,13 @@ public class ContractPageRateLimiter {
             }
             if (count != null && count > limit) {
                 log.warn("[ContractPageRateLimit] userId={} {}秒窗口内访问 {} 次，超过上限 {}，拒绝", userId, windowSec, count, limit);
+                AlertRuleDO rule = alertRuleService.getCachedRule("CONTRACT_QUERY_RATE_LIMIT");
+                boolean exposeReason = rule != null && Integer.valueOf(1).equals(rule.getExposeReason());
+                if (exposeReason) {
+                    throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(
+                            CONTRACT_QUERY_TOO_FREQUENT.getCode(),
+                            "查询过于频繁，{}秒内已达{}次，超过上限{}次，请稍后再试", windowSec, count, limit);
+                }
                 throw exception(CONTRACT_QUERY_TOO_FREQUENT);
             }
         }
