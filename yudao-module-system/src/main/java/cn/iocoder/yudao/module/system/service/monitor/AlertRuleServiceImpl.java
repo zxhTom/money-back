@@ -106,6 +106,17 @@ public class AlertRuleServiceImpl implements AlertRuleService {
     }
 
     @Override
+    public void setExposeReason(Long id, boolean exposeReason) {
+        AlertRuleDO rule = new AlertRuleDO();
+        rule.setId(id);
+        rule.setExposeReason(exposeReason ? 1 : 0);
+        rule.setUpdater("admin");
+        rule.setUpdateTime(LocalDateTime.now());
+        alertRuleMapper.updateById(rule);
+        loadCache();
+    }
+
+    @Override
     public List<AlertRuleNotifyDO> listNotifies(Long ruleId) {
         return alertRuleNotifyMapper.selectByRuleId(ruleId);
     }

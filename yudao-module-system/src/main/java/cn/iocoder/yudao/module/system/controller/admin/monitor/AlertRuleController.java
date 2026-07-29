@@ -85,6 +85,14 @@ public class AlertRuleController {
         return success(true);
     }
 
+    @PutMapping("/{id}/expose-reason")
+    @Operation(summary = "设置是否暴露具体拦截原因")
+    @PreAuthorize("@ss.hasPermission('custom:security:alert:handle')")
+    public CommonResult<Boolean> setExposeReason(@PathVariable Long id, @RequestParam boolean expose) {
+        alertRuleService.setExposeReason(id, expose);
+        return success(true);
+    }
+
     @Data
     public static class AlertRuleReqVO {
         private AlertRuleDO rule;
