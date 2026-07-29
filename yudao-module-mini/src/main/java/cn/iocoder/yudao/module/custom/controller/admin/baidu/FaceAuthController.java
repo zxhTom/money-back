@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.baidu.vo.BaiduUserInfo;
+import cn.iocoder.yudao.module.custom.framework.faceauth.FaceAuthCallbackTokenStore;
 import cn.iocoder.yudao.module.custom.service.face.baidu.BaiduFaceAuthService;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
@@ -14,7 +15,6 @@ import com.anji.captcha.util.StringUtils;
 import io.swagger.v3.oas.annotations.Parameter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -22,7 +22,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -33,10 +32,6 @@ import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.FACE
 @RestController
 @RequestMapping("/api/faceAuth")
 public class FaceAuthController {
-
-    /** 人脸回调一次性 nonce 的 Redis key 前缀，值=归一明文身份证 */
-    public static final String CALLBACK_NONCE_PREFIX = "face:callback:nonce:";
-    private static final long NONCE_TTL_MINUTES = 30;
 
     @Autowired
     private BaiduFaceAuthService baiduFaceAuthService;
@@ -49,7 +44,7 @@ public class FaceAuthController {
     @Resource
     private AdminUserService adminUserService;
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private FaceAuthCallbackTokenStore faceAuthCallbackTokenStore;
     // 你的小程序服务器域名，用于构造回调地址
     @Value("${server.domain}")
     private String serverDomain;
@@ -62,15 +57,16 @@ public class FaceAuthController {
     public CommonResult<Map<String, Object>> startFaceAuth(
             @Parameter(description = "身份证：明文或密文（与 profile.idNo 一致），服务端自动识别") @RequestParam String idCard) throws Exception {
         // 注意：brain.toms.chat 核身完成后重定向到 successUrl/failUrl 时，只回传 status+idCard，
-        // 不会透传我们追加的任何自定义参数（nonce/verify_token 都拿不回来），
-        // 因此回调只能以 status 为准（配合"只允许成功、绝不降级"的策略）。不要在这里再加 nonce。
+        // 不会透传我们追加的任何自定义参数（verify_token 都拿不回来），因此回调不能直接信任 status；
+        // 服务端权威校验走 idCard -> verify_token 的映射（见 FaceAuthCallbackTokenStore）+ 主动查百度结果。
         String idCardEnc = URLEncoder.encode(idCard, StandardCharsets.UTF_8.name());
         String successUrl = serverDomain + "/api/mini/callback?status=success&idCard=" + idCardEnc;
         String failUrl = serverDomain + "/api/mini/callback?status=failed&idCard=" + idCardEnc;
-//        successUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=success");
-//        failUrl = wechatService.generateUrlLink("/pages/authResult/authResult", "status=fail");
         // 1. 获取 verify_token
         String verifyToken = baiduFaceAuthService.getVerifyToken(successUrl, failUrl);
+
+        // 1.1 记录 idCard -> verify_token 映射，供回调时反查百度权威结果（防伪造 status）
+        faceAuthCallbackTokenStore.store(idCard, verifyToken);
 
         // 2. 根据 token 构造H5核身页面URL[citation:6]
         String authUrl = String.format("https://brain.toms.chat/face/print/?token=%s&successUrl=%s&failedUrl=%s",
@@ -84,6 +80,8 @@ public class FaceAuthController {
 
     /**
      * 第二步：小程序在获取用户输入的姓名、身份证后，调用此接口上报信息
+     * 注意：这一步只是把姓名+身份证上报给百度做身份核验，不代表核身完成，
+     * 不能在这里把 verified 置 1（此前的 bug：曾在这里无条件写库，导致"无论人脸核验成不成功都已认证"）。
      */
     @PostMapping("/reportInfo")
     public CommonResult<Map<String, Object>> reportUserInfo(@RequestBody BaiduUserInfo baiduUserInfo) throws Exception {
@@ -95,7 +93,6 @@ public class FaceAuthController {
         }
         String name = baiduUserInfo.getName();
         String idCard = idCardCipherService.decryptForExternalApi(baiduUserInfo.getIdCard());
-        wechatService.updateVerify(idCard, 1);
         boolean success = baiduFaceAuthService.reportUserInfo(verifyToken, name, idCard);
         Map<String, Object> result = new HashMap<>();
         result.put("success", success);
