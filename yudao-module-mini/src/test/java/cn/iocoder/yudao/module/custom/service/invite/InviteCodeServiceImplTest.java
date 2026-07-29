@@ -56,8 +56,22 @@ public class InviteCodeServiceImplTest {
         assertEquals(10011, ex.getCode());
     }
 
-    // 注：generate() 开启分支里构造 LambdaUpdateWrapper 需要 MyBatis 运行期 TableInfo，
-    // 纯 Mockito 无法覆盖，留给集成测试；此处只覆盖"未开启即拒绝"这条安全分支。
+    // 注：generate() 里"没有可复用的有效码 -> 走失效旧码+插入新码"这条分支要构造
+    // LambdaUpdateWrapper，需要 MyBatis 运行期 TableInfo，纯 Mockito 无法覆盖，留给集成测试；
+    // 此处只覆盖"未开启即拒绝"和"已有未过期有效码直接复用"这两条不涉及 LambdaUpdateWrapper 的分支。
+
+    @Test
+    public void testGenerate_existingValidActiveCode_returnsSameCodeWithoutCreatingNew() {
+        when(adminUserService.getUser(9L)).thenReturn(user(9L, true));
+        InviteCodeDO existing = activeCode(9L); // expireTime = now + 4h，未过期
+        when(inviteCodeMapper.selectActiveByInviter(9L)).thenReturn(existing);
+
+        InviteCodeDO result = service.generate(9L);
+
+        assertSame(existing, result);
+        verify(inviteCodeMapper, never()).update(any(), any());
+        verify(inviteCodeMapper, never()).insert(any(InviteCodeDO.class));
+    }
 
     // ── validate ────────────────────────────────────────────────
     @Test

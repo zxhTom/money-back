@@ -55,7 +55,13 @@ public class InviteCodeServiceImpl implements InviteCodeService {
         if (user == null || !Boolean.TRUE.equals(user.getInviteEnabled())) {
             throw exception(INVITE_NOT_ENABLED);
         }
-        // 同时只有一个有效码：先把该用户旧的有效码全部失效
+        // 同一用户同一时间段内只应有一个邀请码：如果已有一条有效且未过期的，直接复用，
+        // 不要每次点击都生成新码（会让用户之前分享出去的码作废）。
+        InviteCodeDO existing = inviteCodeMapper.selectActiveByInviter(inviterUserId);
+        if (existing != null && existing.getExpireTime() != null && existing.getExpireTime().isAfter(LocalDateTime.now())) {
+            return existing;
+        }
+        // 同时只有一个有效码：先把该用户旧的有效码全部失效（含上面查到的已过期但状态还是"有效"的脏数据）
         inviteCodeMapper.update(null, new LambdaUpdateWrapper<InviteCodeDO>()
                 .eq(InviteCodeDO::getInviterUserId, inviterUserId)
                 .eq(InviteCodeDO::getStatus, InviteCodeDO.STATUS_ACTIVE)

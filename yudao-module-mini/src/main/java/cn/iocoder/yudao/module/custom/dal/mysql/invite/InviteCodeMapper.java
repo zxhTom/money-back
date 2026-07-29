@@ -21,4 +21,11 @@ public interface InviteCodeMapper extends BaseMapperX<InviteCodeDO> {
                 .orderByDesc(InviteCodeDO::getId));
     }
 
+    /** 该用户当前状态为"有效"的邀请码（正常情况下同时最多一条，过期与否由调用方判断） */
+    default InviteCodeDO selectActiveByInviter(Long inviterUserId) {
+        return selectOne(new LambdaQueryWrapperX<InviteCodeDO>()
+                .eq(InviteCodeDO::getInviterUserId, inviterUserId)
+                .eq(InviteCodeDO::getStatus, InviteCodeDO.STATUS_ACTIVE));
+    }
+
 }
