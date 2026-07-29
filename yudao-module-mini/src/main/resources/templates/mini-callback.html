@@ -51,6 +51,10 @@
             color: #ff4d4f;
         }
 
+        .icon.pending {
+            color: #1890ff;
+        }
+
         .title {
             font-size: 28px;
             font-weight: 700;
@@ -161,10 +165,10 @@
 <body>
 <div class="card">
     <!-- 根据状态显示不同的图标 -->
-    <div class="icon" th:classappend="${status == 'success'} ? 'success' : 'failed'"
-         th:text="${status == 'success'} ? '✅' : '❌'">✅</div>
-    <h1 class="title" th:text="${status == 'success'} ? '处理成功！' : '处理失败'">处理结果</h1>
-    <p class="message" th:text="${status == 'success'} ? '操作已完成，正在返回小程序...' : '操作未完成，请返回小程序查看详情。'">
+    <div class="icon" th:classappend="${status == 'success'} ? 'success' : (${status == 'pending'} ? 'pending' : 'failed')"
+         th:text="${status == 'success'} ? '✅' : (${status == 'pending'} ? '⏳' : '❌')">✅</div>
+    <h1 class="title" th:text="${status == 'success'} ? '处理成功！' : (${status == 'pending'} ? '结果确认中' : '处理失败')">处理结果</h1>
+    <p class="message" th:text="${status == 'success'} ? '操作已完成，正在返回小程序...' : (${status == 'pending'} ? '认证结果确认中，请稍后在个人中心查看。' : '操作未完成，请返回小程序查看详情。')">
         正在处理...
     </p>
     <div class="loading" id="loading">正在准备返回小程序...</div>
