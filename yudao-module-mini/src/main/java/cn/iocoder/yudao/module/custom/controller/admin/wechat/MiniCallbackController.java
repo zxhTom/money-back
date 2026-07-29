@@ -26,12 +26,18 @@ import java.util.Map;
  * 微信小程序 WebView 回调控制器
  * 用于接收外部回调（brain.toms.chat 人脸核身完成后重定向到此）并把结果回传小程序。
  *
- * 说明（重要，勿再改回"直接信任 status"）：
+ * 说明（重要，涉及已知的安全取舍，改动前务必确认这是产品明确要的）：
  *   brain.toms.chat 核身完成后只会重定向到 successUrl / failUrl（?status=success|failed&idCard=xxx），
  *   这个重定向里没有 verify_token，本身又是免登录公开地址，任何人都能伪造这个请求。
- *   因此这里不再信任 status，而是用 idCard 反查 FaceAuthCallbackTokenStore 里 startFaceAuth 时
- *   记录的 verify_token，拿这个 token 向百度查权威结果（server -> 百度，无法被第三方伪造），
- *   只有百度确认"通过"才写库。status 只用来渲染结果页文案，不驱动任何写库判断。
+ *   本来（2026-07-29 之前）这里已经改成完全不信任 status，只认 idCard 反查
+ *   FaceAuthCallbackTokenStore 里的 verify_token、拿它向百度查权威结果（server -> 百度，
+ *   无法被第三方伪造）、只有百度确认"通过"才写库。
+ *   2026-07-29 应产品明确要求恢复了"status 快速路径"：status=success 时立即
+ *   updateVerify(idCard,1)，不等百度查询——这意味着这个免登录回调地址理论上可以被
+ *   伪造 status=success 抢先把任意 idCard 标记为已认证，这是明确知情并接受的代价，
+ *   不是遗漏。服务端查百度那套（resolveVerificationOutcome）仍然保留，用于渲染
+ *   真实结果页状态（pending/success/failed），对 PASSED 结果也会重复写一次
+ *   verified=1（幂等），但不会撤销快速路径已经写入的结果。
  *
  * @author zxhtom
  */
@@ -66,13 +72,24 @@ public class MiniCallbackController {
             @RequestParam(value = "verifyToken", required = false) String verifyToken,
             HttpServletResponse response) throws IOException {
         String idNoDisplay = idCardCipherService.idNoDisplayFromStored(idCard);
+
+        // 快速路径（明确要求恢复，接受其安全代价）：直接信任回调自带的 status，
+        // status=success 时立即置 verified=1，不等下面的服务端查百度权威结果。
+        // 代价：这个回调地址本身免登录、任何人可伪造 status=success，所以这行本身
+        // 不能证明用户真的通过了核身——它只是为了比等百度查询快。真正的权威判定
+        // 仍然是下面 resolveVerificationOutcome 里的服务端查百度，失败/不确定都不会
+        // 被这里的快速路径覆盖或抢先（resolveVerificationOutcome 对 PASSED 结果会
+        // 再次 updateVerify(idCard,1)，是幂等重复写，不是回退）。
+        if ("success".equals(status)) {
+            wechatService.updateVerify(idCard, 1);
+        }
+
         String renderStatus = resolveVerificationOutcome(idCard, idNoDisplay);
 
         // 设置响应内容类型为HTML
         response.setContentType("text/html; charset=utf-8");
 
         String idNoCipher = idCardCipherService.storedToCipherForResponse(idCard);
-
         // 创建 Thymeleaf 上下文，设置变量
         Context context = new Context();
         context.setVariable("status", renderStatus);
