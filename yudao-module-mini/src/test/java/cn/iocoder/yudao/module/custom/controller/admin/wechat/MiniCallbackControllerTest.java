@@ -98,6 +98,7 @@ public class MiniCallbackControllerTest {
 
         controller.handleCallback("success", "idCardPlain", null, response);
 
+        verify(baiduFaceAuthService, times(1)).queryFaceAuthResult("verifyTokenAbc");
         verify(wechatService, never()).updateVerify(anyString(), anyInt());
     }
 
