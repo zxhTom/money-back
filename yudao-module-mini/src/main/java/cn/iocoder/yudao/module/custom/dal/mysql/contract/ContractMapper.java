@@ -54,6 +54,27 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
         return selectPage(reqVO, wrapper);
     }
 
+    /** 某身份证号作为欠款人或被欠款人（债权人）的合同总数，不限状态 */
+    default Integer countByPartyIdCard(String idCard) {
+        Long count = selectCount(new LambdaQueryWrapperX<ContractDO>()
+                .and(w -> w.eq(ContractDO::getIndebtedId, idCard).or().eq(ContractDO::getCreditorId, idCard)));
+        return count == null ? 0 : count.intValue();
+    }
+
+    /** 把该身份证号作为欠款人的合同，欠款人姓名改成 newName */
+    default void updateIndebtedNameByIdCard(String idCard, String newName) {
+        update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractDO>()
+                .eq(ContractDO::getIndebtedId, idCard)
+                .set(ContractDO::getIndebtedName, newName));
+    }
+
+    /** 把该身份证号作为被欠款人(债权人)的合同，被欠款人姓名改成 newName */
+    default void updateCreditorNameByIdCard(String idCard, String newName) {
+        update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractDO>()
+                .eq(ContractDO::getCreditorId, idCard)
+                .set(ContractDO::getCreditorName, newName));
+    }
+
     /**
      * 查询当前登录用户创建的合同分页
      *
