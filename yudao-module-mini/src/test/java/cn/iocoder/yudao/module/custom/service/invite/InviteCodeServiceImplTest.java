@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 
@@ -114,6 +115,33 @@ public class InviteCodeServiceImplTest {
         when(inviteCodeMapper.selectByCode("ABCD2345")).thenReturn(c);
         when(adminUserService.getUser(9L)).thenReturn(user(9L, true));
         assertSame(c, service.validate("ABCD2345"));
+    }
+
+    // ── 注册页展示/必填开关 ─────────────────────────────────────
+    @Test
+    public void testIsRegisterInviteRequired_enabledAndRequired_true() {
+        ReflectionTestUtils.setField(service, "registerInviteEnabled", true);
+        ReflectionTestUtils.setField(service, "registerInviteRequired", true);
+        assertTrue(service.isRegisterInviteRequired());
+        assertTrue(service.isRegisterInviteEnabled());
+    }
+
+    @Test
+    public void testIsRegisterInviteRequired_disabledButRequiredTrue_stillFalse() {
+        // 管理员配置死锁场景：功能整体关闭时，即使 required 误配成 true 也不应生效，
+        // 否则前端隐藏了输入框，用户永远无法满足"必填"，注册会被卡死。
+        ReflectionTestUtils.setField(service, "registerInviteEnabled", false);
+        ReflectionTestUtils.setField(service, "registerInviteRequired", true);
+        assertFalse(service.isRegisterInviteRequired());
+        assertFalse(service.isRegisterInviteEnabled());
+    }
+
+    @Test
+    public void testIsRegisterInviteEnabled_enabledButNotRequired_optionalDisplay() {
+        ReflectionTestUtils.setField(service, "registerInviteEnabled", true);
+        ReflectionTestUtils.setField(service, "registerInviteRequired", false);
+        assertTrue(service.isRegisterInviteEnabled());
+        assertFalse(service.isRegisterInviteRequired());
     }
 
 }

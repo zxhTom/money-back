@@ -15,6 +15,14 @@ public interface InviteCodeService {
     boolean isRegisterInviteRequired();
 
     /**
+     * 全局开关：注册页是否展示邀请码功能。
+     * 读配置 system.user.invite-register-enabled（缺省 true，保持现有行为不变；
+     * 设为 false 时前端应完全隐藏邀请码输入框，且后端不再要求邀请码，
+     * 避免"隐藏了但又要求必填"这种管理员配置死锁）。
+     */
+    boolean isRegisterInviteEnabled();
+
+    /**
      * 为当前用户生成邀请码（同时只有一个有效码：旧码全部置为失效）。
      * 未开启邀请功能会抛 INVITE_NOT_ENABLED。
      */

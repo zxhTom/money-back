@@ -36,6 +36,10 @@ public class InviteCodeServiceImpl implements InviteCodeService {
     @Value("${system.user.invite-register-required:false}")
     private boolean registerInviteRequired;
 
+    /** 全局开关：注册页是否展示邀请码功能，读配置文件 system.user.invite-register-enabled，缺省 true（展示，保持现有行为） */
+    @Value("${system.user.invite-register-enabled:true}")
+    private boolean registerInviteEnabled;
+
     @Resource
     private InviteCodeMapper inviteCodeMapper;
     @Resource
@@ -45,7 +49,13 @@ public class InviteCodeServiceImpl implements InviteCodeService {
 
     @Override
     public boolean isRegisterInviteRequired() {
-        return registerInviteRequired;
+        // 功能整体关闭时，即使 required 配成 true 也不生效，避免"隐藏了输入框又要求必填"的死锁
+        return registerInviteEnabled && registerInviteRequired;
+    }
+
+    @Override
+    public boolean isRegisterInviteEnabled() {
+        return registerInviteEnabled;
     }
 
     @Override

@@ -70,6 +70,8 @@ public class CustomDefineController {
     @Resource
     private EmailCodeService emailCodeService;
     @Resource
+    private cn.iocoder.yudao.module.custom.service.invite.InviteCodeService inviteCodeService;
+    @Resource
     private AdminUserService userService;
     @Resource
     private AdminUserMapper userMapper;
@@ -209,7 +211,11 @@ public class CustomDefineController {
     @Operation(summary = "获取注册严格等级策略（进注册页调用，小程序据此动态控制）")
     @PermitAll
     public CommonResult<java.util.Map<String, Object>> registerPolicy() {
-        return success(new java.util.HashMap<>());
+        java.util.Map<String, Object> policy = new java.util.HashMap<>();
+        // 邀请码功能是否展示/是否必填：小程序据此决定注册页是否显示邀请码输入框
+        policy.put("inviteEnabled", inviteCodeService.isRegisterInviteEnabled());
+        policy.put("inviteRequired", inviteCodeService.isRegisterInviteRequired());
+        return success(policy);
     }
     @PutMapping("/update")
     @Operation(summary = "有效更新")
