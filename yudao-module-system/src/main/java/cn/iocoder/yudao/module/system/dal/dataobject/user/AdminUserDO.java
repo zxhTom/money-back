@@ -169,4 +169,9 @@ public class AdminUserDO extends TenantBaseDO {
      */
     private Boolean inviteEnabled;
 
+    /**
+     * 该用户最后一次确认已读的版本升级说明版本号
+     */
+    private String lastSeenChangelogVersion;
+
 }
