@@ -19,7 +19,13 @@ public interface MiniProgramConfigService {
      */
     void update(MiniProgramConfigSaveReqVO reqVO);
 
-    /** 查：如果现在绑定的用户名下有多少条合同会受"改名"影响（与新名称具体是什么无关，只看数量） */
-    int previewNameChangeImpact();
+    /**
+     * 查：如果保存后绑定的是 boundUserId 这个用户，名下有多少条合同会受"改名"影响
+     * （与新名称具体是什么无关，只看数量）。
+     * boundUserId 必须传"即将保存的绑定用户"，不能默认取当前已保存的绑定用户——
+     * 否则改名同时换绑时，预览的是旧用户的合同数，跟实际会联动到的新用户对不上。
+     * 传 null 表示"保存后将解绑"，此时直接返回 0。
+     */
+    int previewNameChangeImpact(Long boundUserId);
 
 }

@@ -112,20 +112,30 @@ public class MiniProgramConfigServiceImplTest {
     }
 
     @Test
-    public void testPreviewNameChangeImpact_noBoundUser_returnsZero() {
-        when(miniProgramConfigMapper.selectTheOne()).thenReturn(existing("旧名称", null));
-
-        assertEquals(0, service.previewNameChangeImpact());
+    public void testPreviewNameChangeImpact_nullBoundUserId_returnsZero() {
+        assertEquals(0, service.previewNameChangeImpact(null));
         verify(contractMapper, never()).countByPartyIdCard(anyString());
     }
 
     @Test
     public void testPreviewNameChangeImpact_withBoundUser_returnsContractCount() {
-        when(miniProgramConfigMapper.selectTheOne()).thenReturn(existing("旧名称", 9L));
         when(adminUserMapper.selectById(9L)).thenReturn(user(9L, "110101199001011234"));
         when(contractMapper.countByPartyIdCard("110101199001011234")).thenReturn(7);
 
-        assertEquals(7, service.previewNameChangeImpact());
+        assertEquals(7, service.previewNameChangeImpact(9L));
+    }
+
+    @Test
+    public void testPreviewNameChangeImpact_usesPassedInUserNotCurrentlySavedUser() {
+        // 最终整体review发现的问题：预览必须按"即将保存"的绑定用户算，不能默认取
+        // 当前已保存的绑定用户——否则改名同时换绑时，预览的是旧用户的合同数，
+        // 跟 update() 实际会联动到的新用户对不上。这里当前已保存的是用户9，
+        // 但传入的是即将换绑的用户10，必须返回用户10的合同数，完全不查用户9。
+        when(adminUserMapper.selectById(10L)).thenReturn(user(10L, "220202199002022345"));
+        when(contractMapper.countByPartyIdCard("220202199002022345")).thenReturn(20);
+
+        assertEquals(20, service.previewNameChangeImpact(10L));
+        verify(adminUserMapper, never()).selectById(9L);
     }
 
     @Test

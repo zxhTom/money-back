@@ -48,10 +48,11 @@ public class MiniProgramConfigController {
     }
 
     @GetMapping("/preview-name-change-impact")
-    @Operation(summary = "预览：当前绑定用户名下有多少条合同会被改名联动影响")
+    @Operation(summary = "预览：如果保存后绑定 boundUserId 这个用户，名下有多少条合同会被改名联动影响")
     @PreAuthorize("@ss.hasPermission('custom:miniprogram-config:query')")
-    public CommonResult<Integer> previewNameChangeImpact() {
-        return success(miniProgramConfigService.previewNameChangeImpact());
+    public CommonResult<Integer> previewNameChangeImpact(
+            @RequestParam(value = "boundUserId", required = false) Long boundUserId) {
+        return success(miniProgramConfigService.previewNameChangeImpact(boundUserId));
     }
 
 }

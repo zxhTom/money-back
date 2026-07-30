@@ -75,12 +75,13 @@ public class MiniProgramConfigServiceImpl implements MiniProgramConfigService {
     }
 
     @Override
-    public int previewNameChangeImpact() {
-        MiniProgramConfigDO existing = miniProgramConfigMapper.selectTheOne();
-        if (existing == null || existing.getBoundUserId() == null) {
+    public int previewNameChangeImpact(Long boundUserId) {
+        // 必须用调用方传入的、即将保存的 boundUserId，不能默认取当前已保存的绑定用户——
+        // 否则改名同时换绑时，预览的是旧用户的合同数，跟 update() 实际会联动到的新用户对不上。
+        if (boundUserId == null) {
             return 0;
         }
-        AdminUserDO user = adminUserMapper.selectById(existing.getBoundUserId());
+        AdminUserDO user = adminUserMapper.selectById(boundUserId);
         if (user == null || StrUtil.isBlank(user.getIdNo())) {
             return 0;
         }
