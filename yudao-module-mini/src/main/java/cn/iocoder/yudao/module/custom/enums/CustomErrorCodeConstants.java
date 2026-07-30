@@ -93,4 +93,7 @@ public interface CustomErrorCodeConstants {
     /** IP 命中黑名单被拒绝访问，迁移自 SecurityDetectFilter 原来的裸 403 */
     ErrorCode IP_BLACKLISTED = new ErrorCode(10030, "访问被拒绝");
 
+    /** 版本升级说明的版本号已存在（uk_version 唯一索引兜底，这里提前给出友好提示） */
+    ErrorCode VERSION_CHANGELOG_VERSION_DUPLICATE = new ErrorCode(10031, "该版本号已存在，请勿重复创建");
+
 }

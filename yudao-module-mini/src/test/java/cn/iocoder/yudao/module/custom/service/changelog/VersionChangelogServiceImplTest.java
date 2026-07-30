@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.service.changelog;
 
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.custom.controller.admin.changelog.vo.VersionChangelogCheckRespVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.changelog.VersionChangelogDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.changelog.VersionChangelogMapper;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -115,5 +117,26 @@ public class VersionChangelogServiceImplTest {
         verify(adminUserMapper).updateById(captor.capture());
         assertEquals(9L, captor.getValue().getId());
         assertEquals("1.5.0", captor.getValue().getLastSeenChangelogVersion());
+    }
+
+    @Test
+    public void testCreate_duplicateVersion_throwsFriendlyError() {
+        when(versionChangelogMapper.selectByVersion("1.5.0")).thenReturn(changelog("1.5.0", true));
+
+        VersionChangelogDO newOne = changelog("1.5.0", true);
+        ServiceException ex = assertThrows(ServiceException.class, () -> service.create(newOne));
+
+        assertEquals(10031, ex.getCode());
+        verify(versionChangelogMapper, never()).insert(any(VersionChangelogDO.class));
+    }
+
+    @Test
+    public void testCreate_newVersion_insertsSuccessfully() {
+        when(versionChangelogMapper.selectByVersion("1.6.0")).thenReturn(null);
+
+        VersionChangelogDO newOne = changelog("1.6.0", true);
+        service.create(newOne);
+
+        verify(versionChangelogMapper).insert(newOne);
     }
 }

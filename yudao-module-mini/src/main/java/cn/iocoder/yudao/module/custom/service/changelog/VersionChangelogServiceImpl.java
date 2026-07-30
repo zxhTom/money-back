@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.time.LocalDateTime;
 import java.util.List;
+
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.VERSION_CHANGELOG_VERSION_DUPLICATE;
 
 @Service
 @Slf4j
@@ -58,6 +60,10 @@ public class VersionChangelogServiceImpl implements VersionChangelogService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(VersionChangelogDO changelog) {
+        // uk_version 唯一索引本身能兜底，但直接抛 DuplicateKeyException 到管理员面前不友好，提前查一次给出明确提示
+        if (versionChangelogMapper.selectByVersion(changelog.getVersion()) != null) {
+            throw exception(VERSION_CHANGELOG_VERSION_DUPLICATE);
+        }
         changelog.setId(null);
         versionChangelogMapper.insert(changelog);
         return changelog.getId();
