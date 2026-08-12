@@ -29,3 +29,7 @@ CREATE TABLE IF NOT EXISTS contract_recycle (
     archive_time DateTime
 ) ENGINE = ReplacingMergeTree(archive_time)
 ORDER BY id;
+
+-- 多租户隔离改造：custom_contract 新增 tenant_id 后，归档行也带上该列，
+-- 否则 SELECT * 出来的行会比表结构多一列，插入直接失败。
+ALTER TABLE contract_recycle ADD COLUMN IF NOT EXISTS tenant_id UInt64 DEFAULT 1;

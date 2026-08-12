@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.custom.controller.admin.recycle;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.custom.framework.clickhouse.core.ClickHouseArchiveService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,10 +39,12 @@ public class ContractRecycleController {
             res.put("message", "ClickHouse 未配置");
             return success(res);
         }
-        String where = "";
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        String where = " WHERE tenant_id = ?";
         List<Object> args = new ArrayList<>();
+        args.add(tenantId);
         if (keyword != null && !keyword.trim().isEmpty()) {
-            where = " WHERE indebted_name LIKE ? OR creditor_name LIKE ? OR indebted_id LIKE ? OR creditor_id LIKE ?";
+            where += " AND (indebted_name LIKE ? OR creditor_name LIKE ? OR indebted_id LIKE ? OR creditor_id LIKE ?)";
             String k = "%" + keyword.trim() + "%";
             args.addAll(Arrays.asList(k, k, k, k));
         }
@@ -66,15 +69,17 @@ public class ContractRecycleController {
         if (!ch.isEnabled() || ids.isEmpty()) {
             return success(0);
         }
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         int restored = 0;
         for (Long id : ids) {
-            List<Map<String, Object>> rows = ch.query("SELECT * FROM contract_recycle FINAL WHERE id=?", id);
+            List<Map<String, Object>> rows = ch.query(
+                    "SELECT * FROM contract_recycle FINAL WHERE id=? AND tenant_id=?", id, tenantId);
             if (rows.isEmpty()) {
                 continue;
             }
             Integer exists = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM custom_contract WHERE id=?", Integer.class, id);
+                    "SELECT COUNT(*) FROM custom_contract WHERE tenant_id = ? AND id=?", Integer.class, tenantId, id);
             if (exists != null && exists > 0) {
                 continue; // 原 id 已存在，跳过
             }
@@ -105,8 +110,11 @@ public class ContractRecycleController {
     @PreAuthorize("@ss.hasPermission('custom:contract:recycle')")
     public CommonResult<Boolean> delete(@RequestParam("ids") List<Long> ids) {
         if (ch.isEnabled() && !ids.isEmpty()) {
+            Long tenantId = TenantContextHolder.getRequiredTenantId();
             String ph = String.join(",", Collections.nCopies(ids.size(), "?"));
-            ch.execute("DELETE FROM contract_recycle WHERE id IN (" + ph + ")", ids.toArray());
+            List<Object> args = new ArrayList<>(ids);
+            args.add(tenantId);
+            ch.execute("DELETE FROM contract_recycle WHERE id IN (" + ph + ") AND tenant_id = ?", args.toArray());
         }
         return success(true);
     }

@@ -1,8 +1,10 @@
 package cn.iocoder.yudao.module.custom.service.contract;
 
+import cn.iocoder.yudao.framework.tenant.core.service.TenantFrameworkService;
 import cn.iocoder.yudao.module.custom.framework.clickhouse.core.ClickHouseArchiveService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,6 +15,7 @@ import java.util.*;
 
 @Component
 @Slf4j
+@ConditionalOnProperty(prefix = "yudao.tenant", name = "enable", havingValue = "true")
 public class ContractRecycleJob {
 
     private static final int BATCH = 500;
@@ -21,6 +24,8 @@ public class ContractRecycleJob {
     private ClickHouseArchiveService ch;
     @Resource
     private DataSource dataSource;
+    @Resource
+    private TenantFrameworkService tenantFrameworkService;
 
     @Value("${yudao.contract-recycle.enabled:true}")
     private boolean enabled;
@@ -40,13 +45,22 @@ public class ContractRecycleJob {
         }
     }
 
+    /** 定时任务没有请求上下文，需要逐个租户跑一遍，不能只处理默认租户 */
     public int recycleOnce() {
+        int total = 0;
+        for (Long tenantId : tenantFrameworkService.getTenantIds()) {
+            total += recycleOnceForTenant(tenantId);
+        }
+        return total;
+    }
+
+    private int recycleOnceForTenant(Long tenantId) {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
         int total = 0;
         while (true) {
             List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT * FROM custom_contract WHERE deleted=1 AND update_time < NOW() - INTERVAL " + months
-                            + " MONTH ORDER BY id LIMIT " + BATCH);
+                    "SELECT * FROM custom_contract WHERE tenant_id = ? AND deleted=1 AND update_time < NOW() - INTERVAL " + months
+                            + " MONTH ORDER BY id LIMIT " + BATCH, tenantId);
             if (rows.isEmpty()) {
                 break;
             }
@@ -73,7 +87,7 @@ public class ContractRecycleJob {
             }
         }
         if (total > 0) {
-            log.warn("[ContractRecycle] 物理删除并归档合同 {} 条", total);
+            log.warn("[ContractRecycle] 租户 {} 物理删除并归档合同 {} 条", tenantId, total);
         }
         return total;
     }

@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.time.LocalDateTime;
 import java.time.LocalDateTime;
 import com.baomidou.mybatisplus.annotation.*;
-import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 
 /**
  * 合同 DO
@@ -22,7 +22,7 @@ import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ContractDO extends BaseDO {
+public class ContractDO extends TenantBaseDO {
 
     /**
      * 主键ID

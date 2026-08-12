@@ -171,6 +171,8 @@ wx:
 --- #################### 芋道相关配置 ####################
 
 yudao:
+  tenant:
+    enable: true
   file-cleanup:
     enabled: true
     retention-days: 7
