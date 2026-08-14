@@ -146,6 +146,12 @@ public class AdminUserDO extends TenantBaseDO {
     private String payPassword;
 
     /**
+     * 是否已单独修改过支付密码。
+     * false 表示支付密码仍等于注册时的登录密码，需要强制修改后才能使用业务功能。
+     */
+    private Boolean payPasswordChanged;
+
+    /**
      * 密码强度：0=未知（历史存量），1=弱，2=中，3=强
      * 密码变更时同步计算写入
      */

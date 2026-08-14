@@ -357,6 +357,8 @@ public class AdminUserServiceImpl implements AdminUserService {
         String encoded = encodePassword(password);
         updateObj.setPassword(encoded);
         updateObj.setPayPassword(encoded);
+        // 支付密码又被重置成登录密码了，重新标记为"未单独修改"，让强制修改拦截再次生效
+        updateObj.setPayPasswordChanged(false);
         updateObj.setPasswordStrength(PasswordStrengthUtil.calc(password));
         userMapper.updateById(updateObj);
         recordPasswordHistory(id, null, encoded, "RESET_WITH_PAY");

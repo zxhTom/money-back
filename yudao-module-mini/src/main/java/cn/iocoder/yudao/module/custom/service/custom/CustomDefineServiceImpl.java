@@ -524,6 +524,8 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         // TODO: 按注册严格等级校验登录密码 + 解析支付密码（后端权威校验，不完全信任前端）
         // RegisterPolicyService not available, using defaults
         user.setPayPassword(user.getPassword());
+        // 支付密码沿用登录密码，标记为"未单独修改"，由 PayPasswordInterceptor 强制用户改掉后才能用业务功能
+        user.setPayPasswordChanged(false);
 //            user.setUserCode(openId.hashCode());
         DeptDO deptDO = deptService.getDeptByName("合同管理部");
         if (deptDO != null) {
@@ -678,8 +680,12 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         String oldPayPassword = passwordVO.getOldPayPassword();
         String newPayPassword = passwordVO.getNewPayPassword();
 
+        // 从没单独设过支付密码（仍等于注册时的登录密码）时不校验旧密码：
+        // 这种用户的"原支付密码"是登录密码，通常不是6位纯数字，小程序那个只收6位数字的
+        // 输入框根本打不进去，强制要求会把用户永久卡死在强制修改流程里。
+        boolean neverSetByUser = !Boolean.TRUE.equals(user.getPayPasswordChanged());
         // 如果已经设置过支付密码，则需要校验旧支付密码
-        if (org.apache.commons.lang3.StringUtils.isNotBlank(oldEncodedPayPassword)) {
+        if (!neverSetByUser && org.apache.commons.lang3.StringUtils.isNotBlank(oldEncodedPayPassword)) {
             // 旧密码必填
             Assert.isTrue(org.apache.commons.lang3.StringUtils.isNotBlank(oldPayPassword),
                     "原支付密码不能为空");
@@ -696,6 +702,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(loginUserId);
         updateObj.setPayPassword(passwordEncoder.encode(newPayPassword));
+        updateObj.setPayPasswordChanged(true); // 解除强制修改拦截
         adminUserMapper.updateById(updateObj);
         return true;
     }

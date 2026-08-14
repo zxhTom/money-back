@@ -1,6 +1,13 @@
 server:
   port: 48080
   domain: https://brain.toms.chat/admin-api
+  tomcat:
+    threads:
+      # 访问速度控制开启时，延迟期间线程被占住（见 SpeedControlFilter 里为何不能用异步）。
+      # 默认 200 线程配 6 分钟延迟，全站吞吐上限只有 200/360s ≈ 0.55 req/s；调到 2000 约 5.5 req/s。
+      # 这是"让所有人等几分钟"本身的物理后果，调大只能缓解、消不掉。
+      max: 2000
+    connection-timeout: 620000
 
 --- #################### 数据库相关配置 ####################
 spring:
@@ -171,6 +178,10 @@ wx:
 --- #################### 芋道相关配置 ####################
 
 yudao:
+  # 强制修改支付密码：后端先发版时保持 false，旧版小程序不认 code 10032，
+  # 开了会让老用户拿到一个看不懂的提示。等小程序新版发布并验证后再改 true。
+  pay-password:
+    force-change-enabled: false
   tenant:
     enable: true
   file-cleanup:

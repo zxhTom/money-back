@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.framework.security.config;
 
+import cn.iocoder.yudao.module.custom.framework.security.interceptor.PayPasswordInterceptor;
 import cn.iocoder.yudao.module.custom.framework.security.interceptor.RealNameAuthInterceptor;
 import cn.iocoder.yudao.module.custom.framework.security.interceptor.SimulatedRequestInterceptor;
 import cn.iocoder.yudao.module.custom.framework.security.interceptor.UrlMonitorInterceptor;
@@ -13,7 +14,8 @@ import javax.annotation.Resource;
  * 注册 custom 模块的 MVC 拦截器（运行在 Spring Security 之后，能拿到登录用户）。
  * - SimulatedRequestInterceptor：伪造来源IP / 非法UA 检测；
  * - UrlMonitorInterceptor：按配置的 URL + 频率监控，超阈值立即封IP；
- * - RealNameAuthInterceptor：未实名认证的终端用户禁止访问业务接口（戏耍模式优先放行）。
+ * - RealNameAuthInterceptor：未实名认证的终端用户禁止访问业务接口（戏耍模式优先放行）；
+ * - PayPasswordInterceptor：支付密码仍等于登录密码（注册后没单独改过）的终端用户禁止访问业务接口。
  */
 @Configuration(proxyBeanMethods = false)
 public class CustomWebMvcConfig implements WebMvcConfigurer {
@@ -24,13 +26,15 @@ public class CustomWebMvcConfig implements WebMvcConfigurer {
     private UrlMonitorInterceptor urlMonitorInterceptor;
     @Resource
     private RealNameAuthInterceptor realNameAuthInterceptor;
+    @Resource
+    private PayPasswordInterceptor payPasswordInterceptor;
 
     /**
      * 服务端到服务端的回调/webhook：调用方是微信/支付网关服务器，UA 常为空或非浏览器型，
      * 绝不能用"浏览器 UA 启发式"去判它们（否则会把微信/支付服务器 IP 误封，打断支付/消息回调）。
      * 用 /**（前缀无关）匹配，兼容 admin-api 前缀。
      */
-    private static final String[] WEBHOOK_EXCLUDES = {
+    public static final String[] WEBHOOK_EXCLUDES = {
             "/**/pay/notify/**",                    // 微信/支付宝 支付结果通知
             "/**/offcial/*/callback",               // 微信公众号 消息/事件推送
             "/**/api/mini/callback",                // 人脸核身结果回跳落地页
@@ -45,6 +49,8 @@ public class CustomWebMvcConfig implements WebMvcConfigurer {
         registry.addInterceptor(urlMonitorInterceptor)
                 .addPathPatterns("/**").excludePathPatterns(WEBHOOK_EXCLUDES);
         registry.addInterceptor(realNameAuthInterceptor).addPathPatterns("/**");
+        // 排在实名之后：先要求实名，再要求改支付密码，两个强制流程顺序固定，不会互相盖掉提示
+        registry.addInterceptor(payPasswordInterceptor).addPathPatterns("/**");
     }
 
 }

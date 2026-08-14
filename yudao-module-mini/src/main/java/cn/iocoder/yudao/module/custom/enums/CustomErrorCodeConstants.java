@@ -96,4 +96,7 @@ public interface CustomErrorCodeConstants {
     /** 版本升级说明的版本号已存在（uk_version 唯一索引兜底，这里提前给出友好提示） */
     ErrorCode VERSION_CHANGELOG_VERSION_DUPLICATE = new ErrorCode(10031, "该版本号已存在，请勿重复创建");
 
+    /** 支付密码仍是注册时的登录密码，未单独修改过，禁止访问业务接口 */
+    ErrorCode USER_PAY_PASSWORD_NOT_CHANGED = new ErrorCode(10032, "请先修改支付密码后再使用");
+
 }
