@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.custom.framework.security.interceptor;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.custom.service.contract.ContractTeaseGuard;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
@@ -64,6 +65,8 @@ public class RealNameAuthInterceptor implements HandlerInterceptor {
     private UserRoleMapper userRoleMapper;
     @Resource
     private RoleService roleService;
+    @Resource
+    private ContractTeaseGuard contractTeaseGuard;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -89,8 +92,10 @@ public class RealNameAuthInterceptor implements HandlerInterceptor {
         if (user == null) {
             return true;
         }
-        // 戏耍优先：开启戏耍的用户即便没认证也放行（返回的是 mock 数据）
-        if (Boolean.TRUE.equals(user.getTeaseEnabled())) {
+        // 戏耍优先：开启戏耍的用户即便没认证也放行（返回的是 mock 数据）。
+        // 走 ContractTeaseGuard 而不是只看 user.teaseEnabled，否则"按角色开戏耍"的用户
+        // 会在这里被实名拦截挡住，跟合同查询那边的判定不一致。
+        if (contractTeaseGuard.isTeasing(userId)) {
             return true;
         }
         // 已实名放行（最常见路径，只有一次 getUser 查询）
