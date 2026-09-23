@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.custom.dal.mysql.stats.ContractDailyStatsMapper">
+
+    <!--
+      区间条件写成 create_time >= from AND create_time < to，不要写 DATE(create_time) = x：
+      后者把列包进函数里，create_time 上的索引就用不上了，每次都全表扫。
+    -->
+    <insert id="insertSnapshotOfRange">
+        INSERT IGNORE INTO custom_contract_daily_stats
+            (tenant_id, stat_date, status, contract_count, total_amount)
+        SELECT
+            COALESCE(tenant_id, 1),
+            DATE(create_time),
+            COALESCE(status, 0),
+            COUNT(*),
+            COALESCE(SUM(salary), 0)
+        FROM custom_contract
+        WHERE create_time &gt;= #{fromInclusive}
+          AND create_time &lt; #{toExclusive}
+        GROUP BY COALESCE(tenant_id, 1), DATE(create_time), COALESCE(status, 0)
+    </insert>
+
+    <select id="selectTrendFromSnapshot"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$ContractTrendPoint">
+        SELECT
+            DATE_FORMAT(stat_date, '%Y-%m-%d') AS date,
+            COALESCE(SUM(contract_count), 0)   AS count,
+            COALESCE(SUM(total_amount), 0)     AS amount
+        FROM custom_contract_daily_stats
+        WHERE stat_date BETWEEN #{from} AND #{to}
+        <if test="tenantId != null">
+            AND tenant_id = #{tenantId}
+        </if>
+        <if test="excludeStatuses != null and excludeStatuses.size() > 0">
+            AND status NOT IN
+            <foreach collection="excludeStatuses" item="s" open="(" separator="," close=")">#{s}</foreach>
+        </if>
+        GROUP BY stat_date
+        ORDER BY stat_date
+    </select>
+
+    <select id="selectLiveTrend"
+            resultType="cn.iocoder.yudao.module.custom.dal.mysql.dashboard.DashboardMapper$ContractTrendPoint">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m-%d') AS date,
+            COUNT(*)                             AS count,
+            COALESCE(SUM(salary), 0)             AS amount
+        FROM custom_contract
+        WHERE create_time &gt;= #{fromInclusive}
+          AND create_time &lt; #{toExclusive}
+        <if test="tenantId != null">
+            AND tenant_id = #{tenantId}
+        </if>
+        <if test="excludeStatuses != null and excludeStatuses.size() > 0">
+            AND COALESCE(status, 0) NOT IN
+            <foreach collection="excludeStatuses" item="s" open="(" separator="," close=")">#{s}</foreach>
+        </if>
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d')
+        ORDER BY date
+    </select>
+
+</mapper>
