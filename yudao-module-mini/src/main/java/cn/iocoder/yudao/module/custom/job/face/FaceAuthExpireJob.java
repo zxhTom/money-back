@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.custom.job.face;
 
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -29,15 +30,17 @@ public class FaceAuthExpireJob {
 
     @Scheduled(cron = "${yudao.face-auth.expire-job-cron:0 0 3 * * ?}")
     public void run() {
-        int months = expireMonths > 0 ? expireMonths : 2;
-        LocalDateTime threshold = LocalDateTime.now().minusMonths(months);
-        // verified=1 且 login_date < 阈值 → verified=0（login_date 为空的不动，避免误伤刚注册未登录的）
-        int count = adminUserMapper.update(null, new LambdaUpdateWrapper<AdminUserDO>()
-                .eq(AdminUserDO::getVerified, 1)
-                .isNotNull(AdminUserDO::getLoginDate)
-                .lt(AdminUserDO::getLoginDate, threshold)
-                .set(AdminUserDO::getVerified, 0));
-        log.info("[FaceAuthExpireJob][超过 {} 个月未登录，已将 {} 个已认证用户改回未认证]", months, count);
+        TenantUtils.executeIgnore(() -> {
+            int months = expireMonths > 0 ? expireMonths : 2;
+            LocalDateTime threshold = LocalDateTime.now().minusMonths(months);
+            // verified=1 且 login_date < 阈值 → verified=0（login_date 为空的不动，避免误伤刚注册未登录的）
+            int count = adminUserMapper.update(null, new LambdaUpdateWrapper<AdminUserDO>()
+                    .eq(AdminUserDO::getVerified, 1)
+                    .isNotNull(AdminUserDO::getLoginDate)
+                    .lt(AdminUserDO::getLoginDate, threshold)
+                    .set(AdminUserDO::getVerified, 0));
+            log.info("[FaceAuthExpireJob][超过 {} 个月未登录，已将 {} 个已认证用户改回未认证]", months, count);
+        });
     }
 
 }

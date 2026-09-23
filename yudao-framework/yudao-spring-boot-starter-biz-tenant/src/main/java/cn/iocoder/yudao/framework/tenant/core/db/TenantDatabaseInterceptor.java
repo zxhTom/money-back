@@ -66,18 +66,16 @@ public class TenantDatabaseInterceptor implements TenantLineHandler {
     }
 
     private boolean computeIgnoreTable(String tableName) {
-        // 找不到的表，说明不是 yudao 项目里的，不进行拦截（忽略租户）
         TableInfo tableInfo = TableInfoHelper.getTableInfo(tableName);
         if (tableInfo == null) {
             return true;
         }
-        // 如果继承了 TenantBaseDO 基类，显然不忽略租户
-        if (TenantBaseDO.class.isAssignableFrom(tableInfo.getEntityType())) {
-            return false;
-        }
         // 如果添加了 @TenantIgnore 注解，则忽略租户
-        TenantIgnore tenantIgnore = tableInfo.getEntityType().getAnnotation(TenantIgnore.class);
-        return tenantIgnore != null;
+        if (tableInfo.getEntityType().getAnnotation(TenantIgnore.class) != null) {
+            return true;
+        }
+        // 本项目只有继承 TenantBaseDO 的表带 tenant_id 列，其余表一律不做租户过滤
+        return !TenantBaseDO.class.isAssignableFrom(tableInfo.getEntityType());
     }
 
 }

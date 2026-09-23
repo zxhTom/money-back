@@ -35,7 +35,12 @@ public class SqlMigrationRunnerSplitTest {
         String[] files = {
                 "db/migration/54_contract_tenant_id.sql",
                 "db/migration/55_speed_control.sql",
-                "db/migration/56_pay_password_changed.sql"};
+                "db/migration/56_pay_password_changed.sql",
+                "db/migration/57_tenant_backfill.sql",
+                "db/migration/58_contract_daily_stats.sql",
+                "db/migration/59_tenant_enable_backfill.sql",
+                "db/migration/60_tenant_token_rebackfill.sql",
+                "db/migration/61_tenant_token_backfill2.sql"};
         for (String file : files) {
             for (String sql : SqlMigrationRunner.splitStatements(read(file))) {
                 String upper = sql.toUpperCase();

@@ -41,16 +41,17 @@ public class AutoResetPwdUserController {
         List<AutoResetPwdUserVO> result = new ArrayList<>();
         for (AutoResetPwdUserDO item : doList) {
             AdminUserDO user = adminUserService.getUser(item.getUserId());
+            if (user == null) {
+                continue;
+            }
             AutoResetPwdUserVO vo = new AutoResetPwdUserVO();
             vo.setId(item.getId());
             vo.setUserId(item.getUserId());
             vo.setCreateTime(item.getCreateTime());
-            if (user != null) {
-                vo.setUsername(user.getUsername());
-                vo.setNickname(user.getNickname());
-                vo.setEmail(user.getEmail());
-                vo.setMobile(user.getMobile());
-            }
+            vo.setUsername(user.getUsername());
+            vo.setNickname(user.getNickname());
+            vo.setEmail(user.getEmail());
+            vo.setMobile(user.getMobile());
             result.add(vo);
         }
         return success(result);
@@ -77,6 +78,10 @@ public class AutoResetPwdUserController {
     @Operation(summary = "从自动重置密码集合移除用户")
     @PreAuthorize("@ss.hasPermission('system:user:update')")
     public CommonResult<Boolean> removeUser(@RequestParam("userId") @NotNull Long userId) {
+        AdminUserDO user = adminUserService.getUser(userId);
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
         autoResetPwdUserMapper.deleteByUserId(userId);
         return success(true);
     }
