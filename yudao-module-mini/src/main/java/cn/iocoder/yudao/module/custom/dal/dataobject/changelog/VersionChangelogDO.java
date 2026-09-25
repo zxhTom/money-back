@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.custom.dal.dataobject.changelog;
 
-import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -13,7 +13,7 @@ import lombok.EqualsAndHashCode;
 @TableName("custom_version_changelog")
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class VersionChangelogDO extends BaseDO {
+public class VersionChangelogDO extends TenantBaseDO {
 
     private Long id;
     private String version;

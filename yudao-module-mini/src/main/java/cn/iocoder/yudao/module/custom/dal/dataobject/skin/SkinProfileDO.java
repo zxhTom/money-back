@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.custom.dal.dataobject.skin;
 
-import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -16,7 +16,7 @@ import java.util.Map;
 @TableName(value = "custom_skin_profile", autoResultMap = true)
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class SkinProfileDO extends BaseDO {
+public class SkinProfileDO extends TenantBaseDO {
 
     /** 皮肤类型：预设，不可删除、核心字段不可改 */
     public static final int TYPE_PRESET = 0;

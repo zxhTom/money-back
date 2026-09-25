@@ -3,10 +3,8 @@ package cn.iocoder.yudao.module.fee.dal.dataobject.strategy;
 import lombok.*;
 import java.util.*;
 import java.math.BigDecimal;
-import java.math.BigDecimal;
-import java.math.BigDecimal;
 import com.baomidou.mybatisplus.annotation.*;
-import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 
 /**
  * 费用策略 DO
@@ -21,7 +19,7 @@ import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class StrategyDO extends BaseDO {
+public class StrategyDO extends TenantBaseDO {
 
     /**
      * 主键

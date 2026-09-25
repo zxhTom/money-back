@@ -123,4 +123,41 @@ public class TenantBackfillMigrationTest {
         assertFalse(upperContent.contains("UPDATE"), "全文不应包含 UPDATE");
     }
 
+    @Test
+    public void test63TenantConfigTablesMigration() throws Exception {
+        String content = read("db/migration/63_tenant_config_tables.sql");
+        List<String> statements = SqlMigrationRunner.splitStatements(content);
+
+        // 1. 拆分后共 23 条语句
+        assertEquals(23, statements.size(), "63 号迁移应切分为 23 条语句");
+
+        // 2. 10 条 ADD COLUMN `tenant_id`
+        long addColCount = statements.stream().filter(stmt ->
+                stmt.replaceAll("\\s+", " ").contains("ADD COLUMN `tenant_id`")).count();
+        assertEquals(10, addColCount, "应有 10 条 ADD COLUMN `tenant_id` 语句");
+
+        // 3. 1 条 UPDATE `time_window`
+        long updateCount = statements.stream().filter(stmt ->
+                stmt.replaceAll("\\s+", " ").contains("UPDATE `time_window` SET `tenant_id` = 1 WHERE `tenant_id` = 0")).count();
+        assertEquals(1, updateCount, "应有 1 条 UPDATE `time_window` 语句");
+
+        // 4. 6 对 DROP/ADD UNIQUE（共 12 条）
+        long dropIndexCount = statements.stream().filter(stmt -> stmt.contains("DROP INDEX")).count();
+        long addUniqueCount = statements.stream().filter(stmt -> stmt.contains("ADD UNIQUE KEY")).count();
+        assertEquals(6, dropIndexCount, "应有 6 条 DROP INDEX 语句");
+        assertEquals(6, addUniqueCount, "应有 6 条 ADD UNIQUE KEY 语句");
+
+        // 5. 每个新建的唯一索引名里都包含 tenant
+        statements.stream().filter(stmt -> stmt.contains("ADD UNIQUE KEY")).forEach(stmt -> {
+            assertTrue(stmt.contains("tenant"), "新建的唯一索引名里必须包含 tenant: " + stmt);
+        });
+
+        // 6. 全文不含 SET @、PREPARE、DELETE
+        String upperContent = content.toUpperCase();
+        assertFalse(upperContent.contains("SET @"), "全文不应包含 SET @");
+        assertFalse(upperContent.contains("PREPARE"), "全文不应包含 PREPARE");
+        boolean hasDeleteStmt = statements.stream().anyMatch(stmt -> stmt.toUpperCase().startsWith("DELETE"));
+        assertFalse(hasDeleteStmt, "不应包含 DELETE 语句");
+    }
+
 }
