@@ -101,3 +101,84 @@ mvn -q -pl yudao-module-mini -am test -Dtest='TenantConfigDOTest' -Dsurefire.fai
 mvn -q -pl yudao-module-mini -am compile -DskipTests
 grep -c "extends TenantBaseDO" $(grep -rl "custom_skin_profile\|custom_text_profile\|custom_text_item\|custom_icon_set_profile\|custom_miniprogram_config\|custom_version_changelog\|custom_speed_control_config\|fee_strategy\|contract_model\|time_window" --include=*DO.java yudao-module-mini/src/main)   # 期望每个文件都为 1
 ```
+
+---
+
+# 交接：第 3 步 · 批次 B（新租户配置初始化）
+
+批次 A 完成后，新建租户的配置是空的。本批次提供"把默认租户的配置复制一份给目标租户"的能力。
+
+## 设计
+
+新增服务 `TenantConfigSeedService`（放 `yudao-module-mini/.../service/tenantconfig/`）+ 一个后台接口。
+
+### 复制范围与顺序
+
+用现有 Mapper（都在 `yudao-module-mini`，已确认存在）：
+`SkinProfileMapper`、`TextProfileMapper`、`TextItemMapper`、`IconSetProfileMapper`、
+`MiniProgramConfigMapper`、`VersionChangelogMapper`、`SpeedControlConfigMapper`、
+`StrategyMapper`、`ContractModelMapper`、`TimeWindowMapper`。
+
+顺序要求：**先复制 `custom_text_profile`，再复制 `custom_text_item`**，因为 item 依赖 profile 的新主键。
+
+### 实现要点
+
+1. 读源租户数据：`TenantUtils.execute(sourceTenantId, () -> mapper.selectList())`。
+2. 写目标租户：`TenantUtils.execute(targetTenantId, () -> { ... })`，插入前把 `id` 置为 null、
+   `tenantId` 置为 null（让框架按上下文注入），`createTime/updateTime/creator/updater` 交给框架填充。
+3. `custom_text_item`：复制 profile 时记录 `旧 profileId -> 新 profileId` 的映射，插入 item 时用新 id。
+4. **幂等**：每张表插入前先查目标租户是否已有数据，有就跳过该表，并在返回结果里标明"已跳过"。
+5. 返回结构：`Map<String, Integer>`，key 为表名，value 为本次复制的行数（跳过的记 -1），便于接口直接展示。
+6. 源租户默认取 `TenantProperties.getDefaultTenantId()`（为空取 1L）。
+7. **前置校验**：`TenantProperties` 为 null（租户功能关闭）时，直接抛异常提示"请先开启多租户后再初始化配置"，
+   因为关闭时框架不会注入 tenant_id，复制出来的数据是错的。注入方式用 `@Autowired(required = false)`。
+8. 目标租户 id 等于源租户 id 时，抛异常拒绝。
+
+### 接口
+
+`yudao-module-mini/.../controller/admin/tenantconfig/TenantConfigController.java`
+
+```
+POST /admin-api/system/tenant-config/init?tenantId={id}
+@PreAuthorize("@ss.hasPermission('system:tenant:update')")
+```
+
+返回上面的 Map。该权限只有总平台的超管有，租户套餐里不包含。
+
+## 测试
+
+新增 `TenantConfigSeedServiceTest`，Mockito mock 全部 Mapper：
+
+| # | 场景 | 期望 |
+|---|------|------|
+| 1 | 目标租户各表都为空 | 每个 Mapper 的 insert 都按源数据行数被调用；返回值行数正确 |
+| 2 | 目标租户的 skin 已有数据 | skin 不再 insert，返回值里 skin 为 -1；其余表照常 |
+| 3 | text_item 复制 | 插入的 item 的 profileId 是**新** profile 的 id，不是旧的 |
+| 4 | `tenantProperties` 为 null | 抛 ServiceException，任何 Mapper 都不被调用 |
+| 5 | targetTenantId 等于源租户 id | 抛 ServiceException，任何 Mapper 都不被调用 |
+
+## 不要做的事
+
+- 不改批次 A 已完成的迁移与 DO。
+- 不改小程序、money-ui。
+- 不连接线上；不要自动在启动时执行复制（必须由人调接口触发）。
+- JDK8 写法；注释从简。
+
+## 验收命令
+
+```
+cd money-back
+mvn -q -pl yudao-module-mini -am test -Dtest='TenantConfigSeedServiceTest' -Dsurefire.failIfNoSpecifiedTests=false
+mvn -q -pl yudao-module-mini -am compile -DskipTests
+```
+
+## 评审退回（批次 B · 第 1 轮）
+
+1. **`resetTenantDOFields` 里 id 重置失败被静默吞掉**（`catch (Exception ignored)`）。
+   一旦某个 DO 的 `id` 字段定义在父类、或名字不同，就会带着源租户的 id 去插入，造成主键冲突或覆盖。
+   改为：沿着类继承链向上查找名为 `id` 的字段；**找不到或赋值失败就抛异常**（`exception0(500, "...")`，
+   信息里带上类名），不要继续插入。
+2. 代码里多处全限定类名（`cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX`、
+   `TenantBaseDO`、`java.lang.reflect.Field`），改为 import 后用短名。
+3. 测试追加一个用例：复制后传给 `mapper.insert` 的对象，其 `id` 必须为 null、`tenantId` 必须为 null
+   （用 ArgumentCaptor 捕获），确保重置真的生效。
