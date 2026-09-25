@@ -74,4 +74,21 @@ public class ArchiveQueryControllerTest {
         assertTrue(exception.getMessage().contains("归档数据仅总平台可查询"));
         verifyNoInteractions(ch);
     }
+
+    @Test
+    public void test4_NullTenantProperties_PassesThrough() {
+        ArchiveQueryController controllerWithoutTenantProps = new ArchiveQueryController();
+        CommonResult<List<String>> result = controllerWithoutTenantProps.tables();
+        assertNotNull(result);
+        assertEquals(0, result.getCode());
+    }
+
+    @Test
+    public void test5_NullTenantId_PassesThrough() {
+        TenantContextHolder.clear();
+
+        CommonResult<List<String>> result = controller.tables();
+        assertNotNull(result);
+        assertEquals(0, result.getCode());
+    }
 }

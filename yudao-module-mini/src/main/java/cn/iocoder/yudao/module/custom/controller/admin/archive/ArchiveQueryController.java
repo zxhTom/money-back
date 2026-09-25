@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.custom.framework.clickhouse.core.ClickHouseArchiv
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,7 +32,7 @@ public class ArchiveQueryController {
     private ClickHouseArchiveService ch;
     @Resource
     private LogArchiveJob logArchiveJob;
-    @Resource
+    @Autowired(required = false)
     private TenantProperties tenantProperties;
 
     private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
@@ -40,7 +41,13 @@ public class ArchiveQueryController {
             .map(ArchiveTableRegistry.ArchiveTable::getChTable).collect(Collectors.toSet());
 
     private void checkDefaultTenantOnly() {
-        Long current = TenantContextHolder.getRequiredTenantId();
+        if (tenantProperties == null) {
+            return;
+        }
+        Long current = TenantContextHolder.getTenantId();
+        if (current == null) {
+            return;
+        }
         Long allowed = tenantProperties.getDefaultTenantId() != null ? tenantProperties.getDefaultTenantId() : 1L;
         if (!allowed.equals(current)) {
             throw exception0(FORBIDDEN.getCode(), "归档数据仅总平台可查询");

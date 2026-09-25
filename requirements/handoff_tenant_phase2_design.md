@@ -269,3 +269,33 @@ private boolean computeIgnoreTable(String tableName) {
 注意：这样一来用例 11（实体带 `@TenantIgnore` 且表名在 tenantTables 里）的期望要改成 **false（不忽略）**，
 因为显式配置优先级更高。请一并把该用例的期望和注释改掉，说明"显式配进 tenantTables 的表优先于 @TenantIgnore"。
 其余用例不动。
+
+## 评审退回（第 1 步 · 第 2 轮）—— 旁路验证拦下的启动失败
+
+2026-09-25 发布时旁路容器启动失败（正式环境未受影响）：
+
+```
+APPLICATION FAILED TO START
+A component required a bean of type
+'cn.iocoder.yudao.framework.tenant.config.TenantProperties' that could not be found.
+```
+
+根因：`ArchiveQueryController` 用 `@Resource` 强依赖 `TenantProperties`，
+而该 Bean 由 `YudaoTenantAutoConfiguration` 提供，只在 `yudao.tenant.enable=true` 时创建。
+**线上平时是关闭租户的**，Bean 不存在，应用直接起不来。
+
+改法（只改 `ArchiveQueryController.java` 和 `ArchiveQueryControllerTest.java`）：
+
+1. 注入方式改为可选：`@Autowired(required = false) private TenantProperties tenantProperties;`
+2. `checkDefaultTenantOnly()` 改为：
+   - `tenantProperties == null`（租户功能关闭）→ **直接放行**，不做任何校验；
+   - 否则 `Long current = TenantContextHolder.getTenantId();`（注意用 `getTenantId`，不要用 `getRequiredTenantId`，
+     避免关闭租户时抛 NPE），`current == null` 也放行；
+   - 有值且与 `tenantProperties.getDefaultTenantId()`（为 null 时取 1L）不相等 → 抛原来的 FORBIDDEN 异常。
+3. 测试追加两个用例：
+   - `tenantProperties` 为 null 时调 `tables()`、`query(...)` 都正常返回，不抛异常；
+   - 上下文租户为 null 时同样放行。
+   原有 3 个用例保持不变。
+
+**通用要求**：本仓库中 `yudao-module-*` 的代码不得强依赖租户框架的 Bean，
+因为租户开关可能是关闭的。需要时一律用 `@Autowired(required = false)` 或 `ObjectProvider`，并处理为空的情况。
