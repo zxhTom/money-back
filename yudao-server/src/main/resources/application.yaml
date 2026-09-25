@@ -336,6 +336,11 @@ yudao:
       - /admin-api/system/user/profile/**
       - /admin-api/system/auth/**
     ignore-tables:
+    tenant-tables: # 没继承 TenantBaseDO、但需要按租户过滤的表
+      - custom_audit_log
+      - custom_invite_register_log
+      - custom_user_ip_history
+      - custom_password_history
     ignore-caches:
       - user_role_ids
       - permission_menu_ids

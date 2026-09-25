@@ -48,6 +48,11 @@ public class TenantProperties {
     private Set<String> ignoreTables = Collections.emptySet();
 
     /**
+     * 额外的租户表（表名）。用于没有继承 TenantBaseDO、但需要按租户过滤的表
+     */
+    private Set<String> tenantTables = Collections.emptySet();
+
+    /**
      * 默认租户编号（兜底租户编号）
      */
     private Long defaultTenantId;

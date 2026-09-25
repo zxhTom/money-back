@@ -103,4 +103,35 @@ public class TenantDatabaseInterceptorTest {
         assertTrue(interceptor.ignoreTable("T_PLAIN"));
     }
 
+    @Test
+    public void testCase9_TenantTablesContainsPlain_NotIgnored() {
+        TenantProperties props = new TenantProperties();
+        props.setTenantTables(new java.util.HashSet<>(java.util.Collections.singletonList("t_plain")));
+        TenantDatabaseInterceptor interceptorWithTenantTables = new TenantDatabaseInterceptor(props);
+        assertFalse(interceptorWithTenantTables.ignoreTable("t_plain"));
+    }
+
+    @Test
+    public void testCase10_TenantTablesContainsPlain_UpperCase_NotIgnored() {
+        TenantProperties props = new TenantProperties();
+        props.setTenantTables(new java.util.HashSet<>(java.util.Collections.singletonList("t_plain")));
+        TenantDatabaseInterceptor interceptorWithTenantTables = new TenantDatabaseInterceptor(props);
+        assertFalse(interceptorWithTenantTables.ignoreTable("T_PLAIN"));
+    }
+
+    @Test
+    public void testCase11_TenantTablesContainsIgnore_ExplicitConfigPriority_NotIgnored() {
+        TenantProperties props = new TenantProperties();
+        props.setTenantTables(new java.util.HashSet<>(java.util.Collections.singletonList("t_ignore")));
+        TenantDatabaseInterceptor interceptorWithTenantTables = new TenantDatabaseInterceptor(props);
+        assertFalse(interceptorWithTenantTables.ignoreTable("t_ignore"));
+    }
+
+    @Test
+    public void testCase12_TenantTablesEmpty_Plain_Ignored() {
+        TenantProperties props = new TenantProperties();
+        TenantDatabaseInterceptor interceptorEmptyTenantTables = new TenantDatabaseInterceptor(props);
+        assertTrue(interceptorEmptyTenantTables.ignoreTable("t_plain"));
+    }
+
 }

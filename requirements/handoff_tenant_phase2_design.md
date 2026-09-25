@@ -142,3 +142,130 @@ git diff --stat   # 期望只有 2 个主文件 + 2 个新测试
 3. 测试补一个用例：`listRegistrations` 返回的记录里 `inviterUserId` 为 null 时，抛 ServiceException。
 
 `ArchiveQueryController` 评审通过，不要改。
+
+---
+
+# 交接：第 2 步实现（B 类六张表租户化）
+
+## 前置事实（已核实，不用再查）
+
+| 表 | 行数 | DO | 现有基类 | 写入位置 |
+|---|---|---|---|---|
+| `custom_audit_log` | 8.4 万 | `module/custom/dal/dataobject/audit/AuditLogDO` | 无基类 | `AuditLogServiceImpl.save` 带 `@Async`（框架异步执行器包了 TtlRunnable，租户上下文会传递） |
+| `custom_invite_code` | 56 | `module/custom/dal/dataobject/invite/InviteCodeDO` | `BaseDO` | 注册/生成邀请码，请求线程内 |
+| `custom_invite_register_log` | 1 | `module/custom/dal/dataobject/invite/InviteRegisterLogDO` | 无基类 | 注册流程，请求线程内 |
+| `system_feedback` | 10 | `module/custom/dal/dataobject/feedback/FeedbackDO` | `BaseDO` | 反馈提交，请求线程内 |
+| `custom_user_ip_history` | 2655 | `module/system/dal/dataobject/monitor/UserIpHistoryDO` | 无基类 | `LoginLogServiceImpl`（登录流程）、`SecurityMonitorController` |
+| `custom_password_history` | 2596 | `module/system/dal/dataobject/user/PasswordHistoryDO` | 无基类 | `AdminUserServiceImpl` 改密流程；`AutoResetPwdJob` 带 `@TenantIgnore` |
+
+四张"无基类"的表只有 `id + 业务字段 + create_time`，没有 creator/updater/deleted，
+**不能**改成继承 `TenantBaseDO`（会多出表里不存在的字段导致插入失败）。
+
+## 改动
+
+### 1. `TenantProperties` 新增配置项
+
+```java
+/**
+ * 额外的租户表（表名）。用于没有继承 TenantBaseDO、但需要按租户过滤的表
+ */
+private Set<String> tenantTables = Collections.emptySet();
+```
+
+### 2. `TenantDatabaseInterceptor.computeIgnoreTable` 增加一条判断
+
+顺序：`@TenantIgnore` → 忽略；继承 `TenantBaseDO` → 不忽略；**表名在 `tenantTables` 里 → 不忽略**；其余忽略。
+表名比较**忽略大小写**（构造方法里把配置的表名转小写存一份）。
+
+### 3. `application.yaml` 的 `yudao.tenant` 下新增
+
+```yaml
+    tenant-tables: # 没继承 TenantBaseDO、但需要按租户过滤的表
+      - custom_audit_log
+      - custom_invite_register_log
+      - custom_user_ip_history
+      - custom_password_history
+```
+
+### 4. 两个 DO 改基类
+
+- `InviteCodeDO`、`FeedbackDO`：`extends BaseDO` → `extends TenantBaseDO`（import 同步改）。
+
+### 5. 新增迁移 `yudao-server/src/main/resources/db/migration/62_tenant_phase2_columns.sql`
+
+幂等、不用 `SET @var`/`PREPARE`；列已存在时 MySQL 报 1060，执行器会跳过：
+
+```sql
+ALTER TABLE `custom_audit_log`           ADD COLUMN `tenant_id` bigint NOT NULL DEFAULT 1 COMMENT '租户编号';
+ALTER TABLE `custom_invite_code`         ADD COLUMN `tenant_id` bigint NOT NULL DEFAULT 1 COMMENT '租户编号';
+ALTER TABLE `custom_invite_register_log` ADD COLUMN `tenant_id` bigint NOT NULL DEFAULT 1 COMMENT '租户编号';
+ALTER TABLE `system_feedback`            ADD COLUMN `tenant_id` bigint NOT NULL DEFAULT 1 COMMENT '租户编号';
+ALTER TABLE `custom_user_ip_history`     ADD COLUMN `tenant_id` bigint NOT NULL DEFAULT 1 COMMENT '租户编号';
+ALTER TABLE `custom_password_history`    ADD COLUMN `tenant_id` bigint NOT NULL DEFAULT 1 COMMENT '租户编号';
+```
+
+文件头写明：存量数据归默认租户；这些表在请求线程内写入，开启租户后由框架自动过滤。
+
+## 测试
+
+### `TenantDatabaseInterceptorTest` 追加用例（沿用现有写法）
+
+| # | 场景 | 期望 |
+|---|------|------|
+| 9 | `tenantTables` 含 `t_plain`，`ignoreTable("t_plain")` | false（不忽略） |
+| 10 | `tenantTables` 含 `t_plain`，传大写 `T_PLAIN` | false |
+| 11 | `tenantTables` 含 `t_ignore`，但该实体有 `@TenantIgnore` | true（注解优先） |
+| 12 | `tenantTables` 为空时 `t_plain` | true（保持现有行为） |
+
+### `TenantBackfillMigrationTest` 追加方法校验 62 号
+
+拆分后 6 条语句；每条都是 `ADD COLUMN \`tenant_id\` bigint NOT NULL DEFAULT 1`；
+全文不含 `DELETE`、`SET @`、`PREPARE`、`UPDATE`。
+
+## 不要做的事
+
+- 不动 A 类表（接口日志、安全告警、IP 黑名单、登录/操作日志、job 日志）。
+- 不改 C 类配置表。
+- 不改 `TenantSecurityWebFilter`、小程序、money-ui。
+- 不连接线上。JDK8 写法；注释从简。
+
+## 验收命令
+
+```
+cd money-back
+mvn -q -pl yudao-framework/yudao-spring-boot-starter-biz-tenant -am test -Dtest='TenantDatabaseInterceptorTest,TenantSecurityWebFilterTest' -Dsurefire.failIfNoSpecifiedTests=false
+mvn -q -pl yudao-server -am test -Dtest='TenantBackfillMigrationTest,SqlMigrationRunnerSplitTest' -Dsurefire.failIfNoSpecifiedTests=false
+mvn -q -pl yudao-module-mini -am compile -DskipTests
+mvn -q -pl yudao-module-system -am compile -DskipTests
+```
+
+## 评审退回（第 2 步 · 第 1 轮）
+
+`TenantDatabaseInterceptorTest.testCase10`（大写表名）失败，暴露实现缺陷：
+`computeIgnoreTable` 里 `TableInfoHelper.getTableInfo(tableName) == null` 时直接 `return true`，
+在它之后才判断 `tenantTables`，所以：
+1. 大小写不一致时（MP 按注册名查不到）配置会失效；
+2. 更重要的是，**只用 XML 手写 SQL、没有注册 MyBatis-Plus 实体的表，即使配进 tenantTables 也会被忽略**。
+
+改法：把 `tenantTables` 的判断**提到方法最前面**——
+
+```java
+private boolean computeIgnoreTable(String tableName) {
+    // 配置为租户表的，优先生效（哪怕没有注册实体）
+    if (tenantTables.contains(tableName.toLowerCase())) {
+        return false;
+    }
+    TableInfo tableInfo = TableInfoHelper.getTableInfo(tableName);
+    if (tableInfo == null) {
+        return true;
+    }
+    if (tableInfo.getEntityType().getAnnotation(TenantIgnore.class) != null) {
+        return true;
+    }
+    return !TenantBaseDO.class.isAssignableFrom(tableInfo.getEntityType());
+}
+```
+
+注意：这样一来用例 11（实体带 `@TenantIgnore` 且表名在 tenantTables 里）的期望要改成 **false（不忽略）**，
+因为显式配置优先级更高。请一并把该用例的期望和注释改掉，说明"显式配进 tenantTables 的表优先于 @TenantIgnore"。
+其余用例不动。

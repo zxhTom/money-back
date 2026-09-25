@@ -11,7 +11,9 @@ import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 基于 MyBatis Plus 多租户的功能，实现 DB 层面的多租户的功能
@@ -27,12 +29,20 @@ public class TenantDatabaseInterceptor implements TenantLineHandler {
      * VALUE：是否忽略
      */
     private final Map<String, Boolean> ignoreTables = new HashMap<>();
+    private final Set<String> tenantTables = new HashSet<>();
 
     public TenantDatabaseInterceptor(TenantProperties properties) {
         // 不同 DB 下，大小写的习惯不同，所以需要都添加进去
         properties.getIgnoreTables().forEach(table -> {
             addIgnoreTable(table, true);
         });
+        if (properties.getTenantTables() != null) {
+            properties.getTenantTables().forEach(table -> {
+                if (table != null) {
+                    tenantTables.add(table.toLowerCase());
+                }
+            });
+        }
         // 在 OracleKeyGenerator 中，生成主键时，会查询这个表，查询这个表后，会自动拼接 TENANT_ID 导致报错
         addIgnoreTable("DUAL", true);
     }
@@ -50,7 +60,8 @@ public class TenantDatabaseInterceptor implements TenantLineHandler {
         }
         // 情况二，忽略多租户的表
         tableName = SqlParserUtils.removeWrapperSymbol(tableName);
-        Boolean ignore = ignoreTables.get(tableName.toLowerCase());
+        String lowerCaseTable = tableName.toLowerCase();
+        Boolean ignore = ignoreTables.get(lowerCaseTable);
         if (ignore == null) {
             ignore = computeIgnoreTable(tableName);
             synchronized (ignoreTables) {
@@ -66,15 +77,17 @@ public class TenantDatabaseInterceptor implements TenantLineHandler {
     }
 
     private boolean computeIgnoreTable(String tableName) {
+        // 配置为租户表的，优先生效（哪怕没有注册实体）
+        if (tenantTables.contains(tableName.toLowerCase())) {
+            return false;
+        }
         TableInfo tableInfo = TableInfoHelper.getTableInfo(tableName);
         if (tableInfo == null) {
             return true;
         }
-        // 如果添加了 @TenantIgnore 注解，则忽略租户
         if (tableInfo.getEntityType().getAnnotation(TenantIgnore.class) != null) {
             return true;
         }
-        // 本项目只有继承 TenantBaseDO 的表带 tenant_id 列，其余表一律不做租户过滤
         return !TenantBaseDO.class.isAssignableFrom(tableInfo.getEntityType());
     }
 
