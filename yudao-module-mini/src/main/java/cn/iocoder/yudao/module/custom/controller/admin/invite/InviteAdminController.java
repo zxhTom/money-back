@@ -4,7 +4,10 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.invite.vo.InviteCodeRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.invite.vo.InviteRegisterLogRespVO;
+import cn.iocoder.yudao.module.custom.dal.dataobject.invite.InviteRegisterLogDO;
 import cn.iocoder.yudao.module.custom.service.invite.InviteCodeService;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,7 +22,9 @@ import javax.annotation.Resource;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS;
 
 @Tag(name = "管理后台 - 邀请码记录")
 @RestController
@@ -29,12 +34,18 @@ public class InviteAdminController {
 
     @Resource
     private InviteCodeService inviteCodeService;
+    @Resource
+    private AdminUserService adminUserService;
 
     @GetMapping("/codes")
     @Operation(summary = "查看某用户生成的邀请码记录")
     @Parameter(name = "userId", description = "邀请人用户ID", required = true)
     @PreAuthorize("@ss.hasPermission('system:user:invite')")
     public CommonResult<List<InviteCodeRespVO>> getCodes(@RequestParam("userId") Long userId) {
+        AdminUserDO user = adminUserService.getUser(userId);
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
         List<InviteCodeRespVO> list = inviteCodeService.listCodesByInviter(userId).stream()
                 .map(InviteController::toRespVO).collect(Collectors.toList());
         return success(list);
@@ -45,8 +56,14 @@ public class InviteAdminController {
     @Parameter(name = "codeId", description = "邀请码ID", required = true)
     @PreAuthorize("@ss.hasPermission('system:user:invite')")
     public CommonResult<List<InviteRegisterLogRespVO>> getRegistrations(@RequestParam("codeId") Long codeId) {
-        List<InviteRegisterLogRespVO> list = BeanUtils.toBean(
-                inviteCodeService.listRegistrations(codeId), InviteRegisterLogRespVO.class);
+        List<InviteRegisterLogDO> regs = inviteCodeService.listRegistrations(codeId);
+        if (regs != null && !regs.isEmpty()) {
+            Long inviterUserId = regs.get(0).getInviterUserId();
+            if (inviterUserId == null || adminUserService.getUser(inviterUserId) == null) {
+                throw exception(USER_NOT_EXISTS);
+            }
+        }
+        List<InviteRegisterLogRespVO> list = BeanUtils.toBean(regs, InviteRegisterLogRespVO.class);
         return success(list);
     }
 

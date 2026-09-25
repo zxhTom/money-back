@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.custom.controller.admin.archive;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.tenant.config.TenantProperties;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.custom.framework.archive.ArchiveTableRegistry;
 import cn.iocoder.yudao.module.custom.framework.archive.LogArchiveJob;
 import cn.iocoder.yudao.module.custom.framework.clickhouse.core.ClickHouseArchiveService;
@@ -15,6 +17,8 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.FORBIDDEN;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 归档查询")
@@ -27,16 +31,27 @@ public class ArchiveQueryController {
     private ClickHouseArchiveService ch;
     @Resource
     private LogArchiveJob logArchiveJob;
+    @Resource
+    private TenantProperties tenantProperties;
 
     private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
 
     private static final Set<String> ALLOWED = ArchiveTableRegistry.tables().stream()
             .map(ArchiveTableRegistry.ArchiveTable::getChTable).collect(Collectors.toSet());
 
+    private void checkDefaultTenantOnly() {
+        Long current = TenantContextHolder.getRequiredTenantId();
+        Long allowed = tenantProperties.getDefaultTenantId() != null ? tenantProperties.getDefaultTenantId() : 1L;
+        if (!allowed.equals(current)) {
+            throw exception0(FORBIDDEN.getCode(), "归档数据仅总平台可查询");
+        }
+    }
+
     @GetMapping("/tables")
     @Operation(summary = "可查询的归档表")
     @PreAuthorize("@ss.hasPermission('custom:security:archive')")
     public CommonResult<List<String>> tables() {
+        checkDefaultTenantOnly();
         return success(new ArrayList<>(ALLOWED));
     }
 
@@ -44,6 +59,7 @@ public class ArchiveQueryController {
     @Operation(summary = "立即执行日志归档（不等每天04:00定时）")
     @PreAuthorize("@ss.hasPermission('custom:security:archive')")
     public CommonResult<String> runNow() {
+        checkDefaultTenantOnly();
         if (!ch.isEnabled()) {
             return success("ClickHouse 未启用（yudao.clickhouse.enabled=false），已忽略");
         }
@@ -71,6 +87,7 @@ public class ArchiveQueryController {
             @RequestParam(required = false) String end,
             @RequestParam(defaultValue = "1") int pageNo,
             @RequestParam(defaultValue = "20") int pageSize) {
+        checkDefaultTenantOnly();
         Map<String, Object> res = new LinkedHashMap<>();
         if (!ch.isEnabled()) {
             res.put("list", Collections.emptyList());
