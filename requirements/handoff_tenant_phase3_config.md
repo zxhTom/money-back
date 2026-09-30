@@ -182,3 +182,48 @@ mvn -q -pl yudao-module-mini -am compile -DskipTests
    `TenantBaseDO`、`java.lang.reflect.Field`），改为 import 后用短名。
 3. 测试追加一个用例：复制后传给 `mapper.insert` 的对象，其 `id` 必须为 null、`tenantId` 必须为 null
    （用 ArgumentCaptor 捕获），确保重置真的生效。
+
+## 评审退回（批次 B · 第 2 轮）—— 线上初始化实测失败
+
+2026-09-25 线上调 `/system/tenant-config/init?tenantId=162` 报 500：
+
+```
+Unknown column 'deleted' in 'where clause'
+  at TenantConfigSeedServiceImpl.copyTable(TenantConfigSeedServiceImpl.java:119)
+```
+
+根因：`contract_model` 表只有 `id, model, create_time, app_version, tenant_id` 五列，
+缺 `creator/updater/update_time/deleted`，而 `ContractModelDO` 声明继承 `TenantBaseDO`（原先是 `BaseDO`），
+基类带 `@TableLogic` 的 `deleted`，MyBatis-Plus 的标准方法（`selectCount`/`selectList`）会自动追加 `deleted = 0`。
+以前没暴露，是因为没有代码用 MP 标准方法查这张表。
+
+### 改动 1：新增 `yudao-server/src/main/resources/db/migration/64_contract_model_base_columns.sql`
+
+把缺的基类字段补齐（幂等，列已存在报 1060 会被跳过）：
+
+```sql
+ALTER TABLE `contract_model` ADD COLUMN `creator` varchar(64) DEFAULT '' COMMENT '创建者';
+ALTER TABLE `contract_model` ADD COLUMN `updater` varchar(64) DEFAULT '' COMMENT '更新者';
+ALTER TABLE `contract_model` ADD COLUMN `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间';
+ALTER TABLE `contract_model` ADD COLUMN `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除';
+```
+
+文件头注释写明原因：该表缺基类字段，DO 继承 TenantBaseDO 后用 MP 标准方法会报 Unknown column。
+
+### 改动 2：`TenantConfigSeedServiceImpl.seedTenantConfig` 加事务
+
+加 `@Transactional(rollbackFor = Exception.class)`。这次失败在第 9 张表，前 8 张已经写进去了，
+留下了半套配置（靠"已有数据就跳过"才能补齐）。加事务后失败即整体回滚，状态更干净。
+
+### 改动 3：`TenantBackfillMigrationTest` 追加 64 号校验
+
+4 条语句；都是 `ALTER TABLE \`contract_model\` ADD COLUMN`；不含 `DELETE`、`SET @`、`PREPARE`。
+
+## 验收命令
+
+```
+cd money-back
+mvn -q -pl yudao-server -am test -Dtest='TenantBackfillMigrationTest,SqlMigrationRunnerSplitTest' -Dsurefire.failIfNoSpecifiedTests=false
+mvn -q -pl yudao-module-mini -am test -Dtest='TenantConfigSeedServiceTest' -Dsurefire.failIfNoSpecifiedTests=false
+mvn -q -pl yudao-module-mini -am compile -DskipTests
+```

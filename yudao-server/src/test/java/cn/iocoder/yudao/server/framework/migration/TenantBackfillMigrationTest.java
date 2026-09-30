@@ -160,4 +160,27 @@ public class TenantBackfillMigrationTest {
         assertFalse(hasDeleteStmt, "不应包含 DELETE 语句");
     }
 
+    @Test
+    public void test64ContractModelBaseColumnsMigration() throws Exception {
+        String content = read("db/migration/64_contract_model_base_columns.sql");
+        List<String> statements = SqlMigrationRunner.splitStatements(content);
+
+        // 1. 拆分后共 4 条语句
+        assertEquals(4, statements.size(), "64 号迁移应切分为 4 条语句");
+
+        // 2. 4 条都是 ALTER TABLE `contract_model` ADD COLUMN
+        for (String stmt : statements) {
+            String s = stmt.replaceAll("\\s+", " ");
+            assertTrue(s.contains("ALTER TABLE `contract_model` ADD COLUMN"),
+                    "每条语句都应为 ALTER TABLE `contract_model` ADD COLUMN: " + stmt);
+        }
+
+        // 3. 全文不含 DELETE 语句、SET @、PREPARE
+        String upperContent = content.toUpperCase();
+        boolean hasDeleteStmt = statements.stream().anyMatch(stmt -> stmt.toUpperCase().startsWith("DELETE"));
+        assertFalse(hasDeleteStmt, "不应包含 DELETE 语句");
+        assertFalse(upperContent.contains("SET @"), "全文不应包含 SET @");
+        assertFalse(upperContent.contains("PREPARE"), "全文不应包含 PREPARE");
+    }
+
 }

@@ -29,6 +29,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import javax.annotation.Resource;
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -67,6 +69,7 @@ public class TenantConfigSeedServiceImpl implements TenantConfigSeedService {
     private TimeWindowMapper timeWindowMapper;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Integer> seedTenantConfig(Long targetTenantId) {
         if (tenantProperties == null) {
             throw exception0(400, "请先开启多租户后再初始化配置");
