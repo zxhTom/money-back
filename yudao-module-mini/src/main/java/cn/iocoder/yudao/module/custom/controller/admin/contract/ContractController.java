@@ -51,10 +51,35 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @Slf4j
 public class ContractController {
 
+    @GetMapping("/admin-search")
+    @Operation(summary = "【小程序】管理员全量检索合同(含已删除)")
+    @PreAuthorize("@ss.hasPermission('mini:admin:contract:list')")
+    public CommonResult<PageResult<ContractRespVO>> adminSearch(@Valid ContractPageReqVO pageReqVO) {
+        com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> mpPage = cn.iocoder.yudao.framework.mybatis.core.util.MyBatisUtils.buildPage(pageReqVO, null);
+        contractMapper.selectAdminSearchPage(mpPage, pageReqVO);
+        PageResult<ContractDO> pageResult = new PageResult<>(mpPage.getRecords(), mpPage.getTotal());
+        return success(cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(pageResult, ContractRespVO.class));
+    }
+
+    @GetMapping("/admin-detail")
+    @Operation(summary = "【小程序】管理员查看合同详情(含已删除)")
+    @PreAuthorize("@ss.hasPermission('mini:admin:contract:list')")
+    public CommonResult<ContractRespVO> adminDetail(@RequestParam("id") Long id) {
+        ContractDO contract = contractMapper.selectByIdIgnoreDeleted(id);
+        if (contract == null) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
+                    .exception(cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS);
+        }
+        return success(cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(contract, ContractRespVO.class));
+    }
+
+
     @Resource
     private ConfirmPdfService confirmPdfService;
     @Resource
     private ContractService contractService;
+    @Resource
+    private cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper contractMapper;
     @Resource
     private IdCardCipherService idCardCipherService;
     @Resource

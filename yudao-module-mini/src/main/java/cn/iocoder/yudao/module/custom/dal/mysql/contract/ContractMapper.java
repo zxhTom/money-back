@@ -120,6 +120,29 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
      * 判断两个（明文归一化）身份证号之间是否存在合同往来（互为甲乙方，不区分方向）。
      * 用于信用互查场景：无独立credit-query权限时，允许查询与自己有合同关系的对方。
      */
+    
+    
+    
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "false", illegalSql = "false")
+    @org.apache.ibatis.annotations.Select("<script>" +
+            "SELECT * FROM custom_contract " +
+            "<where> " +
+            "<if test=\"reqVO.id != null\"> AND id = #{reqVO.id} </if> " +
+            "<if test=\"reqVO.indebtedName != null and reqVO.indebtedName != ''\"> AND indebted_name LIKE CONCAT('%', #{reqVO.indebtedName}, '%') </if> " +
+            "<if test=\"reqVO.creditorName != null and reqVO.creditorName != ''\"> AND creditor_name LIKE CONCAT('%', #{reqVO.creditorName}, '%') </if> " +
+            "<if test=\"reqVO.indebtedId != null and reqVO.indebtedId != ''\"> AND indebted_id = #{reqVO.indebtedId} </if> " +
+            "<if test=\"reqVO.creditorId != null and reqVO.creditorId != ''\"> AND creditor_id = #{reqVO.creditorId} </if> " +
+            "</where> " +
+            "ORDER BY id DESC " +
+            "</script>")
+    com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> selectAdminSearchPage(
+        com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> page, 
+        @org.apache.ibatis.annotations.Param("reqVO") ContractPageReqVO reqVO);
+
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "false", illegalSql = "false")
+    @org.apache.ibatis.annotations.Select("SELECT * FROM custom_contract WHERE id = #{id}")
+    ContractDO selectByIdIgnoreDeleted(@org.apache.ibatis.annotations.Param("id") Long id);
+
     default boolean existsContractRelation(String idNoA, String idNoB) {
         Long count = selectCount(new LambdaQueryWrapperX<ContractDO>()
                 .and(w -> w.eq(ContractDO::getIndebtedId, idNoA).eq(ContractDO::getCreditorId, idNoB))
