@@ -107,4 +107,12 @@ public interface RedisKeyConstants {
      */
     String WXA_SUBSCRIBE_TEMPLATE = "wxa_subscribe_template";
 
+    /**
+     * 启用的风控频率规则列表的缓存
+     *
+     * KEY 格式：risk_rate_limit_rules:all
+     * VALUE 数据格式：String 规则列表
+     */
+    String RISK_RATE_LIMIT_RULES = "risk_rate_limit_rules";
+
 }
