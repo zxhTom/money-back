@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.service.risk;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.dal.dataobject.risk.RiskRateLimitConfigDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.risk.RiskUserLockLogDO;
 import cn.iocoder.yudao.module.system.dal.mysql.risk.RiskRateLimitConfigMapper;
@@ -134,6 +135,36 @@ public class RiskLockServiceImpl implements RiskLockService {
             stringRedisTemplate.opsForValue().set(lockKey, String.valueOf(endTs), lockSeconds, TimeUnit.SECONDS);
             log.warn("[lockUser][用户({}) 因 {} 被锁定 {} 秒，阶梯等级: {}]", userId, lockType, lockSeconds, escalationLevel);
         }
+    }
+
+    @Override
+    public void unlockUser(Long adminUserId, Long targetUserId) {
+        if (targetUserId == null) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        // 1. 查询该 targetUserId 尚未结束的锁定记录（lock_end_time > now() 或为 null）
+        List<RiskUserLockLogDO> activeLogs = riskUserLockLogMapper.selectList(new LambdaQueryWrapperX<RiskUserLockLogDO>()
+                .eq(RiskUserLockLogDO::getUserId, targetUserId)
+                .and(w -> w.isNull(RiskUserLockLogDO::getLockEndTime).or().gt(RiskUserLockLogDO::getLockEndTime, now)));
+
+        // 2. 将其更新：unlock_time = now(), unlocker_id = adminUserId, 如果 lock_end_time 为空或在未来，则将其改为 now()（即立刻结束）
+        for (RiskUserLockLogDO logDO : activeLogs) {
+            logDO.setUnlockTime(now);
+            logDO.setUnlockerId(adminUserId);
+            if (logDO.getLockEndTime() == null || logDO.getLockEndTime().isAfter(now)) {
+                logDO.setLockEndTime(now);
+            }
+            riskUserLockLogMapper.updateById(logDO);
+        }
+
+        // 3. 删除 Redis 中的限制锁
+        stringRedisTemplate.delete(REDIS_KEY_LOCK_STATUS + targetUserId);
+
+        // 4. 清除密码错误次数计数器
+        stringRedisTemplate.delete(REDIS_KEY_PWD_ERR + targetUserId);
+
+        log.info("[unlockUser][管理员({}) 手动解锁用户({})，更新了 {} 条锁定记录]", adminUserId, targetUserId, activeLogs.size());
     }
 }
 

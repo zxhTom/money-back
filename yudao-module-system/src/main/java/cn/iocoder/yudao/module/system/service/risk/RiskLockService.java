@@ -36,4 +36,12 @@ public interface RiskLockService {
      */
     void escalateLock(Long userId, String lockType, RiskRateLimitConfigDO rule);
 
+    /**
+     * 手动解锁用户
+     *
+     * @param adminUserId 操作管理员编号
+     * @param targetUserId 被解锁用户编号
+     */
+    void unlockUser(Long adminUserId, Long targetUserId);
+
 }

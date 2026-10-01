@@ -212,4 +212,51 @@ public class RiskLockServiceImplTest extends BaseMockitoUnitTest {
 
         assertDoesNotThrow(() -> riskLockService.checkLockStatus(userId));
     }
+
+    @Test
+    public void testUnlockUser_Success() {
+        Long adminUserId = 1L;
+        Long targetUserId = 100L;
+
+        RiskUserLockLogDO log1 = RiskUserLockLogDO.builder()
+                .id(10L)
+                .userId(targetUserId)
+                .lockType("RATE_LIMIT")
+                .lockStartTime(LocalDateTime.now().minusMinutes(10))
+                .lockEndTime(null) // 永久锁定
+                .build();
+        RiskUserLockLogDO log2 = RiskUserLockLogDO.builder()
+                .id(11L)
+                .userId(targetUserId)
+                .lockType("PASSWORD_ERR")
+                .lockStartTime(LocalDateTime.now().minusMinutes(5))
+                .lockEndTime(LocalDateTime.now().plusMinutes(25)) // 未来结束时间
+                .build();
+
+        when(riskUserLockLogMapper.selectList(any())).thenReturn(java.util.Arrays.asList(log1, log2));
+
+        riskLockService.unlockUser(adminUserId, targetUserId);
+
+        ArgumentCaptor<RiskUserLockLogDO> captor = ArgumentCaptor.forClass(RiskUserLockLogDO.class);
+        verify(riskUserLockLogMapper, times(2)).updateById(captor.capture());
+        List<RiskUserLockLogDO> updated = captor.getAllValues();
+        assertEquals(2, updated.size());
+        assertEquals(adminUserId, updated.get(0).getUnlockerId());
+        assertNotNull(updated.get(0).getUnlockTime());
+        assertNotNull(updated.get(0).getLockEndTime());
+
+        assertEquals(adminUserId, updated.get(1).getUnlockerId());
+        assertNotNull(updated.get(1).getUnlockTime());
+        assertNotNull(updated.get(1).getLockEndTime());
+
+        verify(stringRedisTemplate).delete("risk:lock_status:" + targetUserId);
+        verify(stringRedisTemplate).delete("risk:pwd_err:" + targetUserId);
+    }
+
+    @Test
+    public void testUnlockUser_NullUserId() {
+        riskLockService.unlockUser(1L, null);
+        verifyNoInteractions(riskUserLockLogMapper);
+        verifyNoInteractions(stringRedisTemplate);
+    }
 }

@@ -11,4 +11,10 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface RiskAbnormalReportMapper extends BaseMapperX<RiskAbnormalReportDO> {
+
+    default RiskAbnormalReportDO selectByUserIdAndStatus(Long userId, Integer status) {
+        return selectFirstOne(RiskAbnormalReportDO::getUserId, userId,
+                RiskAbnormalReportDO::getStatus, status);
+    }
+
 }
