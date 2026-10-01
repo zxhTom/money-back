@@ -60,6 +60,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     @Resource
     private LoginLogService loginLogService;
     @Resource
+    private cn.iocoder.yudao.module.system.service.risk.RiskLockService riskLockService;
+    @Resource
     private OAuth2TokenService oauth2TokenService;
     @Resource
     private SocialUserService socialUserService;
@@ -100,9 +102,14 @@ public class AdminAuthServiceImpl implements AdminAuthService {
             loginFailRiskChecker.onLoginFailure(identifier); // 失败风控：按IP累计，超阈值封IP+告警，不锁账号
             throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
         }
+
+        // 校验账号是否被风控系统锁定
+        riskLockService.checkLockStatus(user.getId());
+
         if (!userService.isPasswordMatch(password, user.getPassword())) {
             createLoginLog(user.getId(), identifier, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
             loginFailRiskChecker.onLoginFailure(identifier); // 失败风控：按IP累计，超阈值封IP+告警，不锁账号
+            riskLockService.processPasswordError(user.getId()); // 记录密码错误风控
             throw exception(AUTH_LOGIN_BAD_CREDENTIALS);
         }
         // 校验是否禁用
