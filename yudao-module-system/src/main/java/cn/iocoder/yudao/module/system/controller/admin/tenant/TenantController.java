@@ -48,14 +48,13 @@ public class TenantController {
         return success(tenant != null ? tenant.getId() : null);
     }
 
-    @GetMapping({ "simple-list" })
+        @GetMapping({ "simple-list" })
     @PermitAll
     @TenantIgnore
     @Operation(summary = "获取租户精简信息列表", description = "只包含被开启的租户，用于【首页】功能的选择租户选项")
     public CommonResult<List<TenantRespVO>> getTenantSimpleList() {
-        List<TenantDO> list = tenantService.getTenantListByStatus(CommonStatusEnum.ENABLE.getStatus());
-        return success(convertList(list, tenantDO ->
-                new TenantRespVO().setId(tenantDO.getId()).setName(tenantDO.getName())));
+        // 彻底废除大锅饭下拉框，防止越权泄露商业机密。此接口直接返回空或报错。
+        return success(java.util.Collections.emptyList());
     }
 
     @GetMapping("/get-by-website")
