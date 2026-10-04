@@ -123,23 +123,31 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
     
     
     
-    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "false", illegalSql = "false")
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
     @org.apache.ibatis.annotations.Select("<script>" +
-            "SELECT * FROM custom_contract " +
+            "SELECT * FROM (SELECT * FROM custom_contract) t " +
             "<where> " +
-            "<if test=\"reqVO.id != null\"> AND id = #{reqVO.id} </if> " +
-            "<if test=\"reqVO.indebtedName != null and reqVO.indebtedName != ''\"> AND indebted_name LIKE CONCAT('%', #{reqVO.indebtedName}, '%') </if> " +
-            "<if test=\"reqVO.creditorName != null and reqVO.creditorName != ''\"> AND creditor_name LIKE CONCAT('%', #{reqVO.creditorName}, '%') </if> " +
-            "<if test=\"reqVO.indebtedId != null and reqVO.indebtedId != ''\"> AND indebted_id = #{reqVO.indebtedId} </if> " +
-            "<if test=\"reqVO.creditorId != null and reqVO.creditorId != ''\"> AND creditor_id = #{reqVO.creditorId} </if> " +
+            "<if test=\"reqVO.keyword != null and reqVO.keyword != ''\"> " +
+            "AND (t.id LIKE CONCAT('%', #{reqVO.keyword}, '%') " +
+            "OR t.indebted_name LIKE CONCAT('%', #{reqVO.keyword}, '%') " +
+            "OR t.creditor_name LIKE CONCAT('%', #{reqVO.keyword}, '%') " +
+            "OR t.indebted_id LIKE CONCAT('%', #{reqVO.keyword}, '%') " +
+            "OR t.creditor_id LIKE CONCAT('%', #{reqVO.keyword}, '%')) " +
+            "</if> " +
+            "<if test=\"reqVO.contractId != null\"> AND t.id = #{reqVO.contractId} </if> " +
+            "<if test=\"reqVO.indebtedName != null and reqVO.indebtedName != ''\"> AND t.indebted_name LIKE CONCAT('%', #{reqVO.indebtedName}, '%') </if> " +
+            "<if test=\"reqVO.creditorName != null and reqVO.creditorName != ''\"> AND t.creditor_name LIKE CONCAT('%', #{reqVO.creditorName}, '%') </if> " +
+            "<if test=\"reqVO.indebtedId != null and reqVO.indebtedId != ''\"> AND t.indebted_id = #{reqVO.indebtedId} </if> " +
+            "<if test=\"reqVO.creditorId != null and reqVO.creditorId != ''\"> AND t.creditor_id = #{reqVO.creditorId} </if> " +
+            "<if test=\"reqVO.status != null\"> AND t.status = #{reqVO.status} </if> " +
             "</where> " +
-            "ORDER BY id DESC " +
+            "ORDER BY t.id DESC " +
             "</script>")
     com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> selectAdminSearchPage(
         com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> page, 
         @org.apache.ibatis.annotations.Param("reqVO") ContractPageReqVO reqVO);
 
-    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "false", illegalSql = "false")
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
     @org.apache.ibatis.annotations.Select("SELECT * FROM custom_contract WHERE id = #{id}")
     ContractDO selectByIdIgnoreDeleted(@org.apache.ibatis.annotations.Param("id") Long id);
 

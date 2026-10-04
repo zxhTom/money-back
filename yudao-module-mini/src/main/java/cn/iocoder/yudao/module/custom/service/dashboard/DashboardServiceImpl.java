@@ -40,7 +40,7 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public DashboardOverviewVO getOverview() {
-        return dashboardMapper.selectOverview();
+        return dashboardMapper.selectOverview(currentTenantId());
     }
 
     @Override

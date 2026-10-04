@@ -14,6 +14,12 @@ import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_
 @Data
 public class ContractPageReqVO extends PageParam {
 
+    @Schema(description = "合同ID（管理员精确查询用）", example = "12345")
+    private Long contractId;
+
+    @Schema(description = "全局模糊搜索关键字")
+    private String keyword;
+
     @Schema(description = "欠款人姓名", example = "李四")
     private String indebtedName;
 

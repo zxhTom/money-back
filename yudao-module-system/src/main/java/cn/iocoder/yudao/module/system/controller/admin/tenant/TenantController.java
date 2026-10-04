@@ -13,6 +13,8 @@ import cn.iocoder.yudao.module.system.controller.admin.tenant.vo.tenant.TenantRe
 import cn.iocoder.yudao.module.system.controller.admin.tenant.vo.tenant.TenantSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.tenant.TenantDO;
 import cn.iocoder.yudao.module.system.service.tenant.TenantService;
+import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +39,9 @@ public class TenantController {
 
     @Resource
     private TenantService tenantService;
+
+    @Resource
+    private AdminUserMapper adminUserMapper;
 
     @GetMapping("/get-id-by-name")
     @PermitAll
@@ -117,7 +122,12 @@ public class TenantController {
     @PreAuthorize("@ss.hasPermission('system:tenant:query')")
     public CommonResult<PageResult<TenantRespVO>> getTenantPage(@Valid TenantPageReqVO pageVO) {
         PageResult<TenantDO> pageResult = tenantService.getTenantPage(pageVO);
-        return success(BeanUtils.toBean(pageResult, TenantRespVO.class));
+        PageResult<TenantRespVO> result = BeanUtils.toBean(pageResult, TenantRespVO.class);
+        result.getList().forEach(tenant -> {
+            Long count = TenantUtils.execute(tenant.getId(), () -> adminUserMapper.selectCount());
+            tenant.setUsedAccountCount(count);
+        });
+        return success(result);
     }
 
     @GetMapping("/export-excel")

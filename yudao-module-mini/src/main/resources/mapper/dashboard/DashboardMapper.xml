@@ -17,7 +17,9 @@
             c.total_contract_amount,
             p.total_pay_success,
             p.today_pay_amount,
-            p.month_pay_amount
+            p.month_pay_amount,
+            t_quota.tenant_account_quota,
+            u.total_users AS tenant_account_used
         FROM
         (SELECT
             COUNT(*)                                                                     AS total_users,
@@ -36,7 +38,12 @@
             SUM(CASE WHEN status = 10 THEN 1 ELSE 0 END)                                AS total_pay_success,
             COALESCE(SUM(CASE WHEN status = 10 AND DATE(create_time) = CURDATE() THEN price ELSE 0 END), 0) / 100  AS today_pay_amount,
             COALESCE(SUM(CASE WHEN status = 10 AND create_time >= DATE_FORMAT(CURDATE(),'%Y-%m-01') THEN price ELSE 0 END), 0) / 100 AS month_pay_amount
-         FROM pay_order WHERE deleted = 0) p
+         FROM pay_order WHERE deleted = 0) p,
+        (SELECT account_count AS tenant_account_quota FROM system_tenant WHERE deleted = 0 
+            <if test="tenantId != null">
+                AND id = #{tenantId}
+            </if>
+         LIMIT 1) t_quota
     </select>
 
     <!-- ─── 近 30 天新增用户趋势 ───────────────────────────────── -->

@@ -152,4 +152,5 @@
         <include refid="CustomContractQueryCondition"/>
         <include refid="CustomContractOrderBy"/>
     </select>
+
 </mapper>

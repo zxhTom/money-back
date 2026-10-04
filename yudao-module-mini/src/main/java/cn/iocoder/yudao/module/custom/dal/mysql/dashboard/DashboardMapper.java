@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.custom.controller.admin.dashboard.vo.DashboardOve
 import cn.iocoder.yudao.module.custom.controller.admin.dashboard.vo.FaceAuthStatsVO;
 import lombok.Data;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -12,7 +13,7 @@ import java.util.List;
 @Mapper
 public interface DashboardMapper {
 
-    DashboardOverviewVO selectOverview();
+    DashboardOverviewVO selectOverview(@Param("tenantId") Long tenantId);
 
     List<TrendPoint> selectNewUserTrend();
 

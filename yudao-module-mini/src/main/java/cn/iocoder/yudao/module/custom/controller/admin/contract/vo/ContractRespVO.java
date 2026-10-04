@@ -99,4 +99,7 @@ public class ContractRespVO {
     @ExcelProperty("已还金额")
     private BigDecimal refund;
 
+    @Schema(description = "是否已删除")
+    private Boolean deleted;
+
 }

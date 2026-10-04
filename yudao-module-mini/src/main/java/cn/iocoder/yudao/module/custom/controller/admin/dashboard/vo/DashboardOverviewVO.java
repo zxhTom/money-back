@@ -21,4 +21,8 @@ public class DashboardOverviewVO {
     private Long totalPaySuccess;
     private BigDecimal todayPayAmount;
     private BigDecimal monthPayAmount;
+
+    // 租户额度情况
+    private Integer tenantAccountQuota; // 总额度
+    private Integer tenantAccountUsed;  // 已用额度
 }

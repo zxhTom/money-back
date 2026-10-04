@@ -18,6 +18,7 @@ import org.thymeleaf.context.Context;
 import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
 import javax.servlet.http.HttpServletResponse;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Map;
@@ -45,6 +46,7 @@ import java.util.Map;
 @RequestMapping("/api/mini/callback")
 @PermitAll
 @Slf4j
+@TenantIgnore
 public class MiniCallbackController {
 
     private static final int MAX_QUERY_ATTEMPTS = 3;

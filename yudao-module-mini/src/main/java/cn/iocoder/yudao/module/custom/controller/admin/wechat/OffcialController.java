@@ -12,11 +12,13 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.security.PermitAll;
 import javax.servlet.http.HttpServletRequest;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 
 @RestController
 @RequestMapping("/offcial/{appid}")
 @PermitAll
 @Slf4j
+@TenantIgnore
 public class OffcialController {
     @Autowired
     WxMpService wxMpService;

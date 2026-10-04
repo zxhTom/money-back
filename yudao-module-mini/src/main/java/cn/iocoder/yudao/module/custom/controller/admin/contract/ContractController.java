@@ -58,7 +58,11 @@ public class ContractController {
         com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> mpPage = cn.iocoder.yudao.framework.mybatis.core.util.MyBatisUtils.buildPage(pageReqVO, null);
         contractMapper.selectAdminSearchPage(mpPage, pageReqVO);
         PageResult<ContractDO> pageResult = new PageResult<>(mpPage.getRecords(), mpPage.getTotal());
-        return success(cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(pageResult, ContractRespVO.class));
+        PageResult<ContractRespVO> voPage = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(pageResult, ContractRespVO.class);
+        for (int i = 0; i < voPage.getList().size(); i++) {
+            ContractRespIdCardEnricher.enrich(voPage.getList().get(i), pageResult.getList().get(i), idCardCipherService);
+        }
+        return success(voPage);
     }
 
     @GetMapping("/admin-detail")
@@ -70,7 +74,9 @@ public class ContractController {
             throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
                     .exception(cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS);
         }
-        return success(cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(contract, ContractRespVO.class));
+        ContractRespVO vo = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(contract, ContractRespVO.class);
+        ContractRespIdCardEnricher.enrich(vo, contract, idCardCipherService);
+        return success(vo);
     }
 
 
