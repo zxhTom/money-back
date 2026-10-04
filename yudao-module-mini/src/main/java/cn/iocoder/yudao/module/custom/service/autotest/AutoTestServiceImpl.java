@@ -116,7 +116,7 @@ public class AutoTestServiceImpl implements AutoTestService {
             Long payOrderId = payDemoOrderDO.getPayOrderId();
             PayOrderNotifyReqDTO notifyReqDTO = new PayOrderNotifyReqDTO();
             notifyReqDTO.setPayOrderId(payOrderId);
-            notifyReqDTO.setChannelOrderNo("MOCK-O-" + payOrderId);
+            notifyReqDTO.setMerchantOrderId(payDemoOrderDO.getId().toString());
             customDefineService.updateContractConfirmedStatus(notifyReqDTO);
             log.info("模拟支付回调并确认合同成功, payOrderId={}", payOrderId);
         } else {
