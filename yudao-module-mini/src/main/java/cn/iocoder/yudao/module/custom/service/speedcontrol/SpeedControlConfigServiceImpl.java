@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.custom.service.speedcontrol;
 
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.custom.controller.admin.speedcontrol.vo.SpeedControlConfigRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.speedcontrol.vo.SpeedControlConfigSaveReqVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.speedcontrol.SpeedControlConfigDO;
@@ -11,11 +12,8 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
@@ -28,10 +26,19 @@ public class SpeedControlConfigServiceImpl implements SpeedControlConfigService 
     @Resource
     private PermissionService permissionService;
 
-    private volatile SpeedControlConfigDO cachedConfig;
-    private volatile Set<Long> cachedExemptUserIds = Collections.emptySet();
-    private volatile Set<Long> cachedExemptRoleIds = Collections.emptySet();
-    private volatile long cachedAt;
+    private static class CacheEntry {
+        SpeedControlConfigDO config;
+        Set<Long> exemptUserIds = Collections.emptySet();
+        Set<Long> exemptRoleIds = Collections.emptySet();
+        long cachedAt;
+    }
+
+    private final Map<Long, CacheEntry> tenantCache = new ConcurrentHashMap<>();
+
+    private Long getTenantId() {
+        Long tenantId = TenantContextHolder.getTenantId();
+        return tenantId != null ? tenantId : 0L; // 0L as fallback for global/system
+    }
 
     @Override
     public SpeedControlConfigRespVO get() {
@@ -56,8 +63,11 @@ public class SpeedControlConfigServiceImpl implements SpeedControlConfigService 
 
     @Override
     public void update(SpeedControlConfigSaveReqVO reqVO) {
+        SpeedControlConfigDO existing = speedControlConfigMapper.selectTheOne();
         SpeedControlConfigDO update = new SpeedControlConfigDO();
-        update.setId(1L);
+        if (existing != null) {
+            update.setId(existing.getId());
+        }
         update.setEnabled(Boolean.TRUE.equals(reqVO.getEnabled()));
         update.setRate(reqVO.getRate() == null ? new BigDecimal("100") : reqVO.getRate());
         update.setRangeEnabled(Boolean.TRUE.equals(reqVO.getRangeEnabled()));
@@ -69,49 +79,58 @@ public class SpeedControlConfigServiceImpl implements SpeedControlConfigService 
         update.setJitterPercent(reqVO.getJitterPercent() == null ? BigDecimal.ZERO : reqVO.getJitterPercent());
         update.setExemptUserIds(joinIds(reqVO.getExemptUserIds()));
         update.setExemptRoleIds(joinIds(reqVO.getExemptRoleIds()));
-        if (speedControlConfigMapper.selectById(1L) == null) {
-            speedControlConfigMapper.insert(update);
-        } else {
+        
+        if (existing != null) {
             speedControlConfigMapper.updateById(update);
+        } else {
+            speedControlConfigMapper.insert(update);
         }
-        cachedAt = 0L; // 立即失效，不用等 TTL
+        tenantCache.remove(getTenantId()); // invalidate cache for this tenant
     }
 
     @Override
     public SpeedControlConfigDO getCachedConfig() {
+        Long tenantId = getTenantId();
         long now = System.currentTimeMillis();
-        if (now - cachedAt <= CACHE_TTL_MS) {
-            return cachedConfig;
+        CacheEntry entry = tenantCache.get(tenantId);
+        if (entry != null && now - entry.cachedAt <= CACHE_TTL_MS) {
+            return entry.config;
         }
-        synchronized (this) {
-            if (System.currentTimeMillis() - cachedAt <= CACHE_TTL_MS) {
-                return cachedConfig;
+        synchronized (tenantCache) {
+            entry = tenantCache.get(tenantId);
+            if (entry != null && System.currentTimeMillis() - entry.cachedAt <= CACHE_TTL_MS) {
+                return entry.config;
             }
+            entry = new CacheEntry();
             try {
                 SpeedControlConfigDO config = speedControlConfigMapper.selectTheOne();
-                cachedConfig = config;
-                cachedExemptUserIds = config == null ? Collections.<Long>emptySet() : parseIds(config.getExemptUserIds());
-                cachedExemptRoleIds = config == null ? Collections.<Long>emptySet() : parseIds(config.getExemptRoleIds());
+                entry.config = config;
+                entry.exemptUserIds = config == null ? Collections.emptySet() : parseIds(config.getExemptUserIds());
+                entry.exemptRoleIds = config == null ? Collections.emptySet() : parseIds(config.getExemptRoleIds());
             } catch (Exception e) {
-                // 查库失败按"不限速"处理，绝不能因为限速功能自身故障把全站请求拖死
                 log.warn("[SpeedControl] 读取配置失败，本轮按不限速处理：{}", e.getMessage());
-                cachedConfig = null;
+                entry.config = null;
             }
-            cachedAt = System.currentTimeMillis();
-            return cachedConfig;
+            entry.cachedAt = System.currentTimeMillis();
+            tenantCache.put(tenantId, entry);
+            return entry.config;
         }
     }
 
     @Override
     public boolean isExempt(Long userId) {
         if (userId == null) {
-            return false; // 未登录请求同样受控（黑名单式）
+            return false;
         }
-        getCachedConfig(); // 确保豁免名单快照是新的
-        if (cachedExemptUserIds.contains(userId)) {
+        getCachedConfig(); // Ensure cache is loaded
+        CacheEntry entry = tenantCache.get(getTenantId());
+        if (entry == null) {
+            return false;
+        }
+        if (entry.exemptUserIds.contains(userId)) {
             return true;
         }
-        if (cachedExemptRoleIds.isEmpty()) {
+        if (entry.exemptRoleIds.isEmpty()) {
             return false;
         }
         try {
@@ -120,7 +139,7 @@ public class SpeedControlConfigServiceImpl implements SpeedControlConfigService 
                 return false;
             }
             for (Long roleId : roleIds) {
-                if (cachedExemptRoleIds.contains(roleId)) {
+                if (entry.exemptRoleIds.contains(roleId)) {
                     return true;
                 }
             }
@@ -131,39 +150,24 @@ public class SpeedControlConfigServiceImpl implements SpeedControlConfigService 
     }
 
     private static Set<Long> parseIds(String raw) {
-        if (StrUtil.isBlank(raw)) {
-            return Collections.emptySet();
-        }
+        if (StrUtil.isBlank(raw)) return Collections.emptySet();
         Set<Long> ids = new HashSet<>();
         for (String part : raw.split(",")) {
             String trimmed = part.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            try {
-                ids.add(Long.parseLong(trimmed));
-            } catch (NumberFormatException ignored) {
-                // 脏数据跳过，不影响其它 id
-            }
+            if (trimmed.isEmpty()) continue;
+            try { ids.add(Long.parseLong(trimmed)); } catch (NumberFormatException ignored) {}
         }
         return ids;
     }
 
     private static String joinIds(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return "";
-        }
+        if (ids == null || ids.isEmpty()) return "";
         StringBuilder sb = new StringBuilder();
         for (Long id : ids) {
-            if (id == null) {
-                continue;
-            }
-            if (sb.length() > 0) {
-                sb.append(',');
-            }
+            if (id == null) continue;
+            if (sb.length() > 0) sb.append(',');
             sb.append(id);
         }
         return sb.toString();
     }
-
 }

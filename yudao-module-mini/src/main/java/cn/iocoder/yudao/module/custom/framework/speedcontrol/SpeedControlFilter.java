@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.custom.dal.dataobject.speedcontrol.SpeedControlCo
 import cn.iocoder.yudao.module.custom.framework.security.config.CustomWebMvcConfig;
 import cn.iocoder.yudao.module.custom.service.speedcontrol.SpeedControlCalculator;
 import cn.iocoder.yudao.module.custom.service.speedcontrol.SpeedControlConfigService;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.util.AntPathMatcher;
