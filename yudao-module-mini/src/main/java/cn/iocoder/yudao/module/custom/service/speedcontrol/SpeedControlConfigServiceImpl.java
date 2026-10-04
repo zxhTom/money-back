@@ -69,7 +69,11 @@ public class SpeedControlConfigServiceImpl implements SpeedControlConfigService 
         update.setJitterPercent(reqVO.getJitterPercent() == null ? BigDecimal.ZERO : reqVO.getJitterPercent());
         update.setExemptUserIds(joinIds(reqVO.getExemptUserIds()));
         update.setExemptRoleIds(joinIds(reqVO.getExemptRoleIds()));
-        speedControlConfigMapper.updateById(update);
+        if (speedControlConfigMapper.selectById(1L) == null) {
+            speedControlConfigMapper.insert(update);
+        } else {
+            speedControlConfigMapper.updateById(update);
+        }
         cachedAt = 0L; // 立即失效，不用等 TTL
     }
 
