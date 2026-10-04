@@ -428,3 +428,10 @@ system:
     invite-register-required: false
 
 debug: false
+custom:
+  auto-test:
+    user-a: zxhtom
+    user-b: wgl
+    login-password: 123456
+    pay-password: 123456
+
