@@ -69,6 +69,7 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSW
 @Service
 @Slf4j
 public class CustomDefineServiceImpl implements CustomDefineService{
+
     @Autowired
     MiniUserMapper miniUserMapper;
     @Autowired
@@ -537,6 +538,18 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             userRoleDO.setUserId(user.getId());
             userRoleDO.setRoleId(roleDO.getId());
             userRoleMapper.insert(userRoleDO);
+        }
+        if (org.apache.commons.lang3.StringUtils.isBlank(user.getAvatar())) {
+            try {
+                String nameForAvatar = org.apache.commons.lang3.StringUtils.isNotBlank(user.getRealname()) ? user.getRealname() : user.getNickname();
+                if (org.apache.commons.lang3.StringUtils.isBlank(nameForAvatar)) {
+                    nameForAvatar = user.getUsername();
+                }
+                String avatarB64 = cn.iocoder.yudao.module.custom.util.AvatarGenerateUtil.generateAvatarBase64(nameForAvatar);
+                user.setAvatar(avatarB64);
+            } catch (Exception e) {
+                log.error("生成默认头像失败: {}", e.getMessage());
+            }
         }
         userService.insertUserSimply(user);
         // 记录邀请注册（仅当开关开启且校验出有效邀请码时）
