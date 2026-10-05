@@ -248,11 +248,6 @@ public class SecurityMonitorController {
         return success(true);
     }
 
-    @PostMapping("/blacklist/unlock-by-user")
-    @Operation(summary = "通过用户解封所有相关IP")
-    @Parameter(name = "username", description = "用户名", required = true)
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
-    
     @GetMapping("/user-trajectory")
     @Operation(summary = "按用户查询活动轨迹")
     @Parameter(name = "username", description = "用户名", required = true)
@@ -322,6 +317,10 @@ public class SecurityMonitorController {
         return success(list.get(0));
     }
 
+    @PostMapping("/blacklist/unlock-by-user")
+    @Operation(summary = "通过用户解封所有相关IP")
+    @Parameter(name = "username", description = "用户名", required = true)
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
     public CommonResult<Integer> unlockByUser(@RequestParam String username) {
         String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
