@@ -298,6 +298,30 @@ public class SecurityMonitorController {
         return success(list);
     }
 
+    
+    @GetMapping("/latest-ip")
+    @Operation(summary = "获取用户最近一次使用的IP")
+    @Parameter(name = "username", description = "用户名", required = true)
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:trajectory','mini:admin:security:blacklist')")
+    public CommonResult<String> getLatestIp(@RequestParam String username) {
+        String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
+        if (!"zxhtom".equals(currentLoginUsername)) {
+            return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
+        }
+        
+        cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO user = adminUserMapper.selectByUsername(username);
+        if (user == null) {
+            return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(404, "未找到该用户");
+        }
+        
+        String sql = "SELECT user_ip FROM system_login_log WHERE user_id = ? AND deleted = 0 ORDER BY create_time DESC LIMIT 1";
+        java.util.List<String> list = jdbcTemplate.queryForList(sql, String.class, user.getId());
+        if (list.isEmpty() || list.get(0) == null) {
+            return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(404, "暂无IP记录");
+        }
+        return success(list.get(0));
+    }
+
     public CommonResult<Integer> unlockByUser(@RequestParam String username) {
         String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
