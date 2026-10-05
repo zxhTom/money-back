@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.system.controller.admin.monitor;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -39,6 +40,10 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/custom/security")
 @Validated
 public class SecurityMonitorController {
+
+    @Resource
+    private JdbcTemplate jdbcTemplate;
+
 
     @Resource
     private SecurityAlertService securityAlertService;
@@ -247,6 +252,52 @@ public class SecurityMonitorController {
     @Operation(summary = "通过用户解封所有相关IP")
     @Parameter(name = "username", description = "用户名", required = true)
     @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
+    
+    @GetMapping("/user-trajectory")
+    @Operation(summary = "按用户查询活动轨迹")
+    @Parameter(name = "username", description = "用户名", required = true)
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:trajectory','mini:admin:security:blacklist')")
+    public CommonResult<java.util.List<java.util.Map<String, Object>>> getUserTrajectory(@RequestParam String username) {
+        String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
+        if (!"zxhtom".equals(currentLoginUsername)) {
+            return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
+        }
+        
+        cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO user = adminUserMapper.selectByUsername(username);
+        if (user == null) {
+            return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(404, "未找到该用户");
+        }
+        
+        Long userId = user.getId();
+        
+        String sql = "SELECT * FROM (" +
+                     "  SELECT create_time as time, '登录/登出' as type, " +
+                     "         CASE WHEN log_type=10 THEN '账号密码登录' WHEN log_type=11 THEN '验证码登录' WHEN log_type=12 THEN '小程序登录' WHEN log_type=20 THEN '登出' ELSE '登录操作' END as action, " +
+                     "         user_ip as ip " +
+                     "  FROM system_login_log WHERE user_id = ? AND deleted = 0 " +
+                     "  UNION ALL " +
+                     "  SELECT create_time as time, '操作' as type, " +
+                     "         IFNULL(action, request_url) as action, " +
+                     "         user_ip as ip " +
+                     "  FROM system_operate_log WHERE user_id = ? AND deleted = 0 " +
+                     ") AS t ORDER BY time DESC LIMIT 100";
+                     
+        java.util.List<java.util.Map<String, Object>> list = jdbcTemplate.queryForList(sql, userId, userId);
+        
+        // 格式化时间
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        for (java.util.Map<String, Object> map : list) {
+            if (map.get("time") instanceof java.util.Date) {
+                map.put("time", sdf.format((java.util.Date) map.get("time")));
+            } else if (map.get("time") instanceof java.time.LocalDateTime) {
+                java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                map.put("time", ((java.time.LocalDateTime) map.get("time")).format(dtf));
+            }
+        }
+        
+        return success(list);
+    }
+
     public CommonResult<Integer> unlockByUser(@RequestParam String username) {
         String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
