@@ -18,12 +18,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.HashMap;
 import java.util.Map;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import javax.annotation.Resource;
+import java.util.Base64;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author zxhtom
  * 12/3/25
  */
 @Service
+@Slf4j
 public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
 
     // 从配置文件 application.yml 中读取
@@ -33,6 +38,9 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
     private String secretKey;
     @Value("${baidu.face.plan-id}")
     private String planId;
+
+    @Resource
+    private FileApi fileApi;
 
     // 百度云获取 access_token 的地址 (需提前获取)
     private static final String ACCESS_TOKEN_URL = "https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=%s&client_secret=%s";
@@ -116,6 +124,28 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
             JSONObject verifyResult = result.getJSONObject("result");
             response.put("success", true);
             response.put("data", verifyResult); // 包含passed、score、reason等
+
+            // [新增] 异步提取并保存存证视频和最佳人脸图片到后端 MinIO
+            try {
+                if (verifyResult.containsKey("video")) {
+                    String videoBase64 = verifyResult.getString("video");
+                    byte[] videoBytes = Base64.getDecoder().decode(videoBase64);
+                    String videoUrl = fileApi.createFile(videoBytes, verifyToken + ".mp4");
+                    response.put("videoUrl", videoUrl);
+                    log.info("[FaceAuth] 成功提取人脸认证存证视频, 链接: {}", videoUrl);
+                }
+                
+                if (verifyResult.containsKey("best_image") && verifyResult.getJSONObject("best_image").containsKey("pic")) {
+                    String picBase64 = verifyResult.getJSONObject("best_image").getString("pic");
+                    byte[] picBytes = Base64.getDecoder().decode(picBase64);
+                    String picUrl = fileApi.createFile(picBytes, verifyToken + ".jpg");
+                    response.put("picUrl", picUrl);
+                    log.info("[FaceAuth] 成功提取最佳人脸截图, 链接: {}", picUrl);
+                }
+            } catch (Exception e) {
+                log.error("[FaceAuth] 提取人脸认证存证视频/图片失败", e);
+            }
+            
         } else {
             response.put("success", false);
             response.put("message", result.getString("error_msg"));
