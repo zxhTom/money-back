@@ -108,6 +108,7 @@ public class AutoTestServiceImpl implements AutoTestService {
 
         ContractPayOrderCreateReqVO orderCreateReqVO = new ContractPayOrderCreateReqVO();
         orderCreateReqVO.setContractId(contractId);
+        orderCreateReqVO.setPassword(payPassword);
         Long demoOrderId = customDefineService.createDemoOrder(userA.getId(), orderCreateReqVO);
         log.info("创建 Demo 订单成功, demoOrderId={}", demoOrderId);
 

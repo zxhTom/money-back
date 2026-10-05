@@ -253,7 +253,7 @@ public class SecurityMonitorController {
     @Parameter(name = "username", description = "用户名", required = true)
     @PreAuthorize("@ss.hasAnyPermissions('custom:security:trajectory','mini:admin:security:blacklist')")
     public CommonResult<java.util.List<java.util.Map<String, Object>>> getUserTrajectory(@RequestParam String username) {
-        String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
+        String currentLoginUsername = adminUserMapper.selectById(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()).getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
             return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
         }
@@ -299,7 +299,7 @@ public class SecurityMonitorController {
     @Parameter(name = "username", description = "用户名", required = true)
     @PreAuthorize("@ss.hasAnyPermissions('custom:security:trajectory','mini:admin:security:blacklist')")
     public CommonResult<String> getLatestIp(@RequestParam String username) {
-        String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
+        String currentLoginUsername = adminUserMapper.selectById(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()).getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
             return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
         }
@@ -322,7 +322,7 @@ public class SecurityMonitorController {
     @Parameter(name = "username", description = "用户名", required = true)
     @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
     public CommonResult<Integer> unlockByUser(@RequestParam String username) {
-        String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
+        String currentLoginUsername = adminUserMapper.selectById(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()).getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
             return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
         }
