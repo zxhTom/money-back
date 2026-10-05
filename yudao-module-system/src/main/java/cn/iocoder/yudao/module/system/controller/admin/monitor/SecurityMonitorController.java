@@ -243,6 +243,27 @@ public class SecurityMonitorController {
         return success(true);
     }
 
+    @PostMapping("/blacklist/unlock-by-user")
+    @Operation(summary = "通过用户解封所有相关IP")
+    @Parameter(name = "username", description = "用户名", required = true)
+    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
+    public CommonResult<Integer> unlockByUser(@RequestParam String username) {
+        cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO user = adminUserMapper.selectByUsername(username);
+        if (user == null) {
+            return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(404, "未找到该用户");
+        }
+        java.util.List<cn.iocoder.yudao.module.system.dal.dataobject.monitor.UserIpHistoryDO> historyList = userIpHistoryService.getByUserId(user.getId());
+        int unlockedCount = 0;
+        for (cn.iocoder.yudao.module.system.dal.dataobject.monitor.UserIpHistoryDO history : historyList) {
+            cn.iocoder.yudao.module.system.dal.dataobject.monitor.IpBlacklistDO entry = ipBlacklistService.getActiveEntry(history.getIp());
+            if (entry != null) {
+                ipBlacklistService.removeFromBlacklist(entry.getId());
+                unlockedCount++;
+            }
+        }
+        return success(unlockedCount);
+    }
+
     @GetMapping("/user/ip-count-stats")
     @Operation(summary = "按用户统计使用过的 IP 数（Top N）")
     @Parameter(name = "limit", description = "返回条数", example = "10")
