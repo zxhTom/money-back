@@ -124,7 +124,11 @@ public class TenantController {
         PageResult<TenantDO> pageResult = tenantService.getTenantPage(pageVO);
         PageResult<TenantRespVO> result = BeanUtils.toBean(pageResult, TenantRespVO.class);
         result.getList().forEach(tenant -> {
-            Long count = TenantUtils.execute(tenant.getId(), () -> adminUserMapper.selectCount());
+            // 通过传入显式的 eq 强制让 MyBatis 每次生成不同的 CacheKey，解决 Mybatis-Plus 租户插件一级缓存复用的 Bug
+            Long count = TenantUtils.execute(tenant.getId(), () -> 
+                adminUserMapper.selectCount(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO>()
+                    .eq(cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO::getTenantId, tenant.getId()))
+            );
             tenant.setUsedAccountCount(count);
         });
         return success(result);
