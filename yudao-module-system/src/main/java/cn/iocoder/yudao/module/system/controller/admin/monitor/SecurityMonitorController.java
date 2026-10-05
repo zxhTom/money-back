@@ -248,6 +248,10 @@ public class SecurityMonitorController {
     @Parameter(name = "username", description = "用户名", required = true)
     @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
     public CommonResult<Integer> unlockByUser(@RequestParam String username) {
+        String currentLoginUsername = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUser().getUsername();
+        if (!"zxhtom".equals(currentLoginUsername)) {
+            return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
+        }
         cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO user = adminUserMapper.selectByUsername(username);
         if (user == null) {
             return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(404, "未找到该用户");
