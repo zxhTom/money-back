@@ -51,6 +51,7 @@ public class MiniProgramConfigServiceImpl implements MiniProgramConfigService {
         update.setCompanyName(reqVO.getCompanyName());
         update.setContactEmail(reqVO.getContactEmail());
         update.setBoundUserId(reqVO.getBoundUserId());
+        update.setLayoutTemplate(reqVO.getLayoutTemplate());
         miniProgramConfigMapper.updateById(update);
 
         if (appNameChanged && reqVO.getBoundUserId() != null) {
