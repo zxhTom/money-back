@@ -22,4 +22,7 @@ public class MiniProgramConfigRespVO {
     @Schema(description = "联系邮箱")
     private String contactEmail;
 
+    @Schema(description = "布局排版模版")
+    private String layoutTemplate;
+
 }
