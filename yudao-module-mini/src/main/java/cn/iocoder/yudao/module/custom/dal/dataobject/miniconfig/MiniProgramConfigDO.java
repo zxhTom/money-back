@@ -16,6 +16,6 @@ public class MiniProgramConfigDO extends TenantBaseDO {
     private String appDescription;
     private String companyName;
     private String contactEmail;
-    private Long boundUserId;
+    private Long boundUserId;\n    private String layoutTemplate;
 
 }

@@ -23,6 +23,6 @@ public class MiniProgramConfigSaveReqVO {
     private String contactEmail;
 
     @Schema(description = "绑定的代表用户ID，null表示解绑")
-    private Long boundUserId;
+    private Long boundUserId;\n    private String layoutTemplate;
 
 }

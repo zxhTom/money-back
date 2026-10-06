@@ -1,0 +1,1 @@
+ALTER TABLE custom_miniprogram_config ADD COLUMN layout_template VARCHAR(50) DEFAULT 'classic' COMMENT '布局排版模版：classic|premium';
