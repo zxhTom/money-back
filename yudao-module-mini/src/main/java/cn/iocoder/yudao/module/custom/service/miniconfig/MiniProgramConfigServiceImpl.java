@@ -42,6 +42,7 @@ public class MiniProgramConfigServiceImpl implements MiniProgramConfigService {
     public void update(MiniProgramConfigSaveReqVO reqVO) {
         MiniProgramConfigDO existing = miniProgramConfigMapper.selectTheOne();
         boolean appNameChanged = existing != null && !StrUtil.equals(existing.getAppName(), reqVO.getAppName());
+        boolean boundUserChanged = existing != null && !java.util.Objects.equals(existing.getBoundUserId(), reqVO.getBoundUserId());
 
         MiniProgramConfigDO update = new MiniProgramConfigDO();
         update.setId(1L);
@@ -54,7 +55,7 @@ public class MiniProgramConfigServiceImpl implements MiniProgramConfigService {
         update.setLayoutTemplate(reqVO.getLayoutTemplate());
         miniProgramConfigMapper.updateById(update);
 
-        if (appNameChanged && reqVO.getBoundUserId() != null) {
+        if ((appNameChanged || boundUserChanged) && reqVO.getBoundUserId() != null) {
             cascadeNameChange(reqVO.getBoundUserId(), reqVO.getAppName());
         }
     }
