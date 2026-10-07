@@ -18,5 +18,7 @@ public interface FeedbackService {
      */
     FeedbackSubmitRespVO submitFeedback(FeedbackSubmitReqVO reqVO);
 
-}
 
+    cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO> getFeedbackPage(cn.iocoder.yudao.framework.common.pojo.PageParam pageReqVO);
+
+}

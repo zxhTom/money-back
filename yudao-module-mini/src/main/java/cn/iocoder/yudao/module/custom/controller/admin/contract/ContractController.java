@@ -41,6 +41,14 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
+import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
+
+
 import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -50,6 +58,27 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @Validated
 @Slf4j
 public class ContractController {
+    @GetMapping("/admin-all-users")
+    @Operation(summary = "【小程序】管理员获取全量用户供编辑选择")
+    public CommonResult<List<Map<String, String>>> adminAllUsers() {
+        List<AdminUserDO> users = contractAdminUserService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
+        List<Map<String, String>> result = new ArrayList<>();
+        if (users != null) {
+            for (AdminUserDO user : users) {
+                Map<String, String> map = new HashMap<>();
+                map.put("id", String.valueOf(user.getId()));
+                map.put("realname", user.getRealname());
+                map.put("idNo", idCardCipherService.resolveToPlain(user.getIdNo()));
+                result.add(map);
+            }
+        }
+        return success(result);
+    }
+
+
+    @Resource
+    private AdminUserService contractAdminUserService;
+
 
     @GetMapping("/admin-search")
     @Operation(summary = "【小程序】管理员全量检索合同(含已删除)")
@@ -265,4 +294,16 @@ public class ContractController {
             return new ResponseEntity<>(("PDF生成失败: " + e.getMessage()).getBytes(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    @GetMapping("/guess-you-like")
+    @Operation(summary = "猜你喜欢推荐联系人")
+    public CommonResult<cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO> guessYouLike(
+            @RequestParam("direction") String direction, 
+            @RequestParam("idNo") String idNo) {
+        if (idNo == null || idNo.isEmpty()) {
+            return CommonResult.success(null);
+        }
+        return CommonResult.success(contractService.guessYouLike(direction, idNo));
+    }
+
 }

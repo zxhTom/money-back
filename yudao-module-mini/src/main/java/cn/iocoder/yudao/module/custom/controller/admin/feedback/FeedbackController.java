@@ -9,6 +9,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,5 +44,11 @@ public class FeedbackController {
         return success(respVO);
     }
 
-}
 
+    @GetMapping("/page")
+    @Operation(summary = "获得反馈分页")
+    public CommonResult<cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO>> getFeedbackPage(@Valid cn.iocoder.yudao.framework.common.pojo.PageParam pageReqVO) {
+        return success(feedbackService.getFeedbackPage(pageReqVO));
+    }
+
+}

@@ -158,4 +158,21 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
         return count != null && count > 0;
     }
 
+
+    @org.apache.ibatis.annotations.Select("SELECT indebted_name as targetName, indebted_id as targetIdCard " +
+            "FROM custom_contract " +
+            "WHERE creditor_id = #{myIdCard} AND deleted = 0 " +
+            "GROUP BY indebted_name, indebted_id " +
+            "ORDER BY count(*) DESC, max(create_time) DESC, sum(salary) DESC " +
+            "LIMIT 1")
+    cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessDebtor(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard);
+
+    @org.apache.ibatis.annotations.Select("SELECT creditor_name as targetName, creditor_id as targetIdCard " +
+            "FROM custom_contract " +
+            "WHERE indebted_id = #{myIdCard} AND deleted = 0 " +
+            "GROUP BY creditor_name, creditor_id " +
+            "ORDER BY count(*) DESC, max(create_time) DESC, sum(salary) DESC " +
+            "LIMIT 1")
+    cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessCreditor(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard);
+
 }

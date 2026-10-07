@@ -488,4 +488,14 @@ public class ContractServiceImpl implements ContractService {
         }
     }
 
+
+    @Override
+    public cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessYouLike(String direction, String myIdCard) {
+        if ("from".equals(direction)) {
+            return contractMapper.guessDebtor(myIdCard);
+        } else {
+            return contractMapper.guessCreditor(myIdCard);
+        }
+    }
+
 }

@@ -89,4 +89,14 @@ public interface ContractService {
     void exportContractProtocolPdf(Long id, javax.servlet.http.HttpServletResponse response) throws java.io.IOException;
 
     void exportContractProtocolContractPdf(ContractDO contractDO, HttpServletResponse response) throws IOException;
+
+    /**
+     * 猜你喜欢推荐联系人
+     *
+     * @param direction from-借出，to-借入
+     * @param myIdCard 当前用户身份证
+     * @return 推荐联系人
+     */
+    cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessYouLike(String direction, String myIdCard);
+
 }

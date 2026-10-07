@@ -72,5 +72,10 @@ public class FeedbackServiceImpl implements FeedbackService {
         return respVO;
     }
 
-}
 
+    @Override
+    public cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO> getFeedbackPage(cn.iocoder.yudao.framework.common.pojo.PageParam pageReqVO) {
+        return feedbackMapper.selectPage(pageReqVO, new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO>().orderByDesc("id"));
+    }
+
+}
