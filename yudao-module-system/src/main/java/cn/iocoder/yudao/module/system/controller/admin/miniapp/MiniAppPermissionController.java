@@ -38,6 +38,7 @@ public class MiniAppPermissionController {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", m.getId());
             item.put("name", m.getName());
+            item.put("icon", m.getIcon());
             item.put("permission", m.getPermission());
             item.put("sort", m.getSort());
             return item;

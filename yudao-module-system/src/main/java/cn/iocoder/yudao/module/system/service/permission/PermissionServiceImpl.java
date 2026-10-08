@@ -187,9 +187,9 @@ public class PermissionServiceImpl implements PermissionService {
             return Collections.emptySet();
         }
 
-        // 如果是管理员的情况下，获取全部菜单编号
+        // 如果是管理员的情况下，获取当前租户下的全部菜单编号
         if (roleService.hasAnySuperAdmin(roleIds)) {
-            return convertSet(menuService.getMenuList(), MenuDO::getId);
+            return convertSet(menuService.getMenuListByTenant(new MenuListReqVO()), MenuDO::getId);
         }
         // 如果是非管理员的情况下，获得拥有的菜单编号
         return convertSet(roleMenuMapper.selectListByRoleId(roleIds), RoleMenuDO::getMenuId);
