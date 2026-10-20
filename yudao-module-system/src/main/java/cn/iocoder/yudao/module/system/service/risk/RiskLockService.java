@@ -6,6 +6,8 @@ import java.util.List;
 
 public interface RiskLockService {
 
+    java.util.Map<String, Object> getLoginSecurity(Long userId);
+
     /**
      * 处理登录密码错误风控
      *

@@ -11,13 +11,16 @@ public interface ErrorCodeConstants {
 
     // ========== AUTH 模块 1-002-000-000 ==========
     ErrorCode AUTH_LOGIN_BAD_CREDENTIALS = new ErrorCode(1_002_000_000, "登录失败，账号密码不正确");
-    ErrorCode AUTH_LOGIN_USER_DISABLED = new ErrorCode(1_002_000_001, "登录失败，账号被禁用");
+    ErrorCode AUTH_LOGIN_USER_DISABLED = new ErrorCode(1_002_000_001, "账号已被管理员停用，请联系管理员启用");
     ErrorCode AUTH_LOGIN_CAPTCHA_CODE_ERROR = new ErrorCode(1_002_000_004, "验证码不正确，原因：{}");
     ErrorCode AUTH_THIRD_LOGIN_NOT_BIND = new ErrorCode(1_002_000_005, "未绑定账号，需要进行绑定");
     ErrorCode AUTH_MOBILE_NOT_EXISTS = new ErrorCode(1_002_000_007, "手机号不存在");
     ErrorCode AUTH_REGISTER_CAPTCHA_CODE_ERROR = new ErrorCode(1_002_000_008, "验证码不正确，原因：{}");
     ErrorCode AUTH_LOGIN_REALNAME_CONFLICT = new ErrorCode(1_002_000_009, "姓名存在重名，请补充身份证号登录");
     ErrorCode AUTH_LOGIN_USERNAME_CONFLICT = new ErrorCode(1_002_000_010, "用户名存在重名，请补充身份证号登录");
+
+    ErrorCode AUTH_LOGIN_TEMPORARILY_LOCKED = new ErrorCode(1_002_000_011, "账号因{}暂时锁定，预计 {} 恢复（约 {} 分钟），请稍后重试或联系管理员解锁");
+    ErrorCode AUTH_LOGIN_RISK_LOCKED = new ErrorCode(1_002_000_012, "账号因安全风控被长期锁定，请联系管理员解锁");
 
     // ========== 菜单模块 1-002-001-000 ==========
     ErrorCode MENU_NAME_DUPLICATE = new ErrorCode(1_002_001_000, "已经存在该名字的菜单");

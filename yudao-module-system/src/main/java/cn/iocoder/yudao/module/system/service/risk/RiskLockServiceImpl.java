@@ -18,6 +18,14 @@ import org.springframework.stereotype.Service;
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import javax.sql.DataSource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -28,6 +36,9 @@ public class RiskLockServiceImpl implements RiskLockService {
     private static final String REDIS_KEY_LOCK_STATUS = "risk:lock_status:";
     private static final int MAX_PWD_ERR_COUNT = 5;
     private static final int LOCK_MINUTES = 30;
+
+    @Resource
+    private DataSource dataSource;
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
@@ -58,8 +69,14 @@ public class RiskLockServiceImpl implements RiskLockService {
         if (lockEndTimeStr != null) {
             long lockEndTime = Long.parseLong(lockEndTimeStr);
             if (lockEndTime == -1 || lockEndTime > System.currentTimeMillis()) {
-                // throw a runtime exception with a custom message. Using a generic code here since we don't want to create new enums yet.
-                throw ServiceExceptionUtil.exception(ErrorCodeConstants.AUTH_LOGIN_USER_DISABLED);
+                if (lockEndTime == -1) throw ServiceExceptionUtil.exception(ErrorCodeConstants.AUTH_LOGIN_RISK_LOCKED);
+                List<RiskUserLockLogDO> logs = riskUserLockLogMapper.selectList(new LambdaQueryWrapperX<RiskUserLockLogDO>()
+                        .eq(RiskUserLockLogDO::getUserId, userId).orderByDesc(RiskUserLockLogDO::getId).last("LIMIT 1"));
+                String type = logs.isEmpty() ? "" : logs.get(0).getLockType();
+                String reason = "PASSWORD_ERR".equals(type) ? "密码错误次数达到上限" : "RATE_LIMIT".equals(type) ? "操作过于频繁" : "安全风控";
+                String until = Instant.ofEpochMilli(lockEndTime).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                long minutes = Math.max(1, (long) Math.ceil((lockEndTime - System.currentTimeMillis()) / 60000.0));
+                throw ServiceExceptionUtil.exception(ErrorCodeConstants.AUTH_LOGIN_TEMPORARILY_LOCKED, reason, until, minutes);
             } else {
                 stringRedisTemplate.delete(lockKey);
             }
@@ -137,15 +154,61 @@ public class RiskLockServiceImpl implements RiskLockService {
         }
     }
 
+    protected JdbcTemplate jdbc() { return new JdbcTemplate(dataSource); }
+
+    private Integer requireTenantUser(Long userId) {
+        if (userId == null) throw ServiceExceptionUtil.exception(ErrorCodeConstants.USER_NOT_EXISTS);
+        List<Integer> statuses = jdbc().query(
+                "SELECT status FROM system_users WHERE id=? AND tenant_id=? AND deleted=0",
+                (rs, n) -> rs.getInt("status"), userId, TenantContextHolder.getRequiredTenantId());
+        if (statuses.size() != 1) throw ServiceExceptionUtil.exception(ErrorCodeConstants.USER_NOT_EXISTS);
+        return statuses.get(0);
+    }
+
+    @Override
+    public Map<String, Object> getLoginSecurity(Long userId) {
+        int status = requireTenantUser(userId);
+        long now = System.currentTimeMillis();
+        String lockValue = stringRedisTemplate.opsForValue().get(REDIS_KEY_LOCK_STATUS + userId);
+        long lockUntil = lockValue == null ? 0 : Long.parseLong(lockValue);
+        String errors = stringRedisTemplate.opsForValue().get(REDIS_KEY_PWD_ERR + userId);
+        Long countTtl = stringRedisTemplate.getExpire(REDIS_KEY_PWD_ERR + userId, TimeUnit.SECONDS);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("userId", userId); result.put("accountStatus", status); result.put("serverTime", now);
+        result.put("locked", lockUntil == -1 || lockUntil > now);
+        result.put("permanent", lockUntil == -1);
+        result.put("lockEndTime", lockUntil > 0 ? lockUntil : null);
+        result.put("passwordErrorCount", errors == null ? 0 : Long.parseLong(errors));
+        result.put("passwordErrorLimit", MAX_PWD_ERR_COUNT);
+        result.put("counterExpiresAt", countTtl != null && countTtl > 0 ? now + countTtl * 1000L : null);
+        JdbcTemplate jdbc = jdbc();
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        result.put("lockHistory", jdbc.query("SELECT lock_type,lock_start_time,lock_end_time,unlock_time,unlocker_id FROM system_risk_user_lock_log WHERE user_id=? AND tenant_id=? AND deleted=0 ORDER BY id DESC LIMIT 10",
+                (rs, n) -> {
+                    Map<String,Object> item = new LinkedHashMap<>(); item.put("lockType",rs.getString("lock_type"));
+                    for (String field : new String[]{"lock_start_time","lock_end_time","unlock_time"}) {
+                        java.sql.Timestamp time = rs.getTimestamp(field);
+                        String key = "lock_start_time".equals(field) ? "startTime" : "lock_end_time".equals(field) ? "endTime" : "unlockTime";
+                        item.put(key, time == null ? null : time.getTime());
+                    }
+                    item.put("unlockerId",rs.getObject("unlocker_id"));return item;
+                }, userId, tenantId));
+        result.put("loginHistory", jdbc.query("SELECT create_time,result FROM system_login_log WHERE user_id=? AND tenant_id=? AND user_type=2 AND deleted=0 AND log_type=100 ORDER BY id DESC LIMIT 20",
+                (rs,n) -> { Map<String,Object> item=new LinkedHashMap<>();item.put("time",rs.getTimestamp("create_time").getTime());item.put("result",rs.getInt("result"));return item; }, userId, tenantId));
+        return result;
+    }
+
     @Override
     public void unlockUser(Long adminUserId, Long targetUserId) {
         if (targetUserId == null) {
             return;
         }
+        requireTenantUser(targetUserId);
         LocalDateTime now = LocalDateTime.now();
         // 1. 查询该 targetUserId 尚未结束的锁定记录（lock_end_time > now() 或为 null）
         List<RiskUserLockLogDO> activeLogs = riskUserLockLogMapper.selectList(new LambdaQueryWrapperX<RiskUserLockLogDO>()
                 .eq(RiskUserLockLogDO::getUserId, targetUserId)
+                .eq(RiskUserLockLogDO::getTenantId, TenantContextHolder.getRequiredTenantId())
                 .and(w -> w.isNull(RiskUserLockLogDO::getLockEndTime).or().gt(RiskUserLockLogDO::getLockEndTime, now)));
 
         // 2. 将其更新：unlock_time = now(), unlocker_id = adminUserId, 如果 lock_end_time 为空或在未来，则将其改为 now()（即立刻结束）
