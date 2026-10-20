@@ -18,6 +18,10 @@ public interface AuditLogMapper extends BaseMapperX<AuditLogDO> {
     Integer deleteByCreateTimeLt(@Param("createTime") LocalDateTime createTime, @Param("limit") Integer limit);
 
     default PageResult<AuditLogDO> selectPage(AuditLogPageReqVO reqVO) {
+        return selectPage(reqVO, (Long) null);
+    }
+
+    default PageResult<AuditLogDO> selectPage(AuditLogPageReqVO reqVO, Long tenantId) {
         return selectPage(reqVO, new LambdaQueryWrapperX<AuditLogDO>()
                 .eqIfPresent(AuditLogDO::getUserId, reqVO.getUserId())
                 .eqIfPresent(AuditLogDO::getOperationType, reqVO.getOperationType())
@@ -27,6 +31,13 @@ public interface AuditLogMapper extends BaseMapperX<AuditLogDO> {
                 .eqIfPresent(AuditLogDO::getExternalIp, reqVO.getExternalIp())
                 .eqIfPresent(AuditLogDO::getStatus, reqVO.getStatus())
                 .betweenIfPresent(AuditLogDO::getCreateTime, reqVO.getCreateTime())
-                .orderByDesc(AuditLogDO::getId));
+                .orderByDesc(AuditLogDO::getId)
+                .apply(tenantId != null, "user_id IN (SELECT id FROM system_users WHERE tenant_id = {0})", tenantId));
+    }
+
+    default AuditLogDO selectByIdInTenant(Long id, Long tenantId) {
+        return selectOne(new LambdaQueryWrapperX<AuditLogDO>()
+                .eq(AuditLogDO::getId, id)
+                .apply(tenantId != null, "user_id IN (SELECT id FROM system_users WHERE tenant_id = {0})", tenantId));
     }
 }

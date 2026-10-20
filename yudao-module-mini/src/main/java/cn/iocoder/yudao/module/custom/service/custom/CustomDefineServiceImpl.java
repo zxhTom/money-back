@@ -164,10 +164,11 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public List<RecentContractVO> rencentContractList() {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
+        AdminUserDO user = loginUser == null ? null : adminUserService.getUser(loginUser.getId());
+        if (!hasVerifiedIdentity(user)) return Collections.emptyList();
         if (teaseGuard.isTeasing(loginUser.getId())) {
             return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory.generateRecentContractList(loginUser.getId());
         }
-        AdminUserDO user = adminUserService.getUser(loginUser.getId());
         List<RecentContractVO> list = customDefineMapper.rencentContractList(user.getIdNo());
         for (RecentContractVO vo : list) {
             if (vo == null || StrUtil.isBlank(vo.getIdNo())) {
@@ -189,7 +190,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             throw new AccessDeniedException("无权限查询该用户信用信息");
         }
         Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
-        log.info("[creditSearch][信用查询审计] operator={} idNoCipher={}", loginUserId, pageReqVO.getIdNo());
+        log.info("[creditSearch][信用查询审计] operator={}", loginUserId);
         if (teaseGuard.isTeasing(loginUserId)) {
             return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory.generateCreditSearchPage(loginUserId, pageReqVO);
         }
@@ -248,11 +249,12 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public List<ContractDO> page(ContractPageReqDtoVO reqVO) {
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
+        AdminUserDO user = loginUser == null ? null : adminUserService.getUser(loginUser.getId());
+        if (!hasVerifiedIdentity(user)) return Collections.emptyList();
         if (teaseGuard.isTeasing(loginUser.getId())) {
             return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory
                     .generateContractList(loginUser.getId(), reqVO, 8);
         }
-        AdminUserDO user = adminUserService.getUser(loginUser.getId());
         if (StringUtils.isEmpty(user.getRealname()) || StringUtils.isEmpty(user.getIdNo())) {
             throw new RuntimeException("请完善个人信息");
         }
@@ -282,10 +284,14 @@ public class CustomDefineServiceImpl implements CustomDefineService{
                 .eqIfPresent(ContractDO::getTariff, reqVO.getTariff())
                 .eqIfPresent(ContractDO::getFile, reqVO.getFile())
                 .orderByDesc(ContractDO::getId);
-        log.info("SQL: {}", contractDOLambdaQueryWrapperX.getSqlSegment());
-        log.info("参数: {}", reqVO.getIndebtedId());
+        log.info("[contractPage][查询审计] operator={}", loginUser.getId());
         List<ContractDO> contractDOS = contractMapper.selectList(contractDOLambdaQueryWrapperX);
         return contractDOS;
+    }
+
+    private boolean hasVerifiedIdentity(AdminUserDO user) {
+        return user != null && Integer.valueOf(1).equals(user.getVerified())
+                && StrUtil.isNotBlank(user.getRealname()) && StrUtil.isNotBlank(user.getIdNo());
     }
 
     @Override

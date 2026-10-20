@@ -36,7 +36,7 @@ public class AuditLogController {
 
     @GetMapping("/page")
     @Operation(summary = "分页查询审计日志")
-    @PreAuthorize("@ss.hasPermission('custom:audit-log:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin') and @ss.hasPermission('custom:audit-log:query')")
     public CommonResult<PageResult<AuditLogRespVO>> getAuditLogPage(@Valid AuditLogPageReqVO pageReqVO) {
         PageResult<AuditLogDO> page = auditLogService.getPage(pageReqVO);
         return success(BeanUtils.toBean(page, AuditLogRespVO.class));
@@ -45,7 +45,7 @@ public class AuditLogController {
     @GetMapping("/get")
     @Operation(summary = "查询单条审计日志详情")
     @Parameter(name = "id", description = "日志ID", required = true)
-    @PreAuthorize("@ss.hasPermission('custom:audit-log:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin') and @ss.hasPermission('custom:audit-log:query')")
     public CommonResult<AuditLogRespVO> getAuditLog(@RequestParam("id") Long id) {
         AuditLogDO log = auditLogService.get(id);
         return success(BeanUtils.toBean(log, AuditLogRespVO.class));
@@ -53,12 +53,12 @@ public class AuditLogController {
 
     @GetMapping("/export-excel")
     @Operation(summary = "导出审计日志 Excel")
-    @PreAuthorize("@ss.hasPermission('custom:audit-log:export')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin') and @ss.hasPermission('custom:audit-log:export')")
     @ApiAccessLog(operateType = EXPORT)
     public void exportAuditLogExcel(@Valid AuditLogPageReqVO pageReqVO,
                                     HttpServletResponse response) throws IOException {
         pageReqVO.setPageSize(cn.iocoder.yudao.framework.common.pojo.PageParam.PAGE_SIZE_NONE);
-        List<AuditLogDO> list = auditLogService.getPage(pageReqVO).getList();
+        List<AuditLogDO> list = auditLogService.getExportPage(pageReqVO).getList();
         ExcelUtils.write(response, "审计日志.xls", "数据", AuditLogRespVO.class,
                 BeanUtils.toBean(list, AuditLogRespVO.class));
     }

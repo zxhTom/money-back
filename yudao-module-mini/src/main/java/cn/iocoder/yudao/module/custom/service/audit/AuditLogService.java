@@ -10,6 +10,8 @@ public interface AuditLogService {
 
     PageResult<AuditLogDO> getPage(AuditLogPageReqVO reqVO);
 
+    PageResult<AuditLogDO> getExportPage(AuditLogPageReqVO reqVO);
+
     AuditLogDO get(Long id);
 
     Integer cleanAuditLog(Integer exceedDay, Integer deleteLimit);
