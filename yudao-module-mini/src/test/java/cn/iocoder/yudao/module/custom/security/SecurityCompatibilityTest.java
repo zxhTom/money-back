@@ -57,11 +57,11 @@ class SecurityCompatibilityTest {
  @Test void cannotRecommendForAnotherIdentity()throws Exception{recommendation();assertThrows(AccessDeniedException.class,()->recommendation.guessYouLike("from","other-id"));verifyNoInteractions(contracts);}
  @Test void ownRecommendationKeepsLegacyFieldsAndEncryptsHistoricalPlaintext()throws Exception{recommendation();ContractGuessRespVO v=new ContractGuessRespVO();v.setTargetName("Synthetic Target");v.setTargetIdCard("historical-plain");when(contracts.guessDebtor("stored-id","plain-id")).thenReturn(v);when(cipher.requestToStoredCipher("historical-plain")).thenReturn("encrypted-target");assertSame(v,recommendation.guessYouLike("from","own-id"));assertEquals("Synthetic Target",v.getTargetName());assertEquals("encrypted-target",v.getTargetIdCard());}
  AdminUserServiceImpl profiles;AdminUserMapper userMapper;UserProfileUpdateReqVO profile;
- void profile()throws Exception{profiles=new AdminUserServiceImpl();userMapper=mock(AdminUserMapper.class);cipher=mock(IdCardCipherService.class);when(userMapper.selectById(42L)).thenReturn(user());set(profiles,"userMapper",userMapper);set(profiles,"idCardCipherService",cipher);profile=new UserProfileUpdateReqVO();}
+ void profile()throws Exception{profiles=new AdminUserServiceImpl();userMapper=mock(AdminUserMapper.class);cipher=mock(IdCardCipherService.class);when(userMapper.selectById(42L)).thenReturn(user());when(userMapper.update(any(AdminUserDO.class),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);set(profiles,"userMapper",userMapper);set(profiles,"idCardCipherService",cipher);profile=new UserProfileUpdateReqVO();}
  @Test void verifiedIdentityChangeIsDeniedBeforeDatabaseWrite()throws Exception{profile();profile.setRealname("Other Person");assertThrows(AccessDeniedException.class,()->profiles.updateUserProfile(42L,profile));verify(userMapper,never()).updateById(any(AdminUserDO.class));}
  @Test void verifiedIdentityUnchangedCipherFromReleasedClientStillSaves()throws Exception{profile();profile.setRealname("Test Person");profile.setIdNo("old-client-cipher");when(cipher.sameIdCard("old-client-cipher","stored-id")).thenReturn(true);when(cipher.resolveToPlain("old-client-cipher")).thenReturn("plain-id");profiles.updateUserProfile(42L,profile);verify(userMapper).updateById(any(AdminUserDO.class));}
  @Test void verifiedUserCanSaveOtherProfileFieldsWithoutIdentity()throws Exception{profile();profile.setAddress("Synthetic address");profiles.updateUserProfile(42L,profile);verify(userMapper).updateById(any(AdminUserDO.class));}
- @Test void unverifiedUserCanCompleteIdentityBeforeFirstFaceAuth()throws Exception{profile();AdminUserDO u=user();u.setVerified(0);when(userMapper.selectById(42L)).thenReturn(u);profile.setIdNo("new-identity");profile.setRealname("New Person");when(cipher.resolveToPlain("new-identity")).thenReturn("new-identity");profiles.updateUserProfile(42L,profile);verify(userMapper).updateById(any(AdminUserDO.class));}
+ @Test void unverifiedUserCanCompleteIdentityBeforeFirstFaceAuth()throws Exception{profile();AdminUserDO u=user();u.setVerified(0);when(userMapper.selectById(42L)).thenReturn(u);profile.setIdNo("new-identity");profile.setRealname("New Person");when(cipher.resolveToPlain("new-identity")).thenReturn("new-identity");profiles.updateUserProfile(42L,profile);verify(userMapper).update(any(AdminUserDO.class),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));}
  FaceAuthSessionGuard face;StringRedisTemplate redis;ValueOperations<String,String> ops;FaceAuthCallbackTokenStore legacy;
  void face()throws Exception{face=new FaceAuthSessionGuard();users=mock(AdminUserService.class);cipher=mock(IdCardCipherService.class);redis=mock(StringRedisTemplate.class);ops=mock(ValueOperations.class);legacy=mock(FaceAuthCallbackTokenStore.class);when(redis.opsForValue()).thenReturn(ops);when(users.getUser(42L)).thenReturn(user());when(cipher.sameIdCard("stored-id","stored-id")).thenReturn(true);when(cipher.normalizeRequestToCipher("stored-id")).thenReturn("cipher-id");when(cipher.resolveToPlain("stored-id")).thenReturn("plain-id");set(face,"users",users);set(face,"cipher",cipher);set(face,"redis",redis);set(face,"legacy",legacy);}
  @Test void faceCannotStartForAnotherIdentity()throws Exception{face();assertThrows(AccessDeniedException.class,()->face.requireIdentity("other-id"));}
@@ -105,4 +105,29 @@ class SecurityCompatibilityTest {
  }
 
  @Test void otpAndRecommendationSecretsNeverReachJsonAccessLogs(){String clean=cn.iocoder.yudao.framework.apilog.core.filter.SensitiveLogSanitizer.sanitize("{\"code\":\"synthetic-secret\",\"verifyCode\":\"synthetic-secret\",\"targetName\":\"synthetic-secret\",\"targetIdCard\":\"synthetic-secret\",\"contactInfo\":\"synthetic-secret\",\"safeId\":42}");assertFalse(clean.contains("synthetic-secret"));assertTrue(clean.contains("safeId"));}
+
+ @Test void unverifiedSelfDeclaredIdentityDoesNotGrantPartyAccess()throws Exception{
+  ContractOwnershipGuard guard=new ContractOwnershipGuard();AdminUserService us=mock(AdminUserService.class);IdCardCipherService ci=mock(IdCardCipherService.class);
+  cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper roles=mock(cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper.class);
+  cn.iocoder.yudao.module.system.service.permission.RoleService rs=mock(cn.iocoder.yudao.module.system.service.permission.RoleService.class);
+  when(roles.selectListByUserId(42L)).thenReturn(java.util.Collections.emptyList());when(rs.getRoleList(anyCollection())).thenReturn(java.util.Collections.emptyList());
+  AdminUserDO u=user();u.setVerified(0);when(us.getUser(42L)).thenReturn(u);when(ci.sameIdCard(anyString(),anyString())).thenReturn(true);
+  set(guard,"adminUserService",us);set(guard,"idCardCipherService",ci);set(guard,"userRoleMapper",roles);set(guard,"roleService",rs);
+  ContractDO c=new ContractDO();c.setCreator("99");c.setIndebtedId("stored-id");c.setCreditorId("other-id");assertFalse(guard.isAuthorized(c,42L));
+  u.setVerified(1);assertTrue(guard.isAuthorized(c,42L));u.setVerified(0);c.setCreator("42");assertTrue(guard.isAuthorized(c,42L));
+ }
+ @Test void faceCompletionRacePreventsAnOldIdentityChangeFromOverwritingVerifiedProfile()throws Exception{
+  profile();AdminUserDO u=user();u.setVerified(0);when(userMapper.selectById(42L)).thenReturn(u);profile.setRealname("Changed Person");
+  when(userMapper.update(any(AdminUserDO.class),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(0);
+  assertThrows(AccessDeniedException.class,()->profiles.updateUserProfile(42L,profile));verify(userMapper,never()).updateById(any(AdminUserDO.class));
+ }
+ @Test void unverifiedIdentityCannotObtainContactRecommendations()throws Exception{recommendation();AdminUserDO u=user();u.setVerified(0);when(users.getUser(42L)).thenReturn(u);assertThrows(AccessDeniedException.class,()->recommendation.guessYouLike("from","own-id"));verifyNoInteractions(contracts);}
+
+ @Test void directCreditDetailCannotBypassRelationshipAuthorization()throws Exception{
+  recommendation();cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker checker=mock(cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker.class);
+  ContractTeaseGuard tease=mock(ContractTeaseGuard.class);set(recommendation,"creditQueryAccessChecker",checker);set(recommendation,"teaseGuard",tease);
+  when(cipher.normalizeRequestToCipher("target")).thenReturn("normalized");
+  cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO input=new cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO();input.setCreditorId("target");
+  assertThrows(AccessDeniedException.class,()->recommendation.getContractPageForListing(input));verify(contracts,never()).selectPage(any(cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO.class));
+ }
 }

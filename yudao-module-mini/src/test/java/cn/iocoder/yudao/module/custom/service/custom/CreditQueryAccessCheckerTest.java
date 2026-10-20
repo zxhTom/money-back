@@ -69,6 +69,7 @@ public class CreditQueryAccessCheckerTest {
         when(securityFrameworkService.hasPermission("custom:contract:credit-query")).thenReturn(false);
         loginAs(1L);
         AdminUserDO caller = new AdminUserDO();
+        caller.setVerified(1);
         caller.setIdNo("");
         when(adminUserService.getUser(1L)).thenReturn(caller);
         assertFalse(checker.canQueryCredit("someTargetIdNo"));
@@ -79,6 +80,7 @@ public class CreditQueryAccessCheckerTest {
         when(securityFrameworkService.hasPermission("custom:contract:credit-query")).thenReturn(false);
         loginAs(1L);
         AdminUserDO caller = new AdminUserDO();
+        caller.setVerified(1);
         caller.setIdNo("callerCipher");
         when(adminUserService.getUser(1L)).thenReturn(caller);
         lenient().when(idCardCipherService.resolveToPlain(any())).thenAnswer(inv -> {
@@ -94,6 +96,7 @@ public class CreditQueryAccessCheckerTest {
         when(securityFrameworkService.hasPermission("custom:contract:credit-query")).thenReturn(false);
         loginAs(1L);
         AdminUserDO caller = new AdminUserDO();
+        caller.setVerified(1);
         caller.setIdNo("callerCipher");
         when(adminUserService.getUser(1L)).thenReturn(caller);
         when(idCardCipherService.resolveToPlain(any())).thenReturn("110101199001011234");
@@ -101,4 +104,18 @@ public class CreditQueryAccessCheckerTest {
         assertFalse(checker.canQueryCredit("targetCipher"));
     }
 
+
+    @Test
+    public void unverifiedIdentityCannotUseRelationshipAsAuthorization() {
+        loginAs(1L);AdminUserDO caller=new AdminUserDO();caller.setIdNo("callerCipher");caller.setVerified(0);
+        when(adminUserService.getUser(1L)).thenReturn(caller);
+        assertFalse(checker.canQueryCredit("targetCipher"));
+        org.mockito.Mockito.verifyNoInteractions(contractMapper);
+    }
+    @Test
+    public void verifiedUserCanQueryOwnCreditWithoutSelfContract() {
+        loginAs(1L);AdminUserDO caller=new AdminUserDO();caller.setIdNo("callerCipher");caller.setVerified(1);
+        when(adminUserService.getUser(1L)).thenReturn(caller);when(idCardCipherService.sameIdCard("callerCipher","sameIdentity")).thenReturn(true);
+        assertTrue(checker.canQueryCredit("sameIdentity"));org.mockito.Mockito.verifyNoInteractions(contractMapper);
+    }
 }

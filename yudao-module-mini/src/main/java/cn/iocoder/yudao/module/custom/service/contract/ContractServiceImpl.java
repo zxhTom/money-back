@@ -80,6 +80,8 @@ public class ContractServiceImpl implements ContractService {
     @Resource
     private ContractOwnershipGuard ownershipGuard;
     @Resource
+    private cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker creditQueryAccessChecker;
+    @Resource
     private ContractTeaseGuard teaseGuard;
 
     @Override
@@ -239,6 +241,10 @@ public class ContractServiceImpl implements ContractService {
                 || StrUtil.isNotBlank(pageReqVO.getCreditorId());
         if (!hasPartyFilter) {
             return getSelfContractPage(pageReqVO);
+        }
+        if ((StrUtil.isNotBlank(pageReqVO.getIndebtedId()) && !creditQueryAccessChecker.canQueryCredit(pageReqVO.getIndebtedId()))
+                || (StrUtil.isNotBlank(pageReqVO.getCreditorId()) && !creditQueryAccessChecker.canQueryCredit(pageReqVO.getCreditorId()))) {
+            throw new org.springframework.security.access.AccessDeniedException("无权限查询该用户信用信息");
         }
         return contractMapper.selectPage(pageReqVO);
     }
@@ -493,7 +499,7 @@ public class ContractServiceImpl implements ContractService {
     public cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessYouLike(String direction, String myIdCard) {
         Long userId = SecurityFrameworkUtils.getLoginUserId();
         AdminUserDO caller = userId == null ? null : adminUserService.getUser(userId);
-        if (caller == null || StrUtil.isBlank(caller.getIdNo())
+        if (caller == null || !Integer.valueOf(1).equals(caller.getVerified()) || StrUtil.isBlank(caller.getIdNo())
                 || !idCardCipherService.sameIdCard(caller.getIdNo(), myIdCard)) {
             throw new org.springframework.security.access.AccessDeniedException("只能查询本人的联系人推荐");
         }

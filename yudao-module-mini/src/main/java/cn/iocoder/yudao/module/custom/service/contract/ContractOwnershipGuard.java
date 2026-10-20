@@ -42,7 +42,7 @@ public class ContractOwnershipGuard {
             return true;
         }
         AdminUserDO user = adminUserService.getUser(loginUserId);
-        if (user != null && StrUtil.isNotBlank(user.getIdNo())) {
+        if (user != null && Integer.valueOf(1).equals(user.getVerified()) && StrUtil.isNotBlank(user.getIdNo())) {
             if (idCardCipherService.sameIdCard(user.getIdNo(), contract.getIndebtedId())
                     || idCardCipherService.sameIdCard(user.getIdNo(), contract.getCreditorId())) {
                 return true;

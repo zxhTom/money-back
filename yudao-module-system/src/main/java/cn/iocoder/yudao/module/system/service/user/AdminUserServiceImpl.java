@@ -282,13 +282,18 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (reqVO.getEducation() != null) {
             updateObj.setEducation(reqVO.getEducation());
         }
-        if (reqVO.getRealname() != null) {
-            updateObj.setRealname(reqVO.getRealname());
+        boolean nameChanged = reqVO.getRealname() != null && !Objects.equals(reqVO.getRealname(), current.getRealname());
+        boolean identityChanged = idNoPlain != null && !idCardCipherService.sameIdCard(reqVO.getIdNo(), current.getIdNo());
+        // Do not rewrite unchanged identity fields echoed by an older client.
+        if (nameChanged) updateObj.setRealname(reqVO.getRealname());
+        if (identityChanged) updateObj.setIdNo(idNoPlain);
+        if (nameChanged || identityChanged) {
+            int updated = userMapper.update(updateObj, new LambdaUpdateWrapper<AdminUserDO>().eq(AdminUserDO::getId, id)
+                    .and(w -> w.isNull(AdminUserDO::getVerified).or().ne(AdminUserDO::getVerified, 1)));
+            if (updated != 1) throw new org.springframework.security.access.AccessDeniedException("认证状态已变化，请刷新资料后重试");
+        } else {
+            userMapper.updateById(updateObj);
         }
-        if (idNoPlain != null) {
-            updateObj.setIdNo(idNoPlain);
-        }
-        userMapper.updateById(updateObj);
     }
 
     @Override

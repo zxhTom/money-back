@@ -7,8 +7,8 @@
 1. POST custom/contract/dashboard/getPayOrder：仍接收 {id}，仍返回 data.id、data.payOrderId。
 2. GET custom/contract/dashboard/get?id=...&sync=true：本人或合法合同当事人仍可查询并同步；先授权再同步。
 3. bindQrcode/deleteQrcode：路径、请求和响应不变；服务端新增合同归属检查。二维码仍接受 HTTP/HTTPS 图片地址。
-4. 联系人推荐仍返回 targetName、targetIdCard，查本人时兼容传入明文或原密文；targetIdCard 强制返回密文，避免历史明文透出。仅允许推荐本人联系人。
-5. user/profile/update：已认证用户原样提交姓名、证件原密文仍可保存其他资料；未认证用户仍可完善身份。已认证用户直接更换身份被拒绝，需管理员解除认证后重新核验。
+4. 联系人推荐仍返回 targetName、targetIdCard，查本人时兼容传入明文或原密文；targetIdCard 强制返回密文，避免历史明文透出。仅允许推荐已核验的本人联系人；未核验用户仍可完善资料、发起认证及管理本人创建的合同，但不能凭自填证件获得他人的当事人权限。
+5. user/profile/update：已认证用户原样提交姓名、证件原密文仍可保存其他资料；未认证用户仍可完善身份。已认证用户直接更换身份被拒绝，需管理员解除认证后重新核验。身份写入加条件更新，认证完成后的旧请求不能覆盖身份。
 6. faceAuth/start、reportInfo、queryResult 的字段和格式不变；人脸会话绑定当前用户、租户与登记证件。旧版本已发起、仍在待核身映射中的本人会话可被安全迁移；不存在有效映射的过期会话需重新发起。普通用户不能为他人创建或查询人脸会话。
 7. 反馈分页保持列表结构：普通用户只能看到自己的反馈，管理员可看本租户列表。设备公开 enabled 查询不变，管理操作加管理员角色要求。
 8. 普通 contract 用户的用户名+身份证找回密码策略和 N=3/M=5 不变；管理员仍不能使用该公开找回入口。

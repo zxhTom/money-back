@@ -42,9 +42,10 @@ public class CreditQueryAccessChecker {
             return false;
         }
         AdminUserDO caller = adminUserService.getUser(loginUserId);
-        if (caller == null || StrUtil.isBlank(caller.getIdNo())) {
+        if (caller == null || !Integer.valueOf(1).equals(caller.getVerified()) || StrUtil.isBlank(caller.getIdNo())) {
             return false;
         }
+        if (idCardCipherService.sameIdCard(caller.getIdNo(), targetIdNoRaw)) return true;
         String callerIdNo = idCardCipherService.resolveToPlain(caller.getIdNo());
         String targetIdNo = idCardCipherService.resolveToPlain(targetIdNoRaw);
         if (StrUtil.isBlank(callerIdNo) || StrUtil.isBlank(targetIdNo)) {
