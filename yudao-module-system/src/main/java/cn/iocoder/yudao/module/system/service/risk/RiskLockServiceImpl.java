@@ -193,7 +193,9 @@ public class RiskLockServiceImpl implements RiskLockService {
                     }
                     item.put("unlockerId",rs.getObject("unlocker_id"));return item;
                 }, userId, tenantId));
-        result.put("loginHistory", jdbc.query("SELECT create_time,result FROM system_login_log WHERE user_id=? AND tenant_id=? AND user_type=2 AND deleted=0 AND log_type=100 ORDER BY id DESC LIMIT 20",
+        // Legacy anonymous login events were written with tenant_id=0. The globally unique user ID
+        // is first checked against the current tenant above, so this does not expose other tenants.
+        result.put("loginHistory", jdbc.query("SELECT create_time,result FROM system_login_log WHERE user_id=? AND (tenant_id=? OR tenant_id=0) AND user_type=2 AND deleted=0 AND log_type=100 ORDER BY id DESC LIMIT 20",
                 (rs,n) -> { Map<String,Object> item=new LinkedHashMap<>();item.put("time",rs.getTimestamp("create_time").getTime());item.put("result",rs.getInt("result"));return item; }, userId, tenantId));
         return result;
     }

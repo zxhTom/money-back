@@ -34,7 +34,7 @@ class RiskLoginSecurityTest {
  @Test void snapshotReturnsLiveCountAndTenantScopedHistoryWithoutChangingState(){
   when(values.get("risk:pwd_err:42")).thenReturn("4");when(redis.getExpire("risk:pwd_err:42",TimeUnit.SECONDS)).thenReturn(90L);
   Map<String,Object> state=service.getLoginSecurity(USER);assertEquals(4L,state.get("passwordErrorCount"));assertEquals(false,state.get("locked"));assertEquals(5,state.get("passwordErrorLimit"));assertNotNull(state.get("counterExpiresAt"));
-  verify(jdbc).query(contains("system_login_log WHERE user_id=? AND tenant_id=?"),any(RowMapper.class),eq(USER),eq(7L));verify(redis,never()).delete(anyString());
+  verify(jdbc).query(contains("system_login_log WHERE user_id=? AND (tenant_id=? OR tenant_id=0)"),any(RowMapper.class),eq(USER),eq(7L));verify(redis,never()).delete(anyString());
  }
  @Test void missingOrOtherTenantUserCannotReadOrUnlock(){
   doReturn(Collections.emptyList()).when(jdbc).query(startsWith("SELECT status"),any(RowMapper.class),eq(USER),eq(7L));

@@ -5,7 +5,7 @@
 现有提示源于 `ErrorCodeConstants`，不读取系统配置。管理员停用保留原错误码 `1002000001`，文案明确为管理员停用；临时风控使用 `1002000011`，返回原因、到期时间和剩余分钟；长期风控使用 `1002000012`。密码错误规则保持原样：首次错误起 24 小时累计 5 次锁定 30 分钟，成功登录不清零。
 
 读取：`GET /system/risk-lock/login-security?userId=...`，需 `system:user:query`。
-手动处理：`PUT /system/risk-lock/unlock?userId=...&reason=...`，需 `system:risk-lock:update`；填写原因并确认，清除锁与密码错误计数，不修改密码、不变更 `system_users.status`。通过系统操作日志留痕，有效锁定记录同时写解锁人及时间。接口显式校验目标用户属于当前租户。
+手动处理：`PUT /system/risk-lock/unlock?userId=...&reason=...`，需 `system:risk-lock:update` 或现有的 `system:user:update`；填写原因并确认，清除锁与密码错误计数，不修改密码、不变更 `system_users.status`。通过系统操作日志留痕，有效锁定记录同时写解锁人及时间。接口显式校验目标用户属于当前租户。
 
 仅查询显示字段，不读取或返回密码、密码哈希、令牌、身份证信息。前端接口超时 15 秒；关闭抽屉后过期请求不会覆盖后续用户的状态。
 
