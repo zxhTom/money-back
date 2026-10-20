@@ -138,6 +138,15 @@ public class UserController {
         return success(true);
     }
 
+    @PutMapping("/update-verified")
+    @Operation(summary = "人工修改用户认证状态")
+    @PreAuthorize("@ss.hasPermission('system:user:update-verified')")
+    public CommonResult<Boolean> updateUserVerified(@Valid @RequestBody UserUpdateVerifiedReqVO reqVO) {
+        userService.updateUserVerified(reqVO.getId(), reqVO.getExpectedVerified(),
+                reqVO.getVerified(), reqVO.getReason());
+        return success(true);
+    }
+
     @GetMapping("/page")
     @Operation(summary = "获得用户分页列表")
     @PreAuthorize("@ss.hasPermission('system:user:query')")

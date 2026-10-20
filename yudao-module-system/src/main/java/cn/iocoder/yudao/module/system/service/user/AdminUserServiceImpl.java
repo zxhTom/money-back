@@ -38,6 +38,7 @@ import cn.iocoder.yudao.module.system.service.dept.PostService;
 import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.system.service.tenant.TenantService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.service.impl.DiffParseFunction;
@@ -232,7 +233,12 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Override
     public void updateUserProfile(Long id, UserProfileUpdateReqVO reqVO) {
-        validateUserExists(id);
+        AdminUserDO current = validateUserExists(id);
+        if (Integer.valueOf(1).equals(current.getVerified())
+                && ((reqVO.getRealname() != null && !java.util.Objects.equals(reqVO.getRealname(), current.getRealname()))
+                || (StrUtil.isNotBlank(reqVO.getIdNo()) && !idCardCipherService.sameIdCard(reqVO.getIdNo(), current.getIdNo())))) {
+            throw new org.springframework.security.access.AccessDeniedException("已认证身份不可直接修改，请先由管理员解除认证后重新核验");
+        }
         validateEmailUnique(id, reqVO.getEmail());
         validateMobileUnique(id, reqVO.getMobile());
         validateNicknameContent(reqVO.getNickname());
@@ -417,6 +423,43 @@ public class AdminUserServiceImpl implements AdminUserService {
         if (CommonStatusEnum.isDisable(status)) {
             oauth2TokenService.removeAllTokensByUserId(id, UserTypeEnum.ADMIN.getValue());
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @LogRecord(type = SYSTEM_USER_TYPE, subType = SYSTEM_USER_UPDATE_VERIFIED_SUB_TYPE, bizNo = "{{#id}}",
+            success = SYSTEM_USER_UPDATE_VERIFIED_SUCCESS)
+    public void updateUserVerified(Long id, Integer expectedVerified, Integer verified, String reason) {
+        AdminUserDO user = validateUserExists(id);
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
+        int currentVerified = Integer.valueOf(1).equals(user.getVerified()) ? 1 : 0;
+        if (!Objects.equals(currentVerified, expectedVerified)) {
+            throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "认证状态已变化，请刷新列表后重试");
+        }
+        if (Objects.equals(currentVerified, verified)) {
+            throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "认证状态未变化");
+        }
+        if (Integer.valueOf(1).equals(verified)
+                && (StrUtil.isBlank(user.getRealname()) || StrUtil.isBlank(user.getIdNo()))) {
+            throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "用户缺少真实姓名或身份证号，不能设为已认证");
+        }
+        AdminUserDO updateObj = new AdminUserDO();
+        updateObj.setId(id);
+        updateObj.setVerified(verified);
+        LambdaUpdateWrapper<AdminUserDO> updateCondition = new LambdaUpdateWrapper<AdminUserDO>()
+                .eq(AdminUserDO::getId, id);
+        if (user.getVerified() == null) {
+            updateCondition.isNull(AdminUserDO::getVerified);
+        } else {
+            updateCondition.eq(AdminUserDO::getVerified, user.getVerified());
+        }
+        if (userMapper.update(updateObj, updateCondition) != 1) {
+            throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "认证状态已变化，请刷新列表后重试");
+        }
+        LogRecordContext.putVariable("user", user);
+        LogRecordContext.putVariable("oldVerified", currentVerified == 1 ? "已认证" : "未认证");
+        LogRecordContext.putVariable("newVerified", verified == 1 ? "已认证" : "未认证");
+        LogRecordContext.putVariable("reason", reason.trim());
     }
 
     @Override

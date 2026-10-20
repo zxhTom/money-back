@@ -23,6 +23,7 @@ public class AutoTestController {
     private AutoTestService autoTestService;
 
     @PostMapping("/run")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin')")
     @Operation(summary = "运行自动化测试流程")
     public CommonResult<Boolean> runAutoTest() throws Exception {
         String username = SecurityFrameworkUtils.getLoginUserNickname();

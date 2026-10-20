@@ -491,11 +491,20 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     public cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessYouLike(String direction, String myIdCard) {
-        if ("from".equals(direction)) {
-            return contractMapper.guessDebtor(myIdCard);
-        } else {
-            return contractMapper.guessCreditor(myIdCard);
+        Long userId = SecurityFrameworkUtils.getLoginUserId();
+        AdminUserDO caller = userId == null ? null : adminUserService.getUser(userId);
+        if (caller == null || StrUtil.isBlank(caller.getIdNo())
+                || !idCardCipherService.sameIdCard(caller.getIdNo(), myIdCard)) {
+            throw new org.springframework.security.access.AccessDeniedException("只能查询本人的联系人推荐");
         }
+        // Existing clients send either the stored cipher or a decrypted identity.
+        // Query both historical storage shapes, but never return the stored plaintext.
+        String stored = caller.getIdNo();
+        String plain = idCardCipherService.resolveToPlain(caller.getIdNo());
+        cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO result =
+                "from".equals(direction) ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
+        if (result != null) result.setTargetIdCard(idCardCipherService.requestToStoredCipher(result.getTargetIdCard()));
+        return result;
     }
 
 }

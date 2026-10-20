@@ -33,6 +33,8 @@ import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.FACE
 @RequestMapping("/api/faceAuth")
 public class FaceAuthController {
 
+    @Resource private cn.iocoder.yudao.module.custom.service.face.FaceAuthSessionGuard sessionGuard;
+
     @Autowired
     private BaiduFaceAuthService baiduFaceAuthService;
 
@@ -54,11 +56,13 @@ public class FaceAuthController {
      * 返回 verify_token 和 构造好的核身URL
      */
     @GetMapping("/start")
+    @cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter(time=60, count=10, keyResolver=cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.UserRateLimiterKeyResolver.class)
     public CommonResult<Map<String, Object>> startFaceAuth(
             @Parameter(description = "身份证：明文或密文（与 profile.idNo 一致），服务端自动识别") @RequestParam String idCard) throws Exception {
         // 注意：brain.toms.chat 核身完成后重定向到 successUrl/failUrl 时，只回传 status+idCard，
         // 不会透传我们追加的任何自定义参数（verify_token 都拿不回来），因此回调不能直接信任 status；
         // 服务端权威校验走 idCard -> verify_token 的映射（见 FaceAuthCallbackTokenStore）+ 主动查百度结果。
+        sessionGuard.requireIdentity(idCard);
         String idCardEnc = URLEncoder.encode(idCard, StandardCharsets.UTF_8.name());
         String successUrl = serverDomain + "/api/mini/callback?status=success&idCard=" + idCardEnc;
         String failUrl = serverDomain + "/api/mini/callback?status=failed&idCard=" + idCardEnc;
@@ -66,6 +70,7 @@ public class FaceAuthController {
         String verifyToken = baiduFaceAuthService.getVerifyToken(successUrl, failUrl);
 
         // 1.1 记录 idCard -> verify_token 映射，供回调时反查百度权威结果（防伪造 status）
+        sessionGuard.bind(verifyToken, idCard);
         faceAuthCallbackTokenStore.store(idCard, verifyToken);
 
         // 2. 根据 token 构造H5核身页面URL[citation:6]
@@ -84,14 +89,19 @@ public class FaceAuthController {
      * 不能在这里把 verified 置 1（此前的 bug：曾在这里无条件写库，导致"无论人脸核验成不成功都已认证"）。
      */
     @PostMapping("/reportInfo")
+    @cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter(time=60, count=20, keyResolver=cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.UserRateLimiterKeyResolver.class)
     public CommonResult<Map<String, Object>> reportUserInfo(@RequestBody BaiduUserInfo baiduUserInfo) throws Exception {
+        AdminUserDO caller = sessionGuard.requireIdentity(baiduUserInfo.getIdCard());
+        if (StrUtil.isBlank(caller.getRealname()) || !caller.getRealname().trim().equals(StrUtil.trim(baiduUserInfo.getName())))
+            throw new org.springframework.security.access.AccessDeniedException("请使用本人登记的实名信息");
         String verifyToken = baiduUserInfo.getVerifyToken();
         if (StringUtils.isEmpty(verifyToken)) {
             CommonResult<Map<String, Object>> mapCommonResult = startFaceAuth(baiduUserInfo.getIdCard());
             Map<String, Object> checkedData = mapCommonResult.getCheckedData();
             verifyToken = checkedData.getOrDefault("verify_token","").toString();
         }
-        String name = baiduUserInfo.getName();
+        sessionGuard.requireToken(verifyToken);
+        String name = caller.getRealname();
         String idCard = idCardCipherService.decryptForExternalApi(baiduUserInfo.getIdCard());
         boolean success = baiduFaceAuthService.reportUserInfo(verifyToken, name, idCard);
         Map<String, Object> result = new HashMap<>();
@@ -105,7 +115,9 @@ public class FaceAuthController {
     // 注意：还需要一个查询最终核验结果的接口（调用百度云结果查询API[citation:2]）
     // 核身完成后，你的服务端必须调用此接口验证，不能仅依赖前端回调
     @PostMapping("/queryResult")
+    @cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter(time=60, count=120, keyResolver=cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.UserRateLimiterKeyResolver.class)
     public CommonResult<Map<String, Object>> queryFaceAuthResult(@RequestParam String verifyToken) throws Exception {
+        sessionGuard.requireToken(verifyToken);
         return success(baiduFaceAuthService.queryFaceAuthResult(verifyToken));
     }
 

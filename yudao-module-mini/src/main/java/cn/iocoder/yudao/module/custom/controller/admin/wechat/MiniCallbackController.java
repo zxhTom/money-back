@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.ITemplateEngine;
 import org.thymeleaf.context.Context;
 
 import javax.annotation.Resource;
@@ -22,23 +22,14 @@ import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Map;
+import java.util.Locale;
 
 /**
  * 微信小程序 WebView 回调控制器
  * 用于接收外部回调（brain.toms.chat 人脸核身完成后重定向到此）并把结果回传小程序。
  *
- * 说明（重要，涉及已知的安全取舍，改动前务必确认这是产品明确要的）：
- *   brain.toms.chat 核身完成后只会重定向到 successUrl / failUrl（?status=success|failed&idCard=xxx），
- *   这个重定向里没有 verify_token，本身又是免登录公开地址，任何人都能伪造这个请求。
- *   本来（2026-07-29 之前）这里已经改成完全不信任 status，只认 idCard 反查
- *   FaceAuthCallbackTokenStore 里的 verify_token、拿它向百度查权威结果（server -> 百度，
- *   无法被第三方伪造）、只有百度确认"通过"才写库。
- *   2026-07-29 应产品明确要求恢复了"status 快速路径"：status=success 时立即
- *   updateVerify(idCard,1)，不等百度查询——这意味着这个免登录回调地址理论上可以被
- *   伪造 status=success 抢先把任意 idCard 标记为已认证，这是明确知情并接受的代价，
- *   不是遗漏。服务端查百度那套（resolveVerificationOutcome）仍然保留，用于渲染
- *   真实结果页状态（pending/success/failed），对 PASSED 结果也会重复写一次
- *   verified=1（幂等），但不会撤销快速路径已经写入的结果。
+ * 回调参数仅用于兼容原有跳转。认证状态只信任服务端保存的核身会话和百度查询结果，
+ * 并核对百度确认的证件号与该会话对应的证件号一致。
  *
  * @author zxhtom
  */
@@ -55,7 +46,7 @@ public class MiniCallbackController {
     private enum QueryOutcome { PASSED, NOT_PASSED, INCONCLUSIVE }
 
     @Autowired
-    private TemplateEngine templateEngine;
+    private ITemplateEngine templateEngine;
     @Autowired
     WechatService wechatService;
 
@@ -75,17 +66,6 @@ public class MiniCallbackController {
             HttpServletResponse response) throws IOException {
         String idNoDisplay = idCardCipherService.idNoDisplayFromStored(idCard);
 
-        // 快速路径（明确要求恢复，接受其安全代价）：直接信任回调自带的 status，
-        // status=success 时立即置 verified=1，不等下面的服务端查百度权威结果。
-        // 代价：这个回调地址本身免登录、任何人可伪造 status=success，所以这行本身
-        // 不能证明用户真的通过了核身——它只是为了比等百度查询快。真正的权威判定
-        // 仍然是下面 resolveVerificationOutcome 里的服务端查百度，失败/不确定都不会
-        // 被这里的快速路径覆盖或抢先（resolveVerificationOutcome 对 PASSED 结果会
-        // 再次 updateVerify(idCard,1)，是幂等重复写，不是回退）。
-        if ("success".equals(status)) {
-            wechatService.updateVerify(idCard, 1);
-        }
-
         String renderStatus = resolveVerificationOutcome(idCard, idNoDisplay);
 
         // 设置响应内容类型为HTML
@@ -97,7 +77,8 @@ public class MiniCallbackController {
         context.setVariable("status", renderStatus);
         context.setVariable("idNoCipher", idNoCipher);
         context.setVariable("idNoDisplay", idNoDisplay);
-        context.setVariable("verifyToken", verifyToken);
+        // 不把客户端自行传入的 token 当作服务端已验证的会话标识。
+        context.setVariable("verifyToken", null);
 
         // 使用 Thymeleaf 渲染模板
         String html = templateEngine.process("mini-callback", context);
@@ -130,15 +111,15 @@ public class MiniCallbackController {
             }
             try {
                 Map<String, Object> queryResult = baiduFaceAuthService.queryFaceAuthResult(pendingVerifyToken);
-                outcome = interpretQueryResult(queryResult);
+                outcome = interpretQueryResult(queryResult, idCard);
             } catch (Exception e) {
                 log.warn("[FaceAuth] 第{}次查询百度权威结果异常，idCard(脱敏)={}", attempt + 1, idNoDisplay, e);
             }
         }
 
         if (outcome == QueryOutcome.PASSED) {
-            faceAuthCallbackTokenStore.delete(idCard);
             wechatService.updateVerify(idCard, 1);
+            faceAuthCallbackTokenStore.delete(idCard);
             return "success";
         } else if (outcome == QueryOutcome.NOT_PASSED) {
             faceAuthCallbackTokenStore.delete(idCard);
@@ -162,12 +143,8 @@ public class MiniCallbackController {
         }
     }
 
-    /**
-     * ⚠️ data.passed 这个字段名未在真实百度响应上验证过（queryFaceAuthResult 此前是死代码，从未被调用），
-     * 上线前必须用真实核身流程核对。success=false（含异常）一律视为 INCONCLUSIVE 触发重试，
-     * 而不是直接判定 NOT_PASSED，避免把"百度那边暂时查不到/接口抖动"误判成"核验不通过"。
-     */
-    private QueryOutcome interpretQueryResult(Map<String, Object> queryResult) {
+    /** 查询失败、响应缺字段时不认证，保留会话供用户稍后重试。 */
+    private QueryOutcome interpretQueryResult(Map<String, Object> queryResult, String idCard) {
         if (queryResult == null || !Boolean.TRUE.equals(queryResult.get("success"))) {
             return QueryOutcome.INCONCLUSIVE;
         }
@@ -179,6 +156,17 @@ public class MiniCallbackController {
         if (passed == null) {
             return QueryOutcome.INCONCLUSIVE;
         }
-        return passed ? QueryOutcome.PASSED : QueryOutcome.NOT_PASSED;
+        if (!passed) {
+            return QueryOutcome.NOT_PASSED;
+        }
+        JSONObject identity = ((JSONObject) data).getJSONObject("idcard_confirm");
+        String confirmedId = identity == null ? null : identity.getString("idcard_number");
+        String expectedId = idCardCipherService.resolveToPlain(idCard);
+        if (confirmedId == null || confirmedId.trim().isEmpty()
+                || expectedId == null || expectedId.trim().isEmpty()) {
+            return QueryOutcome.INCONCLUSIVE;
+        }
+        return confirmedId.trim().toUpperCase(Locale.ROOT).equals(expectedId.trim().toUpperCase(Locale.ROOT))
+                ? QueryOutcome.PASSED : QueryOutcome.NOT_PASSED;
     }
 }

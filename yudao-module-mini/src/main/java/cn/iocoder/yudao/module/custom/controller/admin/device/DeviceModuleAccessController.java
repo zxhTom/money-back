@@ -37,7 +37,7 @@ public class DeviceModuleAccessController {
 
     @PostMapping("/set")
     @Operation(summary = "设置指定模块在指定设备上是否开放")
-    @PreAuthorize("@ss.hasPermission('custom:deviceModuleAccess:set')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin') and @ss.hasPermission('custom:deviceModuleAccess:set')")
     public CommonResult<Boolean> setAccess(@Valid @RequestBody DeviceModuleAccessSetReqVO reqVO) {
         deviceModuleAccessService.setAccess(reqVO);
         return success(true);
@@ -45,7 +45,7 @@ public class DeviceModuleAccessController {
 
     @PutMapping("/update")
     @Operation(summary = "按主键更新模块名、设备 ID、是否开放（弹窗编辑）")
-    @PreAuthorize("@ss.hasPermission('custom:deviceModuleAccess:update')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin') and @ss.hasPermission('custom:deviceModuleAccess:update')")
     public CommonResult<Boolean> updateAccess(@Valid @RequestBody DeviceModuleAccessUpdateReqVO reqVO) {
         deviceModuleAccessService.updateAccess(reqVO);
         return success(true);
@@ -63,7 +63,7 @@ public class DeviceModuleAccessController {
 
     @GetMapping("/page")
     @Operation(summary = "分页查询模块-设备开放配置")
-    @PreAuthorize("@ss.hasPermission('custom:deviceModuleAccess:set')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin') and @ss.hasPermission('custom:deviceModuleAccess:set')")
     public CommonResult<PageResult<DeviceModuleAccessPageItemRespVO>> page(@Valid DeviceModuleAccessPageReqVO reqVO) {
         PageResult<DeviceModuleAccessDO> page = deviceModuleAccessService.getPage(reqVO);
         return success(BeanUtils.toBean(page, DeviceModuleAccessPageItemRespVO.class));
@@ -71,7 +71,7 @@ public class DeviceModuleAccessController {
 
     @GetMapping("/get")
     @Operation(summary = "按主键查询单条配置（编辑前拉最新数据等场景，可选）")
-    @PreAuthorize("@ss.hasPermission('custom:deviceModuleAccess:set')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin') and @ss.hasPermission('custom:deviceModuleAccess:set')")
     public CommonResult<DeviceModuleAccessPageItemRespVO> get(@RequestParam("id") @NotNull(message = "id 不能为空") Long id) {
         DeviceModuleAccessDO row = deviceModuleAccessService.getById(id);
         if (row == null) {
@@ -82,7 +82,7 @@ public class DeviceModuleAccessController {
 
     @DeleteMapping("/delete")
     @Operation(summary = "删除指定模块-设备开放配置")
-    @PreAuthorize("@ss.hasPermission('custom:deviceModuleAccess:delete')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin') and @ss.hasPermission('custom:deviceModuleAccess:delete')")
     public CommonResult<Boolean> delete(@RequestParam("id") @NotNull(message = "id 不能为空") Long id) {
         deviceModuleAccessService.deleteById(id);
         return success(true);

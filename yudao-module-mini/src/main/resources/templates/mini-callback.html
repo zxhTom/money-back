@@ -196,10 +196,10 @@
     </div>
 </div>
 
-<script>
+<script th:inline="javascript">
     (function () {
         // 获取页面参数
-        const status = /*[[${status}]]*/ 'success';
+        const status = /*[[${status}]]*/ 'failed';
         const idNoCipher = /*[[${idNoCipher}]]*/ '';
         const idNoDisplay = /*[[${idNoDisplay}]]*/ '';
         const verifyToken = /*[[${verifyToken}]]*/ '';

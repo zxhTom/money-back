@@ -23,6 +23,8 @@ import java.util.List;
 @Validated
 @Slf4j
 public class FeedbackServiceImpl implements FeedbackService {
+    @javax.annotation.Resource
+    private cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService securityFrameworkService;
 
     @Resource
     private FeedbackMapper feedbackMapper;
@@ -75,7 +77,12 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     @Override
     public cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO> getFeedbackPage(cn.iocoder.yudao.framework.common.pojo.PageParam pageReqVO) {
-        return feedbackMapper.selectPage(pageReqVO, new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO>().orderByDesc("id"));
+        Long userId = SecurityFrameworkUtils.getLoginUserId();
+        if (userId == null) throw new org.springframework.security.access.AccessDeniedException("请先登录");
+        com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO> query =
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+        if (!securityFrameworkService.hasAnyRoles("super_admin", "tenant_admin")) query.eq("user_id", userId);
+        return feedbackMapper.selectPage(pageReqVO, query.orderByDesc("id"));
     }
 
 }

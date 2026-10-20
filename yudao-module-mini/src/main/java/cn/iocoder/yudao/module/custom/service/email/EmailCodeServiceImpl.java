@@ -50,7 +50,7 @@ public class EmailCodeServiceImpl implements EmailCodeService {
 
         // 2. 生成6位数字验证码
         String code = RandomUtil.randomNumbers(6);
-        log.info("[sendCode][发送验证码到邮箱: {}, 验证码: {}]", email, code);
+        log.info("[sendCode][发送邮箱验证码]");
 
         // 3. 构建邮件内容
         String subject = "验证码通知";
@@ -66,6 +66,7 @@ public class EmailCodeServiceImpl implements EmailCodeService {
 
             // 6. 将验证码存储到Redis，设置5分钟过期
             String redisKey = REDIS_KEY_PREFIX + email;
+            stringRedisTemplate.delete(REDIS_KEY_PREFIX + "attempts:" + email);
             stringRedisTemplate.opsForValue().set(redisKey, code, CODE_EXPIRE_MINUTES, TimeUnit.MINUTES);
             log.info("[sendCode][验证码已存储到Redis，邮箱: {}, 有效期: {}分钟]", email, CODE_EXPIRE_MINUTES);
 
@@ -83,27 +84,16 @@ public class EmailCodeServiceImpl implements EmailCodeService {
             return false;
         }
 
-        // 2. 从Redis获取验证码
-        String redisKey = REDIS_KEY_PREFIX + email;
-        String storedCode = stringRedisTemplate.opsForValue().get(redisKey);
-
-        // 3. 验证码不存在或已过期
-        if (StrUtil.isBlank(storedCode)) {
-            log.warn("[verifyCode][验证码不存在或已过期，邮箱: {}]", email);
-            return false;
-        }
-
-        // 4. 验证码匹配
-        boolean matches = storedCode.equals(code);
-        if (matches) {
-            // 验证成功后，删除验证码（防止重复使用）
-            stringRedisTemplate.delete(redisKey);
-            log.info("[verifyCode][验证码验证成功，邮箱: {}]", email);
-        } else {
-            log.warn("[verifyCode][验证码不匹配，邮箱: {}, 输入: {}, 存储: {}]", email, code, storedCode);
-        }
-
-        return matches;
+        // Compare, consume and count failures atomically across workers and source IPs.
+        org.springframework.data.redis.core.script.DefaultRedisScript<Long> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
+                "local v=redis.call('get',KEYS[1]); if not v then return 0 end; " +
+                "local n=tonumber(redis.call('get',KEYS[2]) or '0'); if n>=5 then return 0 end; " +
+                "if v==ARGV[1] then redis.call('del',KEYS[1],KEYS[2]); return 1 end; " +
+                "n=redis.call('incr',KEYS[2]); if n==1 then redis.call('expire',KEYS[2],300) end; " +
+                "if n>=5 then redis.call('del',KEYS[1]) end; return 0", Long.class);
+        Long result = stringRedisTemplate.execute(script,
+                java.util.Arrays.asList(REDIS_KEY_PREFIX + email, REDIS_KEY_PREFIX + "attempts:" + email), code);
+        return Long.valueOf(1).equals(result);
     }
 
     /**

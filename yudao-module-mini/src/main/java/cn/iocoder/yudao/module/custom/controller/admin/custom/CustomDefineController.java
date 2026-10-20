@@ -82,6 +82,8 @@ public class CustomDefineController {
     @Resource
     private IdCardDecryptAccessLimiter idCardDecryptAccessLimiter;
 
+    @Resource private cn.iocoder.yudao.module.custom.service.contract.ContractPaymentAccessGuard paymentAccessGuard;
+
     @GetMapping("/staticsContractByTimePeriod")
     @Operation(summary = "按照时间窗口统计数据")
     @PreAuthorize("@ss.hasPermission('custom:contract:statics')")
@@ -254,12 +256,12 @@ public class CustomDefineController {
     @PreAuthorize("@ss.hasPermission('custom:contract:query')")
     public CommonResult<PayOrderRespVO> getOrder(@RequestParam("id") Long id,
                                                  @RequestParam(value = "sync", required = false) Boolean sync) {
-        PayOrderDO order = orderService.getOrder(id);
+        PayOrderDO order = paymentAccessGuard.requireOrder(id);
         // sync 仅在等待支付
         if (Boolean.TRUE.equals(sync) && PayOrderStatusEnum.isWaiting(order.getStatus())) {
             orderService.syncOrderQuietly(order.getId());
             // 重新查询，因为同步后，可能会有变化
-            order = orderService.getOrder(id);
+            order = paymentAccessGuard.requireOrder(id);
         }
         return success(BeanUtils.toBean(order, PayOrderRespVO.class));
     }

@@ -69,6 +69,7 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSW
 @Service
 @Slf4j
 public class CustomDefineServiceImpl implements CustomDefineService{
+    @Resource private cn.iocoder.yudao.module.custom.service.contract.ContractPaymentAccessGuard paymentAccessGuard;
 
     @Autowired
     MiniUserMapper miniUserMapper;
@@ -301,7 +302,12 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public PayOrderVO getPayOrder(PayOrderVO payOrderVO) {
-        return customDefineMapper.getPayOrder(payOrderVO);
+        if (payOrderVO == null || payOrderVO.getId() == null) throw new IllegalArgumentException("订单编号不能为空");
+        PayDemoOrderDO demo = payDemoOrderMapper.selectById(payOrderVO.getId());
+        if (demo == null || demo.getPayOrderId() == null) throw new AccessDeniedException("无权访问该支付订单");
+        paymentAccessGuard.requireOrder(demo.getPayOrderId());
+        PayOrderVO result = new PayOrderVO(); result.setId(demo.getId()); result.setPayOrderId(demo.getPayOrderId());
+        return result;
     }
 
     @Override
@@ -313,7 +319,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         }
         // 1.1 获得商品
         ContractDO contractDO = contractMapper.selectById(createReqVO.getContractId());
-        Assert.notNull(contractDO, "合同({}) 不存在", createReqVO.getContractId());
+        ownershipGuard.checkOrThrow(contractDO, SecurityFrameworkUtils.getLoginUserId());
         String spuName = String.format("%s->%s", contractDO.getCreditorName(),contractDO.getIndebtedName());
         FeeCalculationResult feeCalculationResult = feeCalculationService.calculateFeeFromDB(BigDecimal.valueOf(contractDO.getSalary()));
         Integer price = feeCalculationResult.getFee().intValue();
@@ -339,16 +345,40 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public Integer updateContractConfirmedStatus(PayOrderNotifyReqDTO notifyReqDTO) {
-        log.info(new Date() + "@@" + notifyReqDTO.getPayOrderId());
-        Long contractId = customDefineMapper.selectContractByPayOrderId(notifyReqDTO.getPayOrderId());
-        ContractDO contractDO = contractMapper.selectById(contractId);
-        contractDO.setStatus(2);
-        contractMapper.updateById(contractDO);
+        cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderDO pay = paymentAccessGuard.requireOrder(notifyReqDTO.getPayOrderId());
+        if (!cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum.isSuccess(pay.getStatus()))
+            throw new AccessDeniedException("支付尚未成功，不能确认合同");
+        PayDemoOrderDO demo = payDemoOrderMapper.selectOne(new LambdaQueryWrapperX<PayDemoOrderDO>().eq(PayDemoOrderDO::getPayOrderId, pay.getId()));
+        if (demo == null || !Objects.equals(demo.getPrice(), pay.getPrice())
+                || !Objects.equals(String.valueOf(demo.getId()), pay.getMerchantOrderId())
+                || !Objects.equals(demo.getUserId(), pay.getUserId())
+                || (notifyReqDTO.getMerchantOrderId() != null && !Objects.equals(notifyReqDTO.getMerchantOrderId(), pay.getMerchantOrderId())))
+            throw new AccessDeniedException("支付订单关联校验失败");
+        Long contractId = customDefineMapper.selectContractByPayOrderId(pay.getId());
+        ContractDO contractDO = contractId == null ? null : contractMapper.selectById(contractId);
+        ownershipGuard.checkOrThrow(contractDO, SecurityFrameworkUtils.getLoginUserId());
+        if (!Objects.equals(demo.getSpuId(), contractId)) throw new AccessDeniedException("支付订单关联校验失败");
+        if (Integer.valueOf(2).equals(contractDO.getStatus())) return 1;
+        if (!Integer.valueOf(1).equals(contractDO.getStatus())) throw new AccessDeniedException("当前合同状态不支持确认");
+        int updated = contractMapper.update(new ContractDO().setStatus(2), new LambdaQueryWrapperX<ContractDO>()
+                .eq(ContractDO::getId, contractId).eq(ContractDO::getStatus, 1));
+        if (updated != 1) throw new AccessDeniedException("合同状态已变化，请刷新后重试");
         return 1;
+    }
+
+    private void validatePaymentQrUrl(String value) {
+        if (StrUtil.isBlank(value)) throw new IllegalArgumentException("二维码地址不能为空");
+        try {
+            java.net.URI uri = java.net.URI.create(value);
+            if (!("https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme())) || uri.getHost() == null)
+                throw new IllegalArgumentException("二维码地址必须为有效的 HTTP 地址");
+        } catch (IllegalArgumentException e) { throw new IllegalArgumentException("二维码地址格式不正确"); }
     }
 
     @Override
     public String bingQrcode(Long contractId, String codeUrl) {
+        ownershipGuard.checkOrThrow(contractMapper.selectById(contractId), SecurityFrameworkUtils.getLoginUserId());
+        validatePaymentQrUrl(codeUrl);
         customDefineMapper.updatePayRelation(contractId, codeUrl);
         return customDefineMapper.selectLatestCodeUrlBaseContractId(contractId);
     }
@@ -368,6 +398,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public String deleteQrcode(Long contractId, String codeUrl) {
+        ownershipGuard.checkOrThrow(contractMapper.selectById(contractId), SecurityFrameworkUtils.getLoginUserId());
         customDefineMapper.updatePayRelation(contractId,"");
         return "";
     }

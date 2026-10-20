@@ -7,6 +7,9 @@ package cn.iocoder.yudao.module.system.enums;
  * @author 芋道源码
  */
 public interface LogRecordConstants {
+    String SYSTEM_USER_UPDATE_VERIFIED_SUB_TYPE = "修改认证状态";
+    String SYSTEM_USER_UPDATE_VERIFIED_SUCCESS = "将用户【{{#user.username}}】的认证状态从【{{#oldVerified}}】改为【{{#newVerified}}】，原因：{{#reason}}";
+
 
     // ======================= SYSTEM_USER 用户 =======================
 

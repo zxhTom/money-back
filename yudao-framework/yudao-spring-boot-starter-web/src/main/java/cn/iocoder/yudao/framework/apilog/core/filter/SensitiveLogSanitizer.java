@@ -11,9 +11,9 @@ public final class SensitiveLogSanitizer {
     private static final Set<String> PRIVATE_KEYS = new HashSet<>(Arrays.asList(
         "password", "passwd", "pwd", "paypassword", "oldpassword", "newpassword",
         "oldpaypassword", "newpaypassword", "passwordhash", "token", "accesstoken",
-        "refreshtoken", "signature", "authorization", "secret", "clientsecret", "apikey",
+        "refreshtoken", "code", "verifycode", "emailcode", "smscode", "signature", "authorization", "secret", "clientsecret", "apikey",
         "indebtedname", "indebtedid", "creditorname", "creditorid", "salary",
-        "realname", "username", "idno", "idcard", "idnodisplay", "mobile", "email", "address"));
+        "targetname", "targetidcard", "contactinfo", "realname", "username", "idno", "idcard", "idnodisplay", "mobile", "email", "address"));
     private SensitiveLogSanitizer() {}
     private static String normalize(String key) { return key.replaceAll("[^a-zA-Z0-9]", "").toLowerCase(Locale.ROOT); }
     public static String sanitize(String json, String... extraKeys) {

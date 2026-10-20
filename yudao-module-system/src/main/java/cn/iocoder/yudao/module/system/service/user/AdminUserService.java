@@ -24,6 +24,8 @@ import java.util.Map;
  * @author 芋道源码
  */
 public interface AdminUserService {
+    void updateUserVerified(Long id, Integer expectedVerified, Integer verified, String reason);
+
 
     /**
      * 创建用户

@@ -27,6 +27,8 @@ import java.time.LocalDateTime;
 @Slf4j
 @Service
 public class AutoTestServiceImpl implements AutoTestService {
+    @Resource private cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService securityFrameworkService;
+    @Value("${custom.auto-test.enabled:false}") private boolean enabled;
 
     @Value("${custom.auto-test.user-a:zxhtom}")
     private String userAUsername;
@@ -66,11 +68,12 @@ public class AutoTestServiceImpl implements AutoTestService {
 
     @Override
     public boolean hasAdminRole() {
-        return true; 
+        return securityFrameworkService.hasAnyRoles("super_admin", "tenant_admin");
     }
 
     @Override
     public boolean runFullTest() throws Exception {
+        if (!enabled || !hasAdminRole()) throw new org.springframework.security.access.AccessDeniedException("当前环境不允许执行自动化测试");
         log.info("开始执行自动化测试...");
         
         AdminUserDO userA = adminUserService.getUserByUsername(userAUsername);
