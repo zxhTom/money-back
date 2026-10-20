@@ -1,6 +1,10 @@
 package cn.iocoder.yudao.module.system.controller.admin.monitor;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.apilog.core.filter.SensitiveLogSanitizer;
+import org.springframework.security.access.AccessDeniedException;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -60,15 +64,48 @@ public class SecurityMonitorController {
     @Resource
     private cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper adminUserMapper;
 
+    @Resource
+    private SecurityFrameworkService securityFrameworkService;
+
+    private void requireSecurityAccess(String... permissions) {
+        if (SecurityFrameworkUtils.getLoginUserId() == null
+                || !securityFrameworkService.hasAnyRoles("super_admin", "tenant_admin", "contract-manager")
+                || !securityFrameworkService.hasAnyPermissions(permissions)) {
+            throw new AccessDeniedException("无安全监控管理权限");
+        }
+    }
+
+    private static final java.util.regex.Pattern IDENTITY = java.util.regex.Pattern.compile(
+            "(?<![A-Za-z0-9])(?:[1-9]\\d{16}[\\dXx]|[1-9]\\d{14})(?![A-Za-z0-9])");
+
+    private String safeAlertText(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        String clean = trimmed.startsWith("{") || trimmed.startsWith("[")
+                ? SensitiveLogSanitizer.sanitize(value, "name", "nickname") : value;
+        return IDENTITY.matcher(clean).replaceAll("[证件已隐藏]");
+    }
+
+    private SecurityAlertDO safeAlert(SecurityAlertDO stored) {
+        SecurityAlertDO copy = BeanUtils.toBean(stored, SecurityAlertDO.class);
+        copy.setDetail(safeAlertText(stored.getDetail()));
+        copy.setSuspiciousContent(safeAlertText(stored.getSuspiciousContent()));
+        copy.setAlertMessage(safeAlertText(stored.getAlertMessage()));
+        copy.setHandleRemark(safeAlertText(stored.getHandleRemark()));
+        copy.setRequestUrl(stored.getRequestUrl() == null ? null : safeAlertText(stored.getRequestUrl().split("\\?", 2)[0]));
+        return copy;
+    }
+
     private static final java.util.regex.Pattern IPV4 =
             java.util.regex.Pattern.compile("^\\d{1,3}(\\.\\d{1,3}){3}$");
 
     @GetMapping("/online-lookup")
     @Operation(summary = "在线IP/用户互查：输入IP查在线用户，否则按用户名/昵称/真实姓名/身份证号查用户的在用IP")
     @Parameter(name = "keyword", description = "IP 或 用户关键字", required = true)
-    @PreAuthorize("@ss.hasPermission('custom:security:online-lookup')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:security:online-lookup')")
     public CommonResult<cn.iocoder.yudao.module.system.controller.admin.monitor.vo.OnlineLookupRespVO> onlineLookup(
             @RequestParam("keyword") String keyword) {
+        requireSecurityAccess("custom:security:online-lookup");
         cn.iocoder.yudao.module.system.controller.admin.monitor.vo.OnlineLookupRespVO vo =
                 new cn.iocoder.yudao.module.system.controller.admin.monitor.vo.OnlineLookupRespVO();
         String kw = keyword == null ? "" : keyword.trim();
@@ -180,23 +217,28 @@ public class SecurityMonitorController {
 
     @GetMapping("/alert/page")
     @Operation(summary = "分页查询安全告警")
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:alert:query','mini:admin:security:alert')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:alert:query','mini:admin:security:alert')")
     public CommonResult<PageResult<SecurityAlertDO>> getAlertPage(@Valid SecurityAlertPageReqVO pageReqVO) {
-        return success(securityAlertService.getPage(pageReqVO));
+        requireSecurityAccess("custom:security:alert:query", "mini:admin:security:alert");
+        PageResult<SecurityAlertDO> page = securityAlertService.getPage(pageReqVO);
+        return success(new PageResult<>(page.getList().stream().map(this::safeAlert)
+                .collect(java.util.stream.Collectors.toList()), page.getTotal()));
     }
 
     @PutMapping("/alert/handle")
     @Operation(summary = "处理安全告警")
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:alert:handle','mini:admin:security:alert')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:alert:handle','mini:admin:security:alert')")
     public CommonResult<Boolean> handleAlert(@Valid @RequestBody SecurityAlertHandleReqVO reqVO) {
+        requireSecurityAccess("custom:security:alert:handle", "mini:admin:security:alert");
         securityAlertService.handle(reqVO, SecurityFrameworkUtils.getLoginUserId());
         return success(true);
     }
 
     @GetMapping("/stats")
     @Operation(summary = "安全统计概览")
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:alert:query','mini:admin:security:alert')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:alert:query','mini:admin:security:alert')")
     public CommonResult<Map<String, Object>> getStats() {
+        requireSecurityAccess("custom:security:alert:query", "mini:admin:security:alert");
         Map<String, Object> stats = new HashMap<>();
         stats.put("todayUnhandled", securityAlertService.countTodayUnhandled());
         stats.put("alertTypeStats", securityAlertService.getTodayAlertTypeStats());
@@ -209,8 +251,9 @@ public class SecurityMonitorController {
     @GetMapping("/ip-diagnose")
     @Operation(summary = "诊断用户所有历史IP风险")
     @Parameter(name = "userId", description = "用户ID", required = true)
-    @PreAuthorize("@ss.hasPermission('custom:security:ip-diagnose')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:security:ip-diagnose')")
     public CommonResult<List<IpDiagnoseResultVO>> diagnoseUserIp(@RequestParam Long userId) {
+        requireSecurityAccess("custom:security:ip-diagnose");
         return success(ipRiskCheckService.diagnoseUser(userId));
     }
 
@@ -218,15 +261,17 @@ public class SecurityMonitorController {
 
     @GetMapping("/blacklist/page")
     @Operation(summary = "分页查询IP黑名单")
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:query','mini:admin:security:blacklist')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:blacklist:query','mini:admin:security:blacklist')")
     public CommonResult<PageResult<IpBlacklistDO>> getBlacklistPage(@Valid PageParam pageParam) {
+        requireSecurityAccess("custom:security:blacklist:query", "mini:admin:security:blacklist");
         return success(ipBlacklistService.getPage(pageParam));
     }
 
     @PostMapping("/blacklist/add")
     @Operation(summary = "手动添加IP黑名单")
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:add','mini:admin:security:blacklist')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:blacklist:add','mini:admin:security:blacklist')")
     public CommonResult<Boolean> addBlacklist(@Valid @RequestBody IpBlacklistAddReqVO reqVO) {
+        requireSecurityAccess("custom:security:blacklist:add", "mini:admin:security:blacklist");
         ipBlacklistService.addToBlacklist(reqVO);
         return success(true);
     }
@@ -234,16 +279,18 @@ public class SecurityMonitorController {
     @DeleteMapping("/blacklist/remove")
     @Operation(summary = "从黑名单移除IP")
     @Parameter(name = "id", description = "黑名单记录ID", required = true)
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
     public CommonResult<Boolean> removeBlacklist(@RequestParam Long id) {
+        requireSecurityAccess("custom:security:blacklist:remove", "mini:admin:security:blacklist");
         ipBlacklistService.removeFromBlacklist(id);
         return success(true);
     }
 
     @PostMapping("/blacklist/refresh-cache")
     @Operation(summary = "刷新IP黑名单缓存")
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:add','mini:admin:security:blacklist')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:blacklist:add','mini:admin:security:blacklist')")
     public CommonResult<Boolean> refreshBlacklistCache() {
+        requireSecurityAccess("custom:security:blacklist:add", "mini:admin:security:blacklist");
         ipBlacklistService.refreshCache();
         return success(true);
     }
@@ -251,8 +298,9 @@ public class SecurityMonitorController {
     @GetMapping("/user-trajectory")
     @Operation(summary = "按用户查询活动轨迹")
     @Parameter(name = "username", description = "用户名", required = true)
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:trajectory','mini:admin:security:blacklist')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:trajectory','mini:admin:security:blacklist')")
     public CommonResult<java.util.List<java.util.Map<String, Object>>> getUserTrajectory(@RequestParam String username) {
+        requireSecurityAccess("custom:security:trajectory", "mini:admin:security:blacklist");
         String currentLoginUsername = adminUserMapper.selectById(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()).getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
             return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
@@ -297,8 +345,9 @@ public class SecurityMonitorController {
     @GetMapping("/latest-ip")
     @Operation(summary = "获取用户最近一次使用的IP")
     @Parameter(name = "username", description = "用户名", required = true)
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:trajectory','mini:admin:security:blacklist')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:trajectory','mini:admin:security:blacklist')")
     public CommonResult<String> getLatestIp(@RequestParam String username) {
+        requireSecurityAccess("custom:security:trajectory", "mini:admin:security:blacklist");
         String currentLoginUsername = adminUserMapper.selectById(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()).getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
             return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
@@ -320,8 +369,9 @@ public class SecurityMonitorController {
     @PostMapping("/blacklist/unlock-by-user")
     @Operation(summary = "通过用户解封所有相关IP")
     @Parameter(name = "username", description = "用户名", required = true)
-    @PreAuthorize("@ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasAnyPermissions('custom:security:blacklist:remove','mini:admin:security:blacklist')")
     public CommonResult<Integer> unlockByUser(@RequestParam String username) {
+        requireSecurityAccess("custom:security:blacklist:remove", "mini:admin:security:blacklist");
         String currentLoginUsername = adminUserMapper.selectById(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()).getUsername();
         if (!"zxhtom".equals(currentLoginUsername)) {
             return cn.iocoder.yudao.framework.common.pojo.CommonResult.error(403, "仅 zxhtom 特有角色拥有此功能");
@@ -345,25 +395,28 @@ public class SecurityMonitorController {
     @GetMapping("/user/ip-count-stats")
     @Operation(summary = "按用户统计使用过的 IP 数（Top N）")
     @Parameter(name = "limit", description = "返回条数", example = "10")
-    @PreAuthorize("@ss.hasPermission('system:user:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:user:query')")
     public CommonResult<List<UserIpStatVO>> getUserIpCountStats(
             @RequestParam(defaultValue = "10") int limit) {
+        requireSecurityAccess("system:user:query");
         return success(userIpHistoryMapper.selectTopUsersByIpCount(limit));
     }
 
     @GetMapping("/user/ip-history")
     @Operation(summary = "查询用户历史IP")
     @Parameter(name = "userId", description = "用户ID", required = true)
-    @PreAuthorize("@ss.hasPermission('system:user:ip-history')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:user:ip-history')")
     public CommonResult<List<UserIpHistoryDO>> getUserIpHistory(@RequestParam Long userId) {
+        requireSecurityAccess("system:user:ip-history");
         return success(userIpHistoryService.getByUserId(userId));
     }
 
     @GetMapping("/blacklist/logs")
     @Operation(summary = "查询IP封禁历史")
     @Parameter(name = "ip", description = "IP地址", required = true)
-    @PreAuthorize("@ss.hasPermission('custom:security:blacklist:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:security:blacklist:query')")
     public CommonResult<List<IpBlacklistLogDO>> getBanLogs(@RequestParam String ip) {
+        requireSecurityAccess("custom:security:blacklist:query");
         return success(ipBlacklistService.getBanLogs(ip));
     }
 }
