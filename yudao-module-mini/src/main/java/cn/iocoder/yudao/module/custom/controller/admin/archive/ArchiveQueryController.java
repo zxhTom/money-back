@@ -41,14 +41,8 @@ public class ArchiveQueryController {
             .map(ArchiveTableRegistry.ArchiveTable::getChTable).collect(Collectors.toSet());
 
     private void checkDefaultTenantOnly() {
-        if (tenantProperties == null) {
-            return;
-        }
         Long current = TenantContextHolder.getTenantId();
-        if (current == null) {
-            return;
-        }
-        Long allowed = tenantProperties.getDefaultTenantId() != null ? tenantProperties.getDefaultTenantId() : 1L;
+        Long allowed = tenantProperties != null && tenantProperties.getDefaultTenantId() != null ? tenantProperties.getDefaultTenantId() : 1L;
         if (!allowed.equals(current)) {
             throw exception0(FORBIDDEN.getCode(), "归档数据仅总平台可查询");
         }
@@ -56,7 +50,7 @@ public class ArchiveQueryController {
 
     @GetMapping("/tables")
     @Operation(summary = "可查询的归档表")
-    @PreAuthorize("@ss.hasPermission('custom:security:archive')")
+    @PreAuthorize("@ss.hasPermission('custom:security:archive') and @ss.hasAnyRoles('super_admin','tenant_admin')")
     public CommonResult<List<String>> tables() {
         checkDefaultTenantOnly();
         return success(new ArrayList<>(ALLOWED));
@@ -64,7 +58,7 @@ public class ArchiveQueryController {
 
     @PostMapping("/run-now")
     @Operation(summary = "立即执行日志归档（不等每天04:00定时）")
-    @PreAuthorize("@ss.hasPermission('custom:security:archive')")
+    @PreAuthorize("@ss.hasPermission('custom:security:archive') and @ss.hasAnyRoles('super_admin','tenant_admin')")
     public CommonResult<String> runNow() {
         checkDefaultTenantOnly();
         if (!ch.isEnabled()) {
@@ -87,7 +81,7 @@ public class ArchiveQueryController {
 
     @GetMapping("/query")
     @Operation(summary = "归档查询（ClickHouse）")
-    @PreAuthorize("@ss.hasPermission('custom:security:archive')")
+    @PreAuthorize("@ss.hasPermission('custom:security:archive') and @ss.hasAnyRoles('super_admin','tenant_admin')")
     public CommonResult<Map<String, Object>> query(
             @RequestParam String table,
             @RequestParam(required = false) String start,
@@ -107,6 +101,9 @@ public class ArchiveQueryController {
             res.put("total", 0);
             return success(res);
         }
+        if (pageNo < 1 || pageSize < 1 || pageSize > 100) {
+            throw exception0(400, "分页参数不合法，每页最多100条");
+        }
         List<Object> args = new ArrayList<>();
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         if (start != null && !start.isEmpty()) { where.append(" AND log_time >= ?"); args.add(start); }
@@ -118,6 +115,10 @@ public class ArchiveQueryController {
         qArgs.add((pageNo - 1) * pageSize);
         List<Map<String, Object>> list = ch.query(
                 "SELECT * FROM " + table + where + " ORDER BY log_time DESC LIMIT ? OFFSET ?", qArgs.toArray());
+        for (Map<String, Object> row : list) {
+            Object raw = row.get("data");
+            if (raw instanceof String) row.put("data", cn.iocoder.yudao.framework.apilog.core.filter.SensitiveLogSanitizer.sanitize((String) raw));
+        }
         res.put("list", list);
         res.put("total", total);
         return success(res);

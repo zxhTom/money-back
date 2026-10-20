@@ -21,6 +21,8 @@ import javax.annotation.Resource;
 public class CustomWebMvcConfig implements WebMvcConfigurer {
 
     @Resource
+    private cn.iocoder.yudao.module.custom.framework.security.interceptor.ContractAttachmentAccessInterceptor contractAttachmentAccessInterceptor;
+    @Resource
     private SimulatedRequestInterceptor simulatedRequestInterceptor;
     @Resource
     private UrlMonitorInterceptor urlMonitorInterceptor;
@@ -43,6 +45,7 @@ public class CustomWebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(contractAttachmentAccessInterceptor).addPathPatterns("/**/infra/file/*/get/**");
         // 模拟/伪造请求检测：排除服务端回调，避免误伤微信/支付网关
         registry.addInterceptor(simulatedRequestInterceptor)
                 .addPathPatterns("/**").excludePathPatterns(WEBHOOK_EXCLUDES);

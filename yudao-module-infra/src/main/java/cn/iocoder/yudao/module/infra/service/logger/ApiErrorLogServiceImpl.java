@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.infra.service.logger;
 
+import cn.iocoder.yudao.framework.apilog.core.filter.SensitiveLogSanitizer;
+
 import cn.iocoder.yudao.framework.common.biz.infra.logger.dto.ApiErrorLogCreateReqDTO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -39,7 +41,7 @@ public class ApiErrorLogServiceImpl implements ApiErrorLogService {
     public void createApiErrorLog(ApiErrorLogCreateReqDTO createDTO) {
         ApiErrorLogDO apiErrorLog = BeanUtils.toBean(createDTO, ApiErrorLogDO.class)
                 .setProcessStatus(ApiErrorLogProcessStatusEnum.INIT.getStatus());
-        apiErrorLog.setRequestParams(StrUtils.maxLength(apiErrorLog.getRequestParams(), REQUEST_PARAMS_MAX_LENGTH));
+        apiErrorLog.setRequestParams(StrUtils.maxLength(SensitiveLogSanitizer.sanitize(apiErrorLog.getRequestParams()), REQUEST_PARAMS_MAX_LENGTH));
         try {
             if (TenantContextHolder.getTenantId() != null) {
                 apiErrorLogMapper.insert(apiErrorLog);
@@ -49,13 +51,17 @@ public class ApiErrorLogServiceImpl implements ApiErrorLogService {
             }
         } catch (Exception ex) {
             // 兜底处理，目前只有 yudao-cloud 会发生：https://gitee.com/yudaocode/yudao-cloud-mini/issues/IC1O0A
-            log.error("[createApiErrorLog][记录时({}) 发生异常]", createDTO, ex);
+            log.error("[createApiErrorLog][记录失败，已省略请求内容]", ex);
         }
     }
 
     @Override
     public PageResult<ApiErrorLogDO> getApiErrorLogPage(ApiErrorLogPageReqVO pageReqVO) {
-        return apiErrorLogMapper.selectPage(pageReqVO);
+        PageResult<ApiErrorLogDO> page = apiErrorLogMapper.selectPage(pageReqVO);
+        for (ApiErrorLogDO row : page.getList()) {
+            row.setRequestParams(SensitiveLogSanitizer.sanitize(row.getRequestParams()));
+        }
+        return page;
     }
 
     @Override

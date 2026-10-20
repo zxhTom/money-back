@@ -60,15 +60,19 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class ContractController {
     @GetMapping("/admin-all-users")
     @Operation(summary = "【小程序】管理员获取全量用户供编辑选择")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager')")
+    @ApiAccessLog(responseEnable = false)
     public CommonResult<List<Map<String, String>>> adminAllUsers() {
         List<AdminUserDO> users = contractAdminUserService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
         List<Map<String, String>> result = new ArrayList<>();
         if (users != null) {
+            Long tenantId = requiredTenantId();
             for (AdminUserDO user : users) {
+                if (!java.util.Objects.equals(tenantId, user.getTenantId())) continue;
                 Map<String, String> map = new HashMap<>();
                 map.put("id", String.valueOf(user.getId()));
                 map.put("realname", user.getRealname());
-                map.put("idNo", idCardCipherService.resolveToPlain(user.getIdNo()));
+                map.put("idNo", idCardCipherService.storedToCipherForResponse(user.getIdNo()));
                 result.add(map);
             }
         }
@@ -76,16 +80,24 @@ public class ContractController {
     }
 
 
+    private Long requiredTenantId() {
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+        if (tenantId == null || tenantId <= 0) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "缺少有效租户身份");
+        }
+        return tenantId;
+    }
+
     @Resource
     private AdminUserService contractAdminUserService;
 
 
     @GetMapping("/admin-search")
     @Operation(summary = "【小程序】管理员全量检索合同(含已删除)")
-    @PreAuthorize("@ss.hasPermission('mini:admin:contract:list')")
+    @PreAuthorize("@ss.hasPermission('mini:admin:contract:list') and @ss.hasAnyRoles('super_admin','tenant_admin','contract-manager')")
     public CommonResult<PageResult<ContractRespVO>> adminSearch(@Valid ContractPageReqVO pageReqVO) {
         com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> mpPage = cn.iocoder.yudao.framework.mybatis.core.util.MyBatisUtils.buildPage(pageReqVO, null);
-        contractMapper.selectAdminSearchPage(mpPage, pageReqVO);
+        contractMapper.selectAdminSearchPage(mpPage, pageReqVO, requiredTenantId());
         PageResult<ContractDO> pageResult = new PageResult<>(mpPage.getRecords(), mpPage.getTotal());
         PageResult<ContractRespVO> voPage = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(pageResult, ContractRespVO.class);
         for (int i = 0; i < voPage.getList().size(); i++) {
@@ -96,9 +108,9 @@ public class ContractController {
 
     @GetMapping("/admin-detail")
     @Operation(summary = "【小程序】管理员查看合同详情(含已删除)")
-    @PreAuthorize("@ss.hasPermission('mini:admin:contract:list')")
+    @PreAuthorize("@ss.hasPermission('mini:admin:contract:list') and @ss.hasAnyRoles('super_admin','tenant_admin','contract-manager')")
     public CommonResult<ContractRespVO> adminDetail(@RequestParam("id") Long id) {
-        ContractDO contract = contractMapper.selectByIdIgnoreDeleted(id);
+        ContractDO contract = contractMapper.selectByIdIgnoreDeleted(id, requiredTenantId());
         if (contract == null) {
             throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
                     .exception(cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS);
@@ -241,7 +253,7 @@ public class ContractController {
         pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
         // 安全：与 /page 一致的归属限定——未带当事人筛选时只导出"自己创建的"，超管/合同管理员不受限；
         //       避免有导出权限就能拉全库合同（原先直接 getContractPage 无归属限制）。
-        List<ContractDO> list = contractService.getContractPageForListing(pageReqVO).getList();
+        List<ContractDO> list = contractService.getSelfContractPage(pageReqVO).getList();
         List<ContractRespVO> voList = BeanUtils.toBean(list, ContractRespVO.class);
         for (int i = 0; i < voList.size(); i++) {
             ContractRespIdCardEnricher.enrich(voList.get(i), list.get(i), idCardCipherService);

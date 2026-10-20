@@ -126,7 +126,7 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
     @org.apache.ibatis.annotations.Select("<script>" +
             "SELECT * FROM (SELECT * FROM custom_contract) t " +
-            "<where> " +
+            "<where> AND t.tenant_id = #{tenantId} " +
             "<if test=\"reqVO.keyword != null and reqVO.keyword != ''\"> " +
             "AND (t.id LIKE CONCAT('%', #{reqVO.keyword}, '%') " +
             "OR t.indebted_name LIKE CONCAT('%', #{reqVO.keyword}, '%') " +
@@ -145,11 +145,12 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
             "</script>")
     com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> selectAdminSearchPage(
         com.baomidou.mybatisplus.core.metadata.IPage<ContractDO> page, 
-        @org.apache.ibatis.annotations.Param("reqVO") ContractPageReqVO reqVO);
+        @org.apache.ibatis.annotations.Param("reqVO") ContractPageReqVO reqVO,
+        @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
-    @org.apache.ibatis.annotations.Select("SELECT * FROM custom_contract WHERE id = #{id}")
-    ContractDO selectByIdIgnoreDeleted(@org.apache.ibatis.annotations.Param("id") Long id);
+    @org.apache.ibatis.annotations.Select("SELECT * FROM custom_contract WHERE id = #{id} AND tenant_id = #{tenantId}")
+    ContractDO selectByIdIgnoreDeleted(@org.apache.ibatis.annotations.Param("id") Long id, @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
     default boolean existsContractRelation(String idNoA, String idNoB) {
         Long count = selectCount(new LambdaQueryWrapperX<ContractDO>()

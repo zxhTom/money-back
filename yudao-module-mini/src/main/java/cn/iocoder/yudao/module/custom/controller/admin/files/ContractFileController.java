@@ -36,6 +36,6 @@ public class ContractFileController {
         MultipartFile file = uploadReqVO.getFile();
         byte[] content = IoUtil.readBytes(file.getInputStream());
         return success(fileService.createFile(content, file.getOriginalFilename(),
-                uploadReqVO.getDirectory(), file.getContentType()));
+                "private/contracts/" + cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId(), file.getContentType()));
     }
 }

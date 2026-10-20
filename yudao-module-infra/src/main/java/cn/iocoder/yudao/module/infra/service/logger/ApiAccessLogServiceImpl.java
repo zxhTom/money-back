@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.infra.service.logger;
 
+import cn.iocoder.yudao.framework.apilog.core.filter.SensitiveLogSanitizer;
+
 import cn.iocoder.yudao.framework.common.biz.infra.logger.dto.ApiAccessLogCreateReqDTO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -35,7 +37,8 @@ public class ApiAccessLogServiceImpl implements ApiAccessLogService {
     @Override
     public void createApiAccessLog(ApiAccessLogCreateReqDTO createDTO) {
         ApiAccessLogDO apiAccessLog = BeanUtils.toBean(createDTO, ApiAccessLogDO.class);
-        apiAccessLog.setRequestParams(StrUtils.maxLength(apiAccessLog.getRequestParams(), REQUEST_PARAMS_MAX_LENGTH));
+        apiAccessLog.setRequestParams(StrUtils.maxLength(SensitiveLogSanitizer.sanitize(apiAccessLog.getRequestParams()), REQUEST_PARAMS_MAX_LENGTH));
+        apiAccessLog.setResponseBody(SensitiveLogSanitizer.sanitize(apiAccessLog.getResponseBody()));
         apiAccessLog.setResultMsg(StrUtils.maxLength(apiAccessLog.getResultMsg(), RESULT_MSG_MAX_LENGTH));
         if (TenantContextHolder.getTenantId() != null) {
             apiAccessLogMapper.insert(apiAccessLog);
@@ -47,7 +50,12 @@ public class ApiAccessLogServiceImpl implements ApiAccessLogService {
 
     @Override
     public PageResult<ApiAccessLogDO> getApiAccessLogPage(ApiAccessLogPageReqVO pageReqVO) {
-        return apiAccessLogMapper.selectPage(pageReqVO);
+        PageResult<ApiAccessLogDO> page = apiAccessLogMapper.selectPage(pageReqVO);
+        for (ApiAccessLogDO row : page.getList()) {
+            row.setRequestParams(SensitiveLogSanitizer.sanitize(row.getRequestParams()));
+            row.setResponseBody(SensitiveLogSanitizer.sanitize(row.getResponseBody()));
+        }
+        return page;
     }
 
     @Override

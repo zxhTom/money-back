@@ -66,6 +66,20 @@ public class FileServiceImpl implements FileService {
         return fileMapper.selectPage(pageReqVO);
     }
 
+    private String validateUploadDirectory(String directory) {
+        if (directory == null || directory.isEmpty()) return directory;
+        if (directory.contains("..") || directory.contains("\\") || directory.contains("%") || directory.startsWith("/") || directory.contains("//")) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "非法上传目录");
+        }
+        if (directory.startsWith("private/contracts/")) {
+            Long userId = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+            if (userId == null || !directory.equals("private/contracts/" + userId)) {
+                throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "不能上传到他人的合同附件目录");
+            }
+        }
+        return directory;
+    }
+
     /** 禁止上传的危险扩展名（服务端可执行 / 浏览器可执行脚本 / 可部署包 / 可执行程序） */
     private static final java.util.Set<String> BLOCKED_UPLOAD_EXT = new java.util.HashSet<>(java.util.Arrays.asList(
             "jsp", "jspx", "jspf", "jspa", "jsv", "jsw", "jhtml", "jtml",
@@ -107,6 +121,7 @@ public class FileServiceImpl implements FileService {
     @Override
     @SneakyThrows
     public String createFile(byte[] content, String name, String directory, String type) {
+        directory = validateUploadDirectory(directory);
         // 0. 上传安全校验（防 jsp/html/war/exe 等上传攻击）
         validateUploadSecurity(content, name);
         // 1.1 处理 type 为空的情况
@@ -224,6 +239,7 @@ public class FileServiceImpl implements FileService {
     @Override
     @SneakyThrows
     public FilePresignedUrlRespVO presignPutUrl(String name, String directory) {
+        directory = validateUploadDirectory(directory);
         // 1. 生成上传的 path，需要保证唯一
         String path = generateUploadPath(name, directory);
 
