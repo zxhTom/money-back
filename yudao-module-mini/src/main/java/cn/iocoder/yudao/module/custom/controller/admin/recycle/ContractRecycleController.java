@@ -2,11 +2,14 @@ package cn.iocoder.yudao.module.custom.controller.admin.recycle;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.module.custom.framework.clickhouse.core.ClickHouseArchiveService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -24,14 +27,41 @@ public class ContractRecycleController {
     private ClickHouseArchiveService ch;
     @Resource
     private DataSource dataSource;
+    @Resource
+    private IdCardCipherService idCardCipherService;
+    @Resource
+    private SecurityFrameworkService securityFrameworkService;
+
+    private void requireRecycleAccess() {
+        if (!securityFrameworkService.hasAnyRoles("super_admin", "tenant_admin", "contract-manager")
+                || !securityFrameworkService.hasPermission("custom:contract:recycle")) {
+            throw new AccessDeniedException("无合同回收站管理权限");
+        }
+    }
+
+    private Map<String, Object> toResponseRow(Map<String, Object> stored) {
+        // Only transform the response copy: restoration must retain the original archived values.
+        Map<String, Object> response = new LinkedHashMap<>(stored);
+        for (String field : Arrays.asList("indebted_id", "creditor_id")) {
+            Object value = stored.get(field);
+            if (value != null) {
+                // Always encrypt, independently of the legacy plaintext-display switch.
+                response.put(field, idCardCipherService.requestToStoredCipher(value.toString()));
+            }
+        }
+        return response;
+    }
 
     @GetMapping("/page")
     @Operation(summary = "回收站分页（ClickHouse）")
-    @PreAuthorize("@ss.hasPermission('custom:contract:recycle')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:contract:recycle')")
     public CommonResult<Map<String, Object>> page(
             @RequestParam(defaultValue = "1") int pageNo,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestParam(required = false) String keyword) {
+        requireRecycleAccess();
+        pageNo = Math.max(1, pageNo);
+        pageSize = Math.min(100, Math.max(1, pageSize));
         Map<String, Object> res = new LinkedHashMap<>();
         if (!ch.isEnabled()) {
             res.put("list", Collections.emptyList());
@@ -50,22 +80,27 @@ public class ContractRecycleController {
         }
         Long total = ((Number) ch.query("SELECT count() c FROM contract_recycle FINAL" + where,
                 args.toArray()).get(0).get("c")).longValue();
-        int offset = (pageNo - 1) * pageSize;
+        long offset = ((long) pageNo - 1) * pageSize;
         List<Object> qArgs = new ArrayList<>(args);
         qArgs.add(pageSize);
         qArgs.add(offset);
         List<Map<String, Object>> list = ch.query(
                 "SELECT * FROM contract_recycle FINAL" + where + " ORDER BY archive_time DESC LIMIT ? OFFSET ?",
                 qArgs.toArray());
-        res.put("list", list);
+        List<Map<String, Object>> responseRows = new ArrayList<>(list.size());
+        for (Map<String, Object> row : list) {
+            responseRows.add(toResponseRow(row));
+        }
+        res.put("list", responseRows);
         res.put("total", total);
         return success(res);
     }
 
     @PutMapping("/restore")
     @Operation(summary = "还原到 MySQL")
-    @PreAuthorize("@ss.hasPermission('custom:contract:recycle')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:contract:recycle')")
     public CommonResult<Integer> restore(@RequestParam("ids") List<Long> ids) {
+        requireRecycleAccess();
         if (!ch.isEnabled() || ids.isEmpty()) {
             return success(0);
         }
@@ -99,7 +134,7 @@ public class ContractRecycleController {
             String colSql = String.join(",", cols);
             String ph = String.join(",", java.util.Collections.nCopies(cols.size(), "?"));
             jdbc.update("INSERT INTO custom_contract (" + colSql + ") VALUES (" + ph + ")", vals.toArray());
-            ch.execute("DELETE FROM contract_recycle WHERE id=?", id);
+            ch.execute("DELETE FROM contract_recycle WHERE id=? AND tenant_id=?", id, tenantId);
             restored++;
         }
         return success(restored);
@@ -107,8 +142,9 @@ public class ContractRecycleController {
 
     @DeleteMapping("/delete")
     @Operation(summary = "回收站彻底删除")
-    @PreAuthorize("@ss.hasPermission('custom:contract:recycle')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:contract:recycle')")
     public CommonResult<Boolean> delete(@RequestParam("ids") List<Long> ids) {
+        requireRecycleAccess();
         if (ch.isEnabled() && !ids.isEmpty()) {
             Long tenantId = TenantContextHolder.getRequiredTenantId();
             String ph = String.join(",", Collections.nCopies(ids.size(), "?"));
