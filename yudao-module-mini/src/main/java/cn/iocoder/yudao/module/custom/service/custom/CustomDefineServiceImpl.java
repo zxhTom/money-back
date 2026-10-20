@@ -720,20 +720,12 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         return true;
     }
 
+    @javax.annotation.Resource
+    private ContractPasswordRecoveryService contractPasswordRecoveryService;
+
     @Override
     public void resetPasswordByIdNo(ResetPasswordByIdNoReqVO reqVO) {
-        String plain = idCardCipherService.resolveToPlain(reqVO.getIdNo());
-        AdminUserDO user = adminUserMapper.selectByIdNo(plain);
-        if (user == null) {
-            throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_NOT_EXISTS);
-        }
-        String inputRealname = reqVO.getRealname() != null ? reqVO.getRealname().trim() : "";
-        String dbRealname = user.getRealname() != null ? user.getRealname().trim() : "";
-        if (!inputRealname.equals(dbRealname)) {
-            throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_IDNO_REALNAME_MISMATCH);
-        }
-        userService.updateUserPasswordAndPayPassword(user.getId(), reqVO.getPassword());
-        log.info("[resetPasswordByIdNo][通过身份证+姓名重置密码成功，用户ID: {}]", user.getId());
+        contractPasswordRecoveryService.reset(reqVO);
     }
 
     @Override

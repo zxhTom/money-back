@@ -7,15 +7,16 @@ import org.hibernate.validator.constraints.Length;
 import javax.validation.constraints.NotEmpty;
 
 /**
- * 管理后台 - 通过身份证+姓名重置密码 Request VO（B 方案：无邮箱时可用此方式找回）
+ * 管理后台 - 通过用户名+身份证重置密码 Request VO（B 方案：无邮箱时可用此方式找回）
  */
-@Schema(description = "管理后台 - 通过身份证+姓名重置密码 Request VO")
+@Schema(description = "管理后台 - 通过用户名+身份证重置密码 Request VO")
 @Data
 public class ResetPasswordByIdNoReqVO {
 
-    @Schema(description = "真实姓名", requiredMode = Schema.RequiredMode.REQUIRED, example = "张三")
-    @NotEmpty(message = "真实姓名不能为空")
-    private String realname;
+    @Schema(description = "登录用户名", requiredMode = Schema.RequiredMode.REQUIRED)
+    @javax.validation.constraints.NotBlank(message = "用户名不能为空")
+    @Length(max = 300, message = "用户名过长")
+    private String username;
 
     @Schema(description = "身份证：忘记密码场景多为手输明文；亦可传密文；服务端自动识别", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "身份证号不能为空")

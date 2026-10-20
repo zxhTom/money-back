@@ -374,12 +374,12 @@ public class CustomDefineController {
     }
 
     @PostMapping("/reset-password-by-idno")
-    @Operation(summary = "通过身份证+姓名重置密码（B 方案：未绑邮箱用户可用此方式找回）")
+    @Operation(summary = "通过用户名+身份证重置普通contract用户密码")
     @PermitAll
     @RateLimiter(time = 300, count = 5, keyResolver = ClientIpRateLimiterKeyResolver.class,
             message = "重置密码请求过于频繁，请稍后再试")
     @AuditLog(module = "账户安全", type = AuditOperationType.UPDATE, operation = "通过身份证重置密码",
-              usernameExpression = "#reqVO.realname")
+              usernameExpression = "#reqVO.username")
     public CommonResult<Boolean> resetPasswordByIdNo(@Valid @RequestBody ResetPasswordByIdNoReqVO reqVO) {
         customDefineService.resetPasswordByIdNo(reqVO);
         return success(true);
