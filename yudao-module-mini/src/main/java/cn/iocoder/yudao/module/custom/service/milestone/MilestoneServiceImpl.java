@@ -31,7 +31,6 @@ public class MilestoneServiceImpl implements MilestoneService {
             milestone.setStatus(0);
         }
         if (milestone.getRemindDays() == null) {
-            milestone.getRemindDays();
             milestone.setRemindDays(30);
         }
         if (milestone.getPriority() == null) {
@@ -79,16 +78,16 @@ public class MilestoneServiceImpl implements MilestoneService {
         for (MilestoneDO milestone : all) {
             MilestoneRespVO resp = convertToResp(milestone, today);
             
-            if (milestone.getStatus() == 2) {
+            if (Integer.valueOf(2).equals(milestone.getStatus())) {
                 completedCount++;
-            } else if (milestone.getStatus() == 0 || milestone.getStatus() == 1) {
+            } else if (milestone.getStatus() == null || Integer.valueOf(0).equals(milestone.getStatus()) || Integer.valueOf(1).equals(milestone.getStatus())) {
                 pendingCount++;
             }
 
-            if (milestone.getStatus() != 2 && milestone.getStatus() != 3) {
+            if (milestone.getTargetDate() != null && !Integer.valueOf(2).equals(milestone.getStatus()) && !Integer.valueOf(3).equals(milestone.getStatus())) {
                 if (resp.getDaysLeft() < 0) {
                     expiredCount++;
-                } else if (resp.getDaysLeft() <= 15) {
+                } else if (resp.getDaysLeft() <= (milestone.getRemindDays() != null ? milestone.getRemindDays() : 30)) {
                     urgentCount++;
                 }
                 if (resp.getDaysLeft() <= (milestone.getRemindDays() != null ? milestone.getRemindDays() : 30)) {
@@ -169,12 +168,13 @@ public class MilestoneServiceImpl implements MilestoneService {
     }
 
     public static MilestoneRespVO convertToResp(MilestoneDO milestone, LocalDate today) {
+        if (milestone == null) return null;
         MilestoneRespVO resp = BeanUtils.toBean(milestone, MilestoneRespVO.class);
         if (milestone.getTargetDate() != null) {
             long days = ChronoUnit.DAYS.between(today, milestone.getTargetDate());
             resp.setDaysLeft((int) days);
 
-            if (milestone.getStatus() == 2 || milestone.getStatus() == 3) {
+            if (Integer.valueOf(2).equals(milestone.getStatus()) || Integer.valueOf(3).equals(milestone.getStatus())) {
                 resp.setAlertStatus("DONE");
             } else if (days < 0) {
                 resp.setAlertStatus("EXPIRED");
