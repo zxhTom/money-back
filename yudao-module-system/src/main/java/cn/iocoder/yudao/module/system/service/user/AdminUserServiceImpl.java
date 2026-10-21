@@ -435,6 +435,11 @@ public class AdminUserServiceImpl implements AdminUserService {
     @LogRecord(type = SYSTEM_USER_TYPE, subType = SYSTEM_USER_UPDATE_VERIFIED_SUB_TYPE, bizNo = "{{#id}}",
             success = SYSTEM_USER_UPDATE_VERIFIED_SUCCESS)
     public void updateUserVerified(Long id, Integer expectedVerified, Integer verified, String reason) {
+        if (id == null || (!Integer.valueOf(0).equals(expectedVerified) && !Integer.valueOf(1).equals(expectedVerified))
+                || (!Integer.valueOf(0).equals(verified) && !Integer.valueOf(1).equals(verified))
+                || StrUtil.isBlank(reason) || reason.length() > 200) {
+            throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "认证状态或修改原因不合法");
+        }
         AdminUserDO user = validateUserExists(id);
         validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
         int currentVerified = Integer.valueOf(1).equals(user.getVerified()) ? 1 : 0;

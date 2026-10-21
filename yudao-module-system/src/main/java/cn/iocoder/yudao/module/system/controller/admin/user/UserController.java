@@ -140,7 +140,7 @@ public class UserController {
 
     @PutMapping("/update-verified")
     @Operation(summary = "人工修改用户认证状态")
-    @PreAuthorize("@ss.hasPermission('system:user:update-verified')")
+    @PreAuthorize("@ss.hasPermission('system:user:update-verified') && @ss.hasAnyRoles('super_admin', 'tenant_admin', 'contract-manager')")
     public CommonResult<Boolean> updateUserVerified(@Valid @RequestBody UserUpdateVerifiedReqVO reqVO) {
         userService.updateUserVerified(reqVO.getId(), reqVO.getExpectedVerified(),
                 reqVO.getVerified(), reqVO.getReason());
