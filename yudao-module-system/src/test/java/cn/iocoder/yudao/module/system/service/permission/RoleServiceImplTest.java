@@ -47,6 +47,9 @@ public class RoleServiceImplTest extends BaseDbUnitTest {
     @MockBean
     private PermissionService permissionService;
 
+    @MockBean
+    private PermissionMutationGuard mutationGuard;
+
     @Test
     public void testCreateRole() {
         // 准备参数

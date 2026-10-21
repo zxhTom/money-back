@@ -64,6 +64,21 @@ public class PermissionMutationGuard {
     private boolean management(Actor a) {
         return a.roles.stream().anyMatch(r -> "tenant_admin".equals(r.getCode()) || "contract-manager".equals(r.getCode()));
     }
+    private boolean managementCode(String code) {
+        return "super_admin".equals(code) || "tenant_admin".equals(code) || "contract-manager".equals(code);
+    }
+    /** Role codes determine authorization; changing an existing role must not promote its members. */
+    public void roleDefinition(RoleDO current, String requestedCode) {
+        if (current != null && !Objects.equals(current.getCode(), requestedCode)
+                && (managementCode(current.getCode()) || managementCode(requestedCode))) {
+            throw denied("不能修改管理员角色标识或将普通角色改为管理员，请通过角色授权操作");
+        }
+        if (!managementCode(requestedCode)) return;
+        Actor a = actor();
+        if (current != null) role(current.getId(), a);
+        if (!a.root && !management(a)) throw denied("仅管理员可以管理管理员角色");
+        if (!a.root && "super_admin".equals(requestedCode)) throw denied("仅超级管理员可以管理超级管理员角色");
+    }
     private void grant(RoleDO r, Actor a) {
         if (a.root) return;
         if (!management(a)

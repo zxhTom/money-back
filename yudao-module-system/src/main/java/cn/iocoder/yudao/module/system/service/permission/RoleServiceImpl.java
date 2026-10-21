@@ -25,6 +25,7 @@ import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -52,6 +53,10 @@ public class RoleServiceImpl implements RoleService {
     @Resource
     private RoleMapper roleMapper;
 
+    @Resource
+    @Lazy
+    private PermissionMutationGuard mutationGuard;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     @LogRecord(type = SYSTEM_ROLE_TYPE, subType = SYSTEM_ROLE_CREATE_SUB_TYPE, bizNo = "{{#role.id}}",
@@ -59,6 +64,7 @@ public class RoleServiceImpl implements RoleService {
     public Long createRole(RoleSaveReqVO createReqVO, Integer type) {
         // 1. 校验角色
         validateRoleDuplicate(createReqVO.getName(), createReqVO.getCode(), null);
+        mutationGuard.roleDefinition(null, createReqVO.getCode());
 
         // 2. 插入到数据库
         RoleDO role = BeanUtils.toBean(createReqVO, RoleDO.class)
@@ -79,6 +85,7 @@ public class RoleServiceImpl implements RoleService {
     public void updateRole(RoleSaveReqVO updateReqVO) {
         // 1.1 校验是否可以更新
         RoleDO role = validateRoleForUpdate(updateReqVO.getId());
+        mutationGuard.roleDefinition(role, updateReqVO.getCode());
         // 1.2 校验角色的唯一字段是否重复
         validateRoleDuplicate(updateReqVO.getName(), updateReqVO.getCode(), updateReqVO.getId());
 
@@ -182,6 +189,7 @@ public class RoleServiceImpl implements RoleService {
         if (RoleTypeEnum.SYSTEM.getType().equals(role.getType())) {
             throw exception(ROLE_CAN_NOT_UPDATE_SYSTEM_TYPE_ROLE);
         }
+        mutationGuard.roleDefinition(role, role.getCode());
         return role;
     }
 

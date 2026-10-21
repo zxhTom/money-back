@@ -70,6 +70,53 @@ class PermissionMutationGuardTest {
     @Test void administratorCanKeepAddingBoundedOrdinaryRolesToSelf(){memberships.put(42L,Arrays.asList(11L));assertDoesNotThrow(()->guard.userRoles(42L,set(11L,20L)));}
     @Test void administratorCanKeepSelfInBulkOrdinaryAssignments(){memberships.put(42L,Arrays.asList(11L));assertDoesNotThrow(()->guard.roleUsers(20L,set(42L)));}
     @Test void ownRoleMenuReductionsRemainAllowed(){assertDoesNotThrow(()->guard.roleMenus(10L,set(100L)));}
+    @Test void delegatedOperatorCannotCreateManagementRole(){
+        for(String code:Arrays.asList("super_admin","tenant_admin","contract-manager"))
+            assertThrows(AccessDeniedException.class,()->guard.roleDefinition(null,code));
+    }
+    @Test void roleEditsCannotPromoteOrdinaryMembers(){
+        for(String code:Arrays.asList("super_admin","tenant_admin","contract-manager"))
+            assertThrows(AccessDeniedException.class,()->guard.roleDefinition(catalog.get(20L),code));
+    }
+    @Test void cannotReleaseManagementCodeByRenamingExistingRole(){
+        RoleDO manager=role(30,"contract-manager",1,100L);
+        assertThrows(AccessDeniedException.class,()->guard.roleDefinition(manager,"old-manager"));
+    }
+    @Test void delegatedOperatorCannotEditOrDeleteManagementDefinition(){
+        RoleDO manager=role(30,"contract-manager",1,100L);
+        assertThrows(AccessDeniedException.class,()->guard.roleDefinition(manager,manager.getCode()));
+    }
+    @Test void ordinaryRoleCreationAndRenamingRemainAllowed(){
+        assertDoesNotThrow(()->guard.roleDefinition(null,"auditor"));
+        assertDoesNotThrow(()->guard.roleDefinition(catalog.get(20L),"contract-reader"));
+    }
+    @Test void managementKeepsCreatingAndEditingManagementRoles(){
+        RoleDO manager=role(30,"contract-manager",1,100L);
+        for(Long actorRole:Arrays.asList(1L,11L,30L)){
+            memberships.put(42L,Arrays.asList(actorRole));
+            assertDoesNotThrow(()->guard.roleDefinition(null,"contract-manager"));
+            assertDoesNotThrow(()->guard.roleDefinition(manager,"contract-manager"));
+        }
+    }
+    @Test void evenAdministratorsCannotPromoteAllMembersByEditingRoleCode(){
+        memberships.put(42L,Arrays.asList(1L));
+        assertThrows(AccessDeniedException.class,()->guard.roleDefinition(catalog.get(20L),"contract-manager"));
+        assertThrows(AccessDeniedException.class,()->guard.roleDefinition(catalog.get(11L),"old-admin"));
+    }
+    @Test void tenantBootstrapCanStillCreateAdministratorUnderNewTenantContext(){
+        memberships.put(42L,Arrays.asList(1L));TenantContextHolder.setTenantId(2L);
+        assertDoesNotThrow(()->guard.roleDefinition(null,"tenant_admin"));
+        assertFalse(TenantContextHolder.isIgnore());
+    }
+    @Test void protectedRoleDefinitionRejectsAnonymousDisabledAndForeignTenantActors(){
+        RoleDO manager=role(30,"contract-manager",1,100L);
+        SecurityContextHolder.clearContext();assertThrows(AccessDeniedException.class,()->guard.roleDefinition(null,"contract-manager"));
+        LoginUser login=new LoginUser();login.setId(42L);login.setUserType(2);SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(login,null));
+        memberships.put(42L,Arrays.asList(11L));catalog.get(11L).setStatus(1);
+        assertThrows(AccessDeniedException.class,()->guard.roleDefinition(manager,"contract-manager"));
+        catalog.get(11L).setStatus(0);manager.setTenantId(2L);
+        assertThrows(AccessDeniedException.class,()->guard.roleDefinition(manager,"contract-manager"));
+    }
     @Test void administratorDataScopeNoOpIgnoresIrrelevantDepartmentList(){memberships.put(42L,Arrays.asList(11L));assertDoesNotThrow(()->guard.roleDataScope(11L,1,set()));}
     @Test void springCanWireLazyGuardAndKeepDelegatedAssignments() {
         try (org.springframework.context.annotation.AnnotationConfigApplicationContext context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
