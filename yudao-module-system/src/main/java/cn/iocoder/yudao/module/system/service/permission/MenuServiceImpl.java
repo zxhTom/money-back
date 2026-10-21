@@ -44,6 +44,9 @@ public class MenuServiceImpl implements MenuService {
     @Resource
     private PermissionService permissionService;
     @Resource
+    @Lazy
+    private PermissionMutationGuard mutationGuard;
+    @Resource
     @Lazy // 延迟，避免循环依赖报错
     private TenantService tenantService;
 
@@ -60,6 +63,7 @@ public class MenuServiceImpl implements MenuService {
         // 插入数据库
         MenuDO menu = BeanUtils.toBean(createReqVO, MenuDO.class);
         initMenuProperty(menu);
+        mutationGuard.menuDefinition(null, menu.getPermission());
         menuMapper.insert(menu);
         // 返回
         return menu.getId();
@@ -70,7 +74,8 @@ public class MenuServiceImpl implements MenuService {
             allEntries = true) // allEntries 清空所有缓存，因为 permission 如果变更，涉及到新老两个 permission。直接清理，简单有效
     public void updateMenu(MenuSaveVO updateReqVO) {
         // 校验更新的菜单是否存在
-        if (menuMapper.selectById(updateReqVO.getId()) == null) {
+        MenuDO current = menuMapper.selectById(updateReqVO.getId());
+        if (current == null) {
             throw exception(MENU_NOT_EXISTS);
         }
         // 校验父菜单存在
@@ -82,6 +87,9 @@ public class MenuServiceImpl implements MenuService {
         // 更新到数据库
         MenuDO updateObj = BeanUtils.toBean(updateReqVO, MenuDO.class);
         initMenuProperty(updateObj);
+        // An omitted optional permission keeps its previous value, as with the existing NOT_NULL update strategy.
+        if (updateObj.getPermission() == null) updateObj.setPermission(current.getPermission());
+        mutationGuard.menuDefinition(current.getPermission(), updateObj.getPermission());
         menuMapper.updateById(updateObj);
     }
 
@@ -95,9 +103,11 @@ public class MenuServiceImpl implements MenuService {
             throw exception(MENU_EXISTS_CHILDREN);
         }
         // 校验删除的菜单是否存在
-        if (menuMapper.selectById(id) == null) {
+        MenuDO current = menuMapper.selectById(id);
+        if (current == null) {
             throw exception(MENU_NOT_EXISTS);
         }
+        mutationGuard.menuDefinition(current.getPermission(), null);
         // 标记删除
         menuMapper.deleteById(id);
         // 删除授予给角色的权限
@@ -114,6 +124,8 @@ public class MenuServiceImpl implements MenuService {
             if (menuMapper.selectCountByParentId(id) > 0) {
                 throw exception(MENU_EXISTS_CHILDREN);
             }
+            MenuDO current = menuMapper.selectById(id);
+            if (current != null) mutationGuard.menuDefinition(current.getPermission(), null);
         });
 
         // 标记删除

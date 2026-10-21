@@ -79,6 +79,13 @@ public class PermissionMutationGuard {
         if (!a.root && !management(a)) throw denied("仅管理员可以管理管理员角色");
         if (!a.root && "super_admin".equals(requestedCode)) throw denied("仅超级管理员可以管理超级管理员角色");
     }
+    /** Permission identifiers are platform-wide authorization definitions, not role display settings. */
+    public void menuDefinition(String currentPermission, String requestedPermission) {
+        String current = currentPermission == null ? "" : currentPermission;
+        String requested = requestedPermission == null ? "" : requestedPermission;
+        if (Objects.equals(current, requested)) return;
+        if (!actor().root) throw denied("仅超级管理员可以修改权限标识，请通过角色授权分配已有权限");
+    }
     private void grant(RoleDO r, Actor a) {
         if (a.root) return;
         if (!management(a)

@@ -16,10 +16,10 @@ public class OAuth2AccessTokenRespVO {
     @Schema(description = "编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
     private Long id;
 
-    @Schema(description = "访问令牌", requiredMode = Schema.RequiredMode.REQUIRED, example = "tudou")
+    @Schema(description = "会话撤销标识，不可用于登录；保留字段名兼容旧管理页面", example = "session:1024")
     private String accessToken;
 
-    @Schema(description = "刷新令牌", requiredMode = Schema.RequiredMode.REQUIRED, example = "nice")
+    @Schema(description = "刷新令牌已隐藏；登录和刷新接口不受影响", example = "已隐藏")
     private String refreshToken;
 
     @Schema(description = "用户编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "666")

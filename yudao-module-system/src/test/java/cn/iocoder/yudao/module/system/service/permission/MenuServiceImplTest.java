@@ -34,6 +34,9 @@ import static org.mockito.Mockito.verify;
 @Import(MenuServiceImpl.class)
 public class MenuServiceImplTest extends BaseDbUnitTest {
 
+    @MockBean
+    private PermissionMutationGuard mutationGuard;
+
     @Resource
     private MenuServiceImpl menuService;
 

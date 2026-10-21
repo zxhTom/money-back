@@ -72,6 +72,22 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
                 .orderByDesc(OAuth2AccessTokenDO::getId));
     }
 
+    /** Management API counts keep the current tenant and the administrator user namespace. */
+    default List<UserTokenStatVO> selectAdminTokenCountsByUserIds(java.util.Collection<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) return java.util.Collections.emptyList();
+        List<OAuth2AccessTokenDO> tokens = selectList(new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
+                .in(OAuth2AccessTokenDO::getUserId, userIds)
+                .eq(OAuth2AccessTokenDO::getUserType, cn.iocoder.yudao.framework.common.enums.UserTypeEnum.ADMIN.getValue())
+                .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now()));
+        java.util.Map<Long, Long> counts = new java.util.LinkedHashMap<>();
+        tokens.forEach(token -> counts.merge(token.getUserId(), 1L, Long::sum));
+        List<UserTokenStatVO> result = new java.util.ArrayList<>();
+        counts.forEach((userId, count) -> {
+            UserTokenStatVO stat = new UserTokenStatVO();stat.setUserId(userId);stat.setTokenCount(count);result.add(stat);
+        });
+        return result;
+    }
+
     /** 某 IP 下当前有效令牌涉及的不同用户ID（用于"一IP多用户"检测） */
     @TenantIgnore
     @Select("SELECT DISTINCT user_id FROM system_oauth2_access_token " +
