@@ -90,4 +90,31 @@ class UserImportSecurityTest {
     @Test void disabledOverwriteNeverMutatesExistingAccount() {
         assertTrue(service.importUserList(Collections.singletonList(row),false).getFailureUsernames().containsKey("fixture_user"));noWrites();
     }
+    @Test void delegatedEditorCannotDisableOrEnableSuperAdmin() {
+        root(99L);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,() -> service.updateUserStatus(99L,1));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,() -> service.updateUserStatus(99L,0));noWrites();
+    }
+    @Test void delegatedEditorCannotChangeSuperAdminSecurityFlags() {
+        root(99L);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,() -> service.updateUserDisablePwdChange(99L,true));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,() -> service.updateUserTeaseEnabled(99L,true));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,() -> service.updateUserInviteEnabled(99L,false));noWrites();
+    }
+    @Test void ordinaryAccountStatusManagementStillWorksAndRevokesSessions() throws Exception {
+        cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService tokens=mock(cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService.class);
+        inject("oauth2TokenService",tokens);service.updateUserStatus(99L,1);
+        verify(mapper).updateById(org.mockito.ArgumentMatchers.<AdminUserDO>argThat(u -> u.getId().equals(99L) && u.getStatus().equals(1)));
+        verify(tokens).removeAllTokensByUserId(99L,2);
+    }
+    @Test void superAdminRetainsAccountStatusAndSecurityFlagManagement() throws Exception {
+        root(42L);root(99L);
+        inject("oauth2TokenService",mock(cn.iocoder.yudao.module.system.service.oauth2.OAuth2TokenService.class));
+        assertDoesNotThrow(() -> service.updateUserStatus(99L,1));
+        assertDoesNotThrow(() -> service.updateUserDisablePwdChange(99L,true));
+        assertDoesNotThrow(() -> service.updateUserTeaseEnabled(99L,true));
+        assertDoesNotThrow(() -> service.updateUserInviteEnabled(99L,true));
+        verify(mapper,times(4)).updateById(any(AdminUserDO.class));
+    }
+
 }

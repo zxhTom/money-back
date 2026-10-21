@@ -80,12 +80,15 @@ public class ContractServiceImpl implements ContractService {
     @Resource
     private ContractOwnershipGuard ownershipGuard;
     @Resource
+    private ContractAttachmentReferenceGuard attachmentReferenceGuard;
+    @Resource
     private cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker creditQueryAccessChecker;
     @Resource
     private ContractTeaseGuard teaseGuard;
 
     @Override
     public Long createContract(ContractSaveReqVO createReqVO) {
+        attachmentReferenceGuard.validate(createReqVO.getFile(), null);
         Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
         AdminUserDO user = adminUserMapper.selectById(loginUserId);
         boolean matches = passwordEncoder.matches(createReqVO.getPassword(), user.getPayPassword());
@@ -140,7 +143,9 @@ public class ContractServiceImpl implements ContractService {
     @Override
     public void updateContract(ContractSaveReqVO updateReqVO) {
         // 校验存在 + 归属（创建者/当事人/超管/合同管理员）
-        ownershipGuard.checkOrThrow(contractMapper.selectById(updateReqVO.getId()), SecurityFrameworkUtils.getLoginUserId());
+        ContractDO current = contractMapper.selectById(updateReqVO.getId());
+        ownershipGuard.checkOrThrow(current, SecurityFrameworkUtils.getLoginUserId());
+        attachmentReferenceGuard.validate(updateReqVO.getFile(), current.getFile());
         // 更新
         ContractDO updateObj = BeanUtils.toBean(updateReqVO, ContractDO.class);
         if (StrUtil.isNotBlank(updateObj.getIndebtedId())) {

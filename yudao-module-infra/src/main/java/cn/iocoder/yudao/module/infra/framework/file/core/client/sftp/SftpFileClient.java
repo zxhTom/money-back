@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.extra.ssh.Sftp;
 import cn.iocoder.yudao.framework.common.util.io.FileUtils;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.AbstractFileClient;
+import cn.iocoder.yudao.module.infra.framework.file.core.client.FilePathSecurity;
 
 import java.io.File;
 
@@ -55,7 +56,7 @@ public class SftpFileClient extends AbstractFileClient<SftpFileClientConfig> {
     }
 
     private String getFilePath(String path) {
-        return config.getBasePath() + File.separator + path;
+        return config.getBasePath() + "/" + FilePathSecurity.relative(path);
     }
 
     private synchronized void reconnectIfTimeout() {

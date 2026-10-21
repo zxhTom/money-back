@@ -6,6 +6,7 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.date.DateUtils;
@@ -33,6 +34,8 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
@@ -66,6 +69,7 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     @Transactional(rollbackFor = Exception.class)
     public OAuth2AccessTokenDO createAccessToken(Long userId, Integer userType, String clientId, List<String> scopes) {
         OAuth2ClientDO clientDO = oauth2ClientService.validOAuthClientFromCache(clientId);
+        validateUserAccount(userId, userType, TenantContextHolder.getTenantId());
         // 创建刷新令牌
         OAuth2RefreshTokenDO refreshTokenDO = createOAuth2RefreshToken(userId, userType, clientDO, scopes);
         // 创建访问令牌
@@ -87,6 +91,8 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
             throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "刷新令牌的客户端编号不正确");
         }
 
+        validateUserAccount(refreshTokenDO.getUserId(), refreshTokenDO.getUserType(), refreshTokenDO.getTenantId());
+
         // 移除相关的访问令牌
         List<OAuth2AccessTokenDO> accessTokenDOs = oauth2AccessTokenMapper.selectListByRefreshToken(refreshToken);
         if (CollUtil.isNotEmpty(accessTokenDOs)) {
@@ -101,7 +107,8 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         }
 
         // 创建访问令牌
-        return createOAuth2AccessToken(refreshTokenDO, clientDO);
+        return TenantUtils.execute(refreshTokenDO.getTenantId(),
+                () -> createOAuth2AccessToken(refreshTokenDO, clientDO));
     }
 
     @Override
@@ -109,7 +116,11 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         // 优先从 Redis 中获取
         OAuth2AccessTokenDO accessTokenDO = oauth2AccessTokenRedisDAO.get(accessToken);
         if (accessTokenDO != null) {
-            return accessTokenDO;
+            if (!StrUtil.equals(accessTokenDO.getAccessToken(), accessTokenDO.getRefreshToken())) {
+                return accessTokenDO;
+            }
+            // Legacy refresh-as-bearer cache entries must not outlive their refresh record.
+            oauth2AccessTokenRedisDAO.delete(accessToken);
         }
 
         // 获取不到，从 MySQL 中获取访问令牌
@@ -125,7 +136,8 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         }
 
         // 如果在 MySQL 存在，则往 Redis 中写入
-        if (accessTokenDO != null && !DateUtils.isExpired(accessTokenDO.getExpiresTime())) {
+        if (accessTokenDO != null && !DateUtils.isExpired(accessTokenDO.getExpiresTime())
+                && !StrUtil.equals(accessTokenDO.getAccessToken(), accessTokenDO.getRefreshToken())) {
             oauth2AccessTokenRedisDAO.set(accessTokenDO);
         }
         return accessTokenDO;
@@ -140,34 +152,56 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         if (DateUtils.isExpired(accessTokenDO.getExpiresTime())) {
             throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "访问令牌已过期");
         }
+        validateUserAccount(accessTokenDO.getUserId(), accessTokenDO.getUserType(), accessTokenDO.getTenantId());
         return accessTokenDO;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OAuth2AccessTokenDO removeAccessToken(String accessToken) {
-        // 删除访问令牌
         OAuth2AccessTokenDO accessTokenDO = oauth2AccessTokenMapper.selectByAccessToken(accessToken);
         if (accessTokenDO == null) {
-            return null;
+            // Logout also accepts the existing refresh-as-bearer compatibility credential.
+            OAuth2RefreshTokenDO refreshTokenDO = oauth2RefreshTokenMapper.selectByRefreshToken(accessToken);
+            if (refreshTokenDO == null) {
+                oauth2AccessTokenRedisDAO.delete(accessToken);
+                return null;
+            }
+            accessTokenDO = BeanUtils.toBean(refreshTokenDO, OAuth2AccessTokenDO.class).setAccessToken(accessToken);
         }
-        oauth2AccessTokenMapper.deleteById(accessTokenDO.getId());
-        oauth2AccessTokenRedisDAO.delete(accessToken);
-        // 删除刷新令牌
-        oauth2RefreshTokenMapper.deleteByRefreshToken(accessTokenDO.getRefreshToken());
-        return accessTokenDO;
+        OAuth2AccessTokenDO revoked = accessTokenDO;
+        TenantUtils.execute(revoked.getTenantId(), () -> {
+            List<OAuth2AccessTokenDO> siblings = oauth2AccessTokenMapper.selectListByRefreshToken(revoked.getRefreshToken());
+            Set<Long> ids = new HashSet<>(convertSet(siblings, OAuth2AccessTokenDO::getId));
+            Set<String> credentials = new HashSet<>(convertSet(siblings, OAuth2AccessTokenDO::getAccessToken));
+            // The direct access record can disappear concurrently with refresh; still evict its cache.
+            credentials.add(accessToken);
+            credentials.add(revoked.getRefreshToken());
+            credentials.remove(null);
+            if (!StrUtil.equals(accessToken, revoked.getRefreshToken())) {
+                ids.add(revoked.getId());
+            }
+            if (!ids.isEmpty()) oauth2AccessTokenMapper.deleteByIds(ids);
+            oauth2RefreshTokenMapper.deleteByRefreshToken(revoked.getRefreshToken());
+            if (!credentials.isEmpty()) oauth2AccessTokenRedisDAO.deleteList(credentials);
+        });
+        return revoked;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeAllTokensByUserId(Long userId, Integer userType) {
         List<OAuth2AccessTokenDO> tokens = oauth2AccessTokenMapper.selectListByUserId(userId, userType);
+        // Refresh records can survive without an access row (for example after access expiry).
+        oauth2RefreshTokenMapper.deleteByUserId(userId, userType);
         if (CollUtil.isEmpty(tokens)) {
             return;
         }
         oauth2AccessTokenMapper.deleteByIds(convertSet(tokens, OAuth2AccessTokenDO::getId));
-        oauth2RefreshTokenMapper.deleteByUserId(userId, userType);
-        oauth2AccessTokenRedisDAO.deleteList(convertSet(tokens, OAuth2AccessTokenDO::getAccessToken));
+        Set<String> credentials = new HashSet<>(convertSet(tokens, OAuth2AccessTokenDO::getAccessToken));
+        credentials.addAll(convertSet(tokens, OAuth2AccessTokenDO::getRefreshToken));
+        credentials.remove(null);
+        if (!credentials.isEmpty()) oauth2AccessTokenRedisDAO.deleteList(credentials);
     }
 
     @Override
@@ -195,6 +229,22 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         } catch (Exception ignored) {
         }
         return accessTokenDO;
+    }
+
+    /** All admin login methods and cached credentials share the current account status. */
+    private void validateUserAccount(Long userId, Integer userType, Long tenantId) {
+        // client_credentials uses userId=0; member authentication is owned by the member module.
+        if (!UserTypeEnum.ADMIN.getValue().equals(userType) || Long.valueOf(0).equals(userId)) {
+            return;
+        }
+        if (userId == null || userId < 0 || tenantId == null) {
+            throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "账号不可用，请重新登录");
+        }
+        AdminUserDO user = TenantUtils.execute(tenantId, () -> adminUserService.getUserSimple(userId));
+        if (user == null || !tenantId.equals(user.getTenantId())
+                || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())) {
+            throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "账号不可用，请重新登录或联系管理员");
+        }
     }
 
     private String currentRequestIp() {
@@ -238,6 +288,7 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         }
         if (userType.equals(UserTypeEnum.ADMIN.getValue())) {
             AdminUserDO user = adminUserService.getUser(userId);
+            if (user == null) return Collections.emptyMap();
             return MapUtil.builder(LoginUser.INFO_KEY_NICKNAME, user.getNickname())
                     .put(LoginUser.INFO_KEY_DEPT_ID, StrUtil.toStringOrNull(user.getDeptId())).build();
         } else if (userType.equals(UserTypeEnum.MEMBER.getValue())) {

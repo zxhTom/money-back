@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.infra.framework.file.core.client.local;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IORuntimeException;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.AbstractFileClient;
+import cn.iocoder.yudao.module.infra.framework.file.core.client.FilePathSecurity;
 
 import java.io.File;
 
@@ -50,7 +51,17 @@ public class LocalFileClient extends AbstractFileClient<LocalFileClientConfig> {
     }
 
     private String getFilePath(String path) {
-        return config.getBasePath() + File.separator + path;
+        FilePathSecurity.relative(path);
+        try {
+            java.nio.file.Path base = new File(config.getBasePath()).getCanonicalFile().toPath();
+            java.nio.file.Path target = base.resolve(path).toFile().getCanonicalFile().toPath();
+            if (target.equals(base) || !target.startsWith(base)) {
+                throw new IllegalArgumentException("文件路径超出存储目录");
+            }
+            return target.toString();
+        } catch (java.io.IOException ex) {
+            throw new IllegalArgumentException("无法校验文件路径", ex);
+        }
     }
 
 }

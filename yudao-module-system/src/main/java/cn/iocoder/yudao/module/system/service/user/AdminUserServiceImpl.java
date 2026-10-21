@@ -375,6 +375,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     public void updateUserDisablePwdChange(Long id, Boolean disable) {
         validateUserExists(id);
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(id);
         updateObj.setDisablePwdChange(disable);
@@ -384,6 +385,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     public void updateUserTeaseEnabled(Long id, Boolean enabled) {
         validateUserExists(id);
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(id);
         updateObj.setTeaseEnabled(enabled);
@@ -393,6 +395,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     public void updateUserInviteEnabled(Long id, Boolean enabled) {
         validateUserExists(id);
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(id);
         updateObj.setInviteEnabled(enabled);
@@ -414,6 +417,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     public void updateUserStatus(Long id, Integer status) {
         // 校验用户存在
         validateUserExists(id);
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(id);
         // 更新状态
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(id);

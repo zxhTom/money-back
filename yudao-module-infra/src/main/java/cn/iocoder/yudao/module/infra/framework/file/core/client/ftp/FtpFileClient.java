@@ -7,6 +7,7 @@ import cn.hutool.extra.ftp.Ftp;
 import cn.hutool.extra.ftp.FtpException;
 import cn.hutool.extra.ftp.FtpMode;
 import cn.iocoder.yudao.module.infra.framework.file.core.client.AbstractFileClient;
+import cn.iocoder.yudao.module.infra.framework.file.core.client.FilePathSecurity;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -65,7 +66,7 @@ public class FtpFileClient extends AbstractFileClient<FtpFileClientConfig> {
     }
 
     private String getFilePath(String path) {
-        return config.getBasePath() + StrUtil.SLASH + path;
+        return config.getBasePath() + "/" + FilePathSecurity.relative(path);
     }
 
     private synchronized void reconnectIfTimeout() {
