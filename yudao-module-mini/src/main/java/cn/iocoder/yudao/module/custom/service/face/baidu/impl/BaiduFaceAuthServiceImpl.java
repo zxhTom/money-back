@@ -50,6 +50,7 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
     private static final String REPORT_USER_INFO_URL = "https://aip.baidubce.com/rpc/2.0/brain/solution/faceprint/userInfo/report";
 
     private static final String REPORT_USER_ID_URL = "https://aip.baidubce.com/rpc/2.0/brain/solution/faceprint/idcard/submit";
+    private static final String QUERY_RESULT_URL = "https://aip.baidubce.com/rpc/2.0/brain/solution/faceprint/result/detail";
 
 
     /**
@@ -101,9 +102,8 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
     }
     @Override
     public Map<String, Object> queryFaceAuthResult(String verifyToken) throws Exception {
-        // 调用百度云的人脸实名认证V4结果查询接口
-        // 接口地址示例：https://aip.baidubce.com/rest/2.0/face/v4/facverify
-        String url = "https://aip.baidubce.com/rest/2.0/face/v4/facverify";
+        // H5 方案的权威结果查询，不是单次人脸实名认证 V4 的图片核验接口。
+        String url = QUERY_RESULT_URL;
 
         // 构建请求参数（根据百度云最新文档调整）
         Map<String, String> params = new HashMap<>();
@@ -120,8 +120,12 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
         Map<String, Object> response = new HashMap<>();
 
         // 解析百度云返回结果（结构需参照官方文档）
-        if (result.getInteger("error_code") == 0) {
+        if (Boolean.TRUE.equals(result.get("success"))
+                && result.getJSONObject("result") != null
+                && result.getJSONObject("result").getJSONObject("verify_result") != null) {
             JSONObject verifyResult = result.getJSONObject("result");
+            // passed 是内部统一字段，只能由已认证的百度 result/detail 响应派生。
+            verifyResult.put("passed", true);
             response.put("success", true);
             response.put("data", verifyResult); // 包含passed、score、reason等
 
@@ -148,7 +152,7 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
             
         } else {
             response.put("success", false);
-            response.put("message", result.getString("error_msg"));
+            response.put("message", result.getString("message"));
         }
 
         return response;
@@ -165,8 +169,10 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
     }
 
     // 发送HTTP POST请求的辅助方法
-    private String sendPost(String url, String body) throws Exception {
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+    protected String sendPost(String url, String body) throws Exception {
+        org.apache.http.client.config.RequestConfig timeout = org.apache.http.client.config.RequestConfig.custom()
+                .setConnectTimeout(5000).setConnectionRequestTimeout(5000).setSocketTimeout(8000).build();
+        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(timeout).build()) {
             HttpPost post = new HttpPost(url);
             post.setHeader("Content-Type", "application/json");
             post.setEntity(new StringEntity(body, "UTF-8"));
@@ -176,8 +182,10 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
     }
 
     // 发送HTTP GET请求的辅助方法
-    private String sendGet(String url) throws Exception {
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+    protected String sendGet(String url) throws Exception {
+        org.apache.http.client.config.RequestConfig timeout = org.apache.http.client.config.RequestConfig.custom()
+                .setConnectTimeout(5000).setConnectionRequestTimeout(5000).setSocketTimeout(8000).build();
+        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(timeout).build()) {
             HttpGet get = new HttpGet(url);
             HttpResponse response = httpClient.execute(get);
             return EntityUtils.toString(response.getEntity(), "UTF-8");
