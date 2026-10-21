@@ -48,6 +48,10 @@ public class PermissionServiceTest extends BaseDbUnitTest {
     @Resource
     private UserRoleMapper userRoleMapper;
 
+    // Persistence behavior is tested here; real authorization boundaries are covered by PermissionMutationGuardTest.
+    @MockBean
+    private PermissionMutationGuard mutationGuard;
+
     @MockBean
     private RoleService roleService;
     @MockBean
