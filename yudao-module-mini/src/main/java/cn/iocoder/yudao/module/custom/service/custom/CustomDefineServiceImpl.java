@@ -538,7 +538,26 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             inviteCode = inviteCodeService.validate(adminUserDO.getInviteCode());
         }
 
-        AdminUserDO user = BeanUtils.toBean(adminUserDO, AdminUserDO.class);
+        // 服务层同样使用白名单，防止其它调用方直接传入数据库对象绕过公开注册 DTO。
+        AdminUserDO user = new AdminUserDO();
+        user.setUsername(adminUserDO.getUsername());
+        user.setPassword(adminUserDO.getPassword());
+        user.setRealname(adminUserDO.getRealname());
+        user.setIdNo(adminUserDO.getIdNo());
+        user.setIdCard(adminUserDO.getIdCard());
+        user.setNickname(adminUserDO.getNickname());
+        user.setMobile(adminUserDO.getMobile());
+        user.setEmail(adminUserDO.getEmail());
+        user.setAvatar(adminUserDO.getAvatar());
+        user.setBirthDate(adminUserDO.getBirthDate());
+        user.setAddress(adminUserDO.getAddress());
+        user.setOccupation(adminUserDO.getOccupation());
+        user.setEducation(adminUserDO.getEducation());
+        user.setSex(adminUserDO.getSex());
+        user.setVerified(0);
+        user.setInviteEnabled(false);
+        user.setDisablePwdChange(false);
+        user.setTeaseEnabled(false);
         if (org.apache.commons.lang3.StringUtils.isBlank(user.getIdNo())
                 && org.apache.commons.lang3.StringUtils.isNotBlank(user.getIdCard())) {
             user.setIdNo(user.getIdCard().trim());

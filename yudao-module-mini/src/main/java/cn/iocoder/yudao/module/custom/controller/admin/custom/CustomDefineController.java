@@ -203,9 +203,9 @@ public class CustomDefineController {
     @RateLimiter(time = 60, count = 5, keyResolver = ClientIpRateLimiterKeyResolver.class,
             message = "注册请求过于频繁，请稍后再试")
     @AuditLog(module = "用户管理", type = AuditOperationType.CREATE,
-            operation = "用户注册-{{#adminUserDO.username}}")
-    public CommonResult<Boolean> register(@RequestBody AdminUserDO adminUserDO) {
-        customDefineService.register(adminUserDO);
+            operation = "用户注册-{{#registerReqVO.username}}")
+    public CommonResult<Boolean> register(@Valid @RequestBody RegisterReqVO registerReqVO) {
+        customDefineService.register(BeanUtils.toBean(registerReqVO, AdminUserDO.class));
         return success(true);
     }
 

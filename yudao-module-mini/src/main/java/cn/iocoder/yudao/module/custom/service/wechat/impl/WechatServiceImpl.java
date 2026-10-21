@@ -121,8 +121,9 @@ public class WechatServiceImpl implements WechatService {
     public String send(TemplateVO templateVO) throws WxErrorException {
         List<AdminUserDO> userListByRealname = adminUserService.getUserByIdNo(templateVO.getIdNo());
         if (CollectionUtil.isEmpty(userListByRealname)) {
-            log.warn("[send] 根据身份信息未找到对应用户，idNo: {}", templateVO.getIdNo());
-            throw exception(WECHAT_TEMPLATE_USER_NOT_FOUND, templateVO.getIdNo() != null ? templateVO.getIdNo() : "");
+            String maskedId = templateVO.getIdNo() == null ? "" : idCardCipherService.maskFromStored(templateVO.getIdNo());
+            log.warn("[send] 根据身份信息未找到对应用户，idNo: {}", maskedId);
+            throw exception(WECHAT_TEMPLATE_USER_NOT_FOUND, maskedId);
         }
         String openId=customDefineMapper.selectOffcialOpenIdByUserId(userListByRealname.get(0).getId());
         WxMpTemplateMessage message = WxMpTemplateMessage.builder()
