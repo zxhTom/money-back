@@ -181,12 +181,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         // 1. 校验正确性
         AdminUserDO oldUser = validateUserForCreateOrUpdate(updateReqVO.getId(), updateReqVO.getUsername(),
                 updateReqVO.getMobile(), updateReqVO.getEmail(), updateReqVO.getDeptId(), updateReqVO.getPostIds());
-        // 1.1 非超管不能修改超管账号
-        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(oldUser.getId());
-        // 1.2 修改 deptId 只有超管能做（没有部门层级数据权限体系可复用，先用这个最简单的兜底）
-        if (!Objects.equals(oldUser.getDeptId(), updateReqVO.getDeptId()) && !isSuperAdmin(SecurityFrameworkUtils.getLoginUserId())) {
-            throw exception0(GlobalErrorCodeConstants.FORBIDDEN.getCode(), "仅超级管理员可以修改用户所属部门");
-        }
+        validateUserUpdateAccess(oldUser, updateReqVO.getDeptId());
 
         // 2.1 更新用户
         AdminUserDO updateObj = BeanUtils.toBean(updateReqVO, AdminUserDO.class);
@@ -694,6 +689,15 @@ public class AdminUserServiceImpl implements AdminUserService {
         }
     }
 
+    /** 普通编辑和批量导入必须遵守相同的账号与部门保护。 */
+    private void validateUserUpdateAccess(AdminUserDO oldUser, Long requestedDeptId) {
+        validateNotOperatingSuperAdminUnlessSelfIsSuperAdmin(oldUser.getId());
+        if (!Objects.equals(oldUser.getDeptId(), requestedDeptId)
+                && !isSuperAdmin(SecurityFrameworkUtils.getLoginUserId())) {
+            throw exception0(GlobalErrorCodeConstants.FORBIDDEN.getCode(), "仅超级管理员可以修改用户所属部门");
+        }
+    }
+
     private AdminUserDO validateUserForCreateOrUpdate(Long id, String username, String mobile, String email,
                                                Long deptId, Set<Long> postIds) {
         // 关闭数据权限，避免因为没有数据权限，查询不到数据，进而导致唯一校验不正确
@@ -831,28 +835,32 @@ public class AdminUserServiceImpl implements AdminUserService {
                 respVO.getFailureUsernames().put(importUser.getUsername(), ex.getMessage());
                 return;
             }
-            // 2.1.2 校验，判断是否有不符合的原因
+            AdminUserDO existUser = userMapper.selectByUsername(importUser.getUsername());
+            if (existUser != null && !isUpdateSupport) {
+                respVO.getFailureUsernames().put(importUser.getUsername(), USER_USERNAME_EXISTS.getMsg());
+                return;
+            }
+            // 导入未填写部门时沿用原值，与 MyBatis 非空更新行为一致。
+            Long effectiveDeptId = importUser.getDeptId() != null || existUser == null
+                    ? importUser.getDeptId() : existUser.getDeptId();
             try {
-                validateUserForCreateOrUpdate(null, null, importUser.getMobile(), importUser.getEmail(),
-                        importUser.getDeptId(), null);
+                if (existUser != null) {
+                    validateUserUpdateAccess(existUser, effectiveDeptId);
+                }
+                validateUserForCreateOrUpdate(existUser == null ? null : existUser.getId(),
+                        null, importUser.getMobile(), importUser.getEmail(), effectiveDeptId, null);
             } catch (ServiceException ex) {
                 respVO.getFailureUsernames().put(importUser.getUsername(), ex.getMessage());
                 return;
             }
 
-            // 2.2.1 判断如果不存在，在进行插入
-            AdminUserDO existUser = userMapper.selectByUsername(importUser.getUsername());
+            // 2.2.1 判断如果不存在，再进行插入
             if (existUser == null) {
                 userMapper.insert(BeanUtils.toBean(importUser, AdminUserDO.class)
                         .setPassword(encodePassword(initPassword))
                         .setPasswordStrength(PasswordStrengthUtil.calc(initPassword))
                         .setPostIds(new HashSet<>()));
                 respVO.getCreateUsernames().add(importUser.getUsername());
-                return;
-            }
-            // 2.2.2 如果存在，判断是否允许更新
-            if (!isUpdateSupport) {
-                respVO.getFailureUsernames().put(importUser.getUsername(), USER_USERNAME_EXISTS.getMsg());
                 return;
             }
             AdminUserDO updateUser = BeanUtils.toBean(importUser, AdminUserDO.class);
