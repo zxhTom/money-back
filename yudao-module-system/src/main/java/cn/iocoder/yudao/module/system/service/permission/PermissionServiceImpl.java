@@ -48,6 +48,9 @@ import static java.util.Collections.singleton;
 public class PermissionServiceImpl implements PermissionService {
 
     @Resource
+    @org.springframework.context.annotation.Lazy
+    private PermissionMutationGuard mutationGuard;
+    @Resource
     private RoleMenuMapper roleMenuMapper;
     @Resource
     private UserRoleMapper userRoleMapper;
@@ -141,6 +144,7 @@ public class PermissionServiceImpl implements PermissionService {
             allEntries = true) // allEntries 清空所有缓存，主要一次更新涉及到的 menuIds 较多，反倒批量会更快
     })
     public void assignRoleMenu(Long roleId, Set<Long> menuIds) {
+        mutationGuard.roleMenus(roleId, menuIds);
         // 获得角色拥有菜单编号
         Set<Long> dbMenuIds = convertSet(roleMenuMapper.selectListByRoleId(roleId), RoleMenuDO::getMenuId);
         // 计算新增和删除的菜单编号
@@ -208,6 +212,7 @@ public class PermissionServiceImpl implements PermissionService {
     @DSTransactional // 多数据源，使用 @DSTransactional 保证本地事务，以及数据源的切换
     @CacheEvict(value = RedisKeyConstants.USER_ROLE_ID_LIST, key = "#userId")
     public void assignUserRole(Long userId, Set<Long> roleIds) {
+        mutationGuard.userRoles(userId, roleIds);
         // 获得角色拥有角色编号
         Set<Long> dbRoleIds = convertSet(userRoleMapper.selectListByUserId(userId),
                 UserRoleDO::getRoleId);
@@ -233,6 +238,7 @@ public class PermissionServiceImpl implements PermissionService {
     @DSTransactional
     @CacheEvict(value = RedisKeyConstants.USER_ROLE_ID_LIST, allEntries = true)
     public void assignRoleUsers(Long roleId, Set<Long> userIds) {
+        mutationGuard.roleUsers(roleId, userIds);
         Set<Long> dbUserIds = convertSet(userRoleMapper.selectListByRoleIds(singleton(roleId)),
                 UserRoleDO::getUserId);
         Set<Long> userIdList = CollUtil.emptyIfNull(userIds);
@@ -293,6 +299,7 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     public void assignRoleDataScope(Long roleId, Integer dataScope, Set<Long> dataScopeDeptIds) {
+        mutationGuard.roleDataScope(roleId, dataScope, dataScopeDeptIds);
         roleService.updateRoleDataScope(roleId, dataScope, dataScopeDeptIds);
     }
 

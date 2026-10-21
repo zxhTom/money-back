@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.custom.controller.admin.security;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.module.system.framework.security.SensitiveRecordAccess;
 import cn.iocoder.yudao.module.custom.dal.dataobject.security.SecurityPwdResetLogDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.security.SecurityPwdResetLogMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +28,9 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class SecurityPwdResetLogController {
 
     @Resource
+    private SensitiveRecordAccess recordAccess;
+
+    @Resource
     private SecurityPwdResetLogMapper securityPwdResetLogMapper;
 
     @GetMapping("/page")
@@ -36,10 +41,17 @@ public class SecurityPwdResetLogController {
             @RequestParam(value = "pageNo", defaultValue = "1") Integer pageNo,
             @RequestParam(value = "pageSize", defaultValue = "10") Integer pageSize,
             @RequestParam(value = "userId", required = false) Long userId) {
+        Long scopedUser = recordAccess.userFilter(userId);
+        String tenantUsers = recordAccess.tenantUserIdsSql();
         PageParam page = new PageParam();
         page.setPageNo(pageNo);
         page.setPageSize(pageSize);
-        return success(securityPwdResetLogMapper.selectPage(page, userId));
+        LambdaQueryWrapperX<SecurityPwdResetLogDO> query =
+                new LambdaQueryWrapperX<SecurityPwdResetLogDO>()
+                        .eqIfPresent(SecurityPwdResetLogDO::getUserId, scopedUser)
+                        .orderByDesc(SecurityPwdResetLogDO::getId);
+        if (tenantUsers != null) query.inSql(SecurityPwdResetLogDO::getUserId, tenantUsers);
+        return success(securityPwdResetLogMapper.selectPage(page, query));
     }
 
 }
