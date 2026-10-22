@@ -179,8 +179,8 @@ public class CustomDefineController {
 
     @PostMapping("/updateContractHadConfirm")
     @Operation(summary = "将合同状态更新为已确认")
-    @PreAuthorize("@ss.hasPermission('custom:contract:update')")
-    public CommonResult<Boolean> updateContractHadConfirm(@RequestBody PayOrderNotifyReqDTO notifyReqDTO) {
+    @PermitAll // 支付服务的异步通知没有用户令牌；业务层核实支付单及合同归属
+    public CommonResult<Boolean> updateContractHadConfirm(@Valid @RequestBody PayOrderNotifyReqDTO notifyReqDTO) {
         customDefineService.updateContractConfirmedStatus(notifyReqDTO);
         return success(true);
     }

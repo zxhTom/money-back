@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
@@ -53,6 +54,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -70,6 +72,9 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSW
 @Slf4j
 public class CustomDefineServiceImpl implements CustomDefineService{
     @Resource private cn.iocoder.yudao.module.custom.service.contract.ContractPaymentAccessGuard paymentAccessGuard;
+    @Resource private cn.iocoder.yudao.module.pay.service.order.PayOrderService payOrderService;
+    // 本次进程启动之前的支付单可能属于历史通知重试，确认收到即可，不改历史业务数据。
+    private LocalDateTime paymentNotifyCutoverTime = LocalDateTime.now();
 
     @Autowired
     MiniUserMapper miniUserMapper;
@@ -350,25 +355,47 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Integer updateContractConfirmedStatus(PayOrderNotifyReqDTO notifyReqDTO) {
-        cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderDO pay = paymentAccessGuard.requireOrder(notifyReqDTO.getPayOrderId());
-        if (!cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum.isSuccess(pay.getStatus()))
+        if (notifyReqDTO == null || notifyReqDTO.getPayOrderId() == null || StrUtil.isBlank(notifyReqDTO.getMerchantOrderId()))
+            throw new AccessDeniedException("支付通知参数不完整");
+        cn.iocoder.yudao.module.pay.dal.dataobject.order.PayOrderDO pay = payOrderService.getOrder(notifyReqDTO.getPayOrderId());
+        if (pay == null || !Objects.equals(pay.getUserType(), UserTypeEnum.ADMIN.getValue())
+                || !cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum.isSuccess(pay.getStatus()))
             throw new AccessDeniedException("支付尚未成功，不能确认合同");
+        // 旧通知可能在发布后继续自动重试；上线前的支付单仅确认收到，不改历史业务数据。
+        if (paymentNotifyCutoverTime == null || pay.getCreateTime() == null
+                || pay.getCreateTime().isBefore(paymentNotifyCutoverTime)) return 1;
+        AdminUserDO owner = pay.getUserId() == null ? null : userService.getUser(pay.getUserId());
+        if (owner == null || TenantContextHolder.getTenantId() == null
+                || !Objects.equals(owner.getTenantId(), TenantContextHolder.getTenantId()))
+            throw new AccessDeniedException("支付订单租户不匹配");
         PayDemoOrderDO demo = payDemoOrderMapper.selectOne(new LambdaQueryWrapperX<PayDemoOrderDO>().eq(PayDemoOrderDO::getPayOrderId, pay.getId()));
         if (demo == null || !Objects.equals(demo.getPrice(), pay.getPrice())
                 || !Objects.equals(String.valueOf(demo.getId()), pay.getMerchantOrderId())
                 || !Objects.equals(demo.getUserId(), pay.getUserId())
-                || (notifyReqDTO.getMerchantOrderId() != null && !Objects.equals(notifyReqDTO.getMerchantOrderId(), pay.getMerchantOrderId())))
+                || !Objects.equals(notifyReqDTO.getMerchantOrderId(), pay.getMerchantOrderId()))
             throw new AccessDeniedException("支付订单关联校验失败");
         Long contractId = customDefineMapper.selectContractByPayOrderId(pay.getId());
         ContractDO contractDO = contractId == null ? null : contractMapper.selectById(contractId);
-        ownershipGuard.checkOrThrow(contractDO, SecurityFrameworkUtils.getLoginUserId());
-        if (!Objects.equals(demo.getSpuId(), contractId)) throw new AccessDeniedException("支付订单关联校验失败");
+        if (contractDO == null || !Objects.equals(demo.getSpuId(), contractId)
+                || !Objects.equals(contractDO.getTenantId(), owner.getTenantId()))
+            throw new AccessDeniedException("支付订单关联校验失败");
+        if (!Integer.valueOf(1).equals(contractDO.getStatus()) && !Integer.valueOf(2).equals(contractDO.getStatus()))
+            throw new AccessDeniedException("当前合同状态不支持确认");
+        if (!Boolean.TRUE.equals(demo.getPayStatus())) {
+            payDemoOrderMapper.updateByIdAndPayed(demo.getId(), false,
+                    new PayDemoOrderDO().setPayStatus(true).setPayTime(pay.getSuccessTime())
+                            .setPayChannelCode(pay.getChannelCode()));
+        }
         if (Integer.valueOf(2).equals(contractDO.getStatus())) return 1;
-        if (!Integer.valueOf(1).equals(contractDO.getStatus())) throw new AccessDeniedException("当前合同状态不支持确认");
         int updated = contractMapper.update(new ContractDO().setStatus(2), new LambdaQueryWrapperX<ContractDO>()
                 .eq(ContractDO::getId, contractId).eq(ContractDO::getStatus, 1));
-        if (updated != 1) throw new AccessDeniedException("合同状态已变化，请刷新后重试");
+        if (updated != 1) {
+            ContractDO current = contractMapper.selectById(contractId);
+            if (current == null || !Integer.valueOf(2).equals(current.getStatus()))
+                throw new AccessDeniedException("合同状态已变化，请刷新后重试");
+        }
         return 1;
     }
 
