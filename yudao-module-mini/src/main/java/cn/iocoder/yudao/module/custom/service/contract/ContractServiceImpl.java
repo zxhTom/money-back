@@ -514,7 +514,10 @@ public class ContractServiceImpl implements ContractService {
         String plain = idCardCipherService.resolveToPlain(caller.getIdNo());
         cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO result =
                 "from".equals(direction) ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
-        if (result != null) result.setTargetIdCard(idCardCipherService.requestToStoredCipher(result.getTargetIdCard()));
+        if (result != null) {
+            result.setTargetIdCardDisplay(idCardCipherService.maskFromStored(result.getTargetIdCard()));
+            result.setTargetIdCard(idCardCipherService.requestToStoredCipher(result.getTargetIdCard()));
+        }
         return result;
     }
 

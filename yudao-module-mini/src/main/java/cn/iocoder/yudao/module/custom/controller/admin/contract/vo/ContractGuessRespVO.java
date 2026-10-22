@@ -11,4 +11,7 @@ public class ContractGuessRespVO {
 
     @Schema(description = "推荐人身份证")
     private String targetIdCard;
+
+    @Schema(description = "推荐人身份证脱敏展示（前六位、后四位）")
+    private String targetIdCardDisplay;
 }
