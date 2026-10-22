@@ -92,6 +92,7 @@ public class DataAccessMonitorServiceImpl implements DataAccessMonitorService {
             alert.setAlertType("DATA_LEAKAGE");
             alert.setSeverity(2);
             alert.setUserId(userId);
+            alert.setSourceIp(clientIp);
             alert.setRequestUrl(requestUrl);
             alert.setRequestMethod("GET");
             alert.setAlertMessage(msg);

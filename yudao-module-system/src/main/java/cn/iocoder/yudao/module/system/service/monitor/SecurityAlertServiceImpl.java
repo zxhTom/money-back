@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.system.service.monitor;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.hutool.crypto.digest.DigestUtil;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertHandleReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.SecurityAlertPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.monitor.AlertRuleDO;
@@ -22,6 +24,7 @@ import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
@@ -38,11 +41,27 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
     private AlertRuleService alertRuleService;
     @Resource
     private ApplicationEventPublisher eventPublisher;
+    @Resource
+    private IpWhitelistService ipWhitelistService;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
+    /** One shared allowance per trusted IP across alert types, accounts and application instances. */
+    private boolean allowAlert(String sourceIp) {
+        if (sourceIp == null || sourceIp.trim().isEmpty()) return true;
+        String ip = sourceIp.trim();
+        if (!ipWhitelistService.isWhitelisted(ip)) return true;
+        String key = "security:alert:whitelist:daily:" + DigestUtil.sha256Hex(ip);
+        // SET NX with expiry is atomic. Repeats must not extend the initial 24-hour window.
+        return Boolean.TRUE.equals(stringRedisTemplate.opsForValue()
+                .setIfAbsent(key, "1", 24, TimeUnit.HOURS));
+    }
 
     @Override
     @Async
     public void saveAsync(SecurityAlertDO alert) {
         try {
+            if (!allowAlert(alert.getSourceIp())) return;
             alert.setCreateTime(LocalDateTime.now());
             securityAlertMapper.insert(alert);
         } catch (Exception e) {
@@ -66,6 +85,7 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
         alert.setHandled(0);
         alert.setCreateTime(LocalDateTime.now());
         try {
+            if (!allowAlert(sourceIp)) return;
             securityAlertMapper.insert(alert);
             dispatchNotify(alert);
         } catch (Exception e) {

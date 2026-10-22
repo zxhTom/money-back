@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.custom.framework.security.aop;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.system.service.monitor.SecurityAlertService;
 import lombok.extern.slf4j.Slf4j;
@@ -48,12 +49,13 @@ public class DataLeakageMonitorAspect {
 
         Long userId = tryGetUserId();
         String methodName = pjp.getSignature().toShortString();
+        String sourceIp = currentSourceIp();
 
         // 单次大量查询告警
         if (size >= SINGLE_QUERY_WARNING_THRESHOLD) {
             String msg = String.format("单次查询返回 %d 条记录，方法：%s", size, methodName);
             log.warn("[DataLeakage] {}", msg);
-            securityAlertService.saveAsync("DATA_LEAKAGE", 2, null, userId,
+            securityAlertService.saveAsync("DATA_LEAKAGE", 2, sourceIp, userId,
                     methodName, "QUERY", null, msg);
         }
 
@@ -67,7 +69,7 @@ public class DataLeakageMonitorAspect {
             if (total != null && total >= CUMULATIVE_CRITICAL_THRESHOLD) {
                 String msg = String.format("用户 %d 在5分钟内累计查询 %d 条记录，方法：%s", userId, total, methodName);
                 log.warn("[DataLeakage] {}", msg);
-                securityAlertService.saveAsync("DATA_LEAKAGE", 3, null, userId,
+                securityAlertService.saveAsync("DATA_LEAKAGE", 3, sourceIp, userId,
                         methodName, "QUERY", null, msg);
                 // 重置计数器，避免重复告警
                 stringRedisTemplate.delete(key);
@@ -75,6 +77,11 @@ public class DataLeakageMonitorAspect {
         }
 
         return result;
+    }
+
+    private String currentSourceIp() {
+        javax.servlet.http.HttpServletRequest request = ServletUtils.getRequest();
+        return request == null ? null : ServletUtils.getClientRealIp(request);
     }
 
     private Long tryGetUserId() {
