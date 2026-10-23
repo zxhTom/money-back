@@ -748,7 +748,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         if (!sessionResponse.isSuccess()) {
             return ApiResponse.error("绑定微信失败" + sessionResponse.getErrmsg());
         }
-        log.info(JSON.toJSONString(sessionResponse));
+        log.debug("[bindmini2user][微信会话校验成功]");
         String openid = sessionResponse.getOpenid();
         String unionid = sessionResponse.getUnionid();
 

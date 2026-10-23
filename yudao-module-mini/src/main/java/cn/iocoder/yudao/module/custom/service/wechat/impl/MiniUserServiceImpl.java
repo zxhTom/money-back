@@ -20,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -36,8 +35,12 @@ import java.util.List;
 public class MiniUserServiceImpl implements MiniUserService {
     @Autowired
     WechatConfig wechatConfig;
-    @Value("${zxhtom.security.user.password:123456}")
-    String password;
+    private static final java.security.SecureRandom PASSWORD_RANDOM = new java.security.SecureRandom();
+    private static String randomInitialPassword() {
+        byte[] bytes = new byte[32];
+        PASSWORD_RANDOM.nextBytes(bytes);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
     @Autowired
     MiniUserMapper miniUserMapper;
     @Autowired
@@ -66,8 +69,8 @@ public class MiniUserServiceImpl implements MiniUserService {
             user.setUsername(String.format("%s_%s_%s", prefix, appId, openId));
             user.setNickname(MD5Util.md5(user.getUsername()));
 //            user.setUserCode(openId.hashCode());
-            user.setPassword(password);
-            user.setPayPassword(password);
+            user.setPassword(randomInitialPassword());
+            user.setPayPassword(randomInitialPassword());
             DeptDO deptDO = deptService.getDeptByName("合同管理部");
             if (deptDO != null) {
                 user.setDeptId(deptDO.getId());
@@ -108,7 +111,8 @@ public class MiniUserServiceImpl implements MiniUserService {
                 user.setUsername(String.format("%s_%s_%s", prefix, appId, openId));
                 user.setNickname(MD5Util.md5(user.getUsername()));
 //            user.setUserCode(openId.hashCode());
-                user.setPassword(password);
+                user.setPassword(randomInitialPassword());
+                user.setPayPassword(randomInitialPassword());
                 userService.insertUserSimply(user);
             }
             combineUser.setMaltcloud(user);

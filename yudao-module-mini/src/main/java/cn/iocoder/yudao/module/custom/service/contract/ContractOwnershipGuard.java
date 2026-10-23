@@ -54,6 +54,7 @@ public class ContractOwnershipGuard {
             return true;
         }
         return roleService.getRoleList(roleIdList).stream()
+                .filter(role -> Integer.valueOf(0).equals(role.getStatus()))
                 .map(RoleDO::getCode).anyMatch("contract-manager"::equals);
     }
 

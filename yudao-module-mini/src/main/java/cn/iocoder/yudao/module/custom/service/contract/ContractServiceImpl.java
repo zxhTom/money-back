@@ -283,7 +283,7 @@ public class ContractServiceImpl implements ContractService {
         List<UserRoleDO> userRoleDOS = userRoleMapper.selectListByUserId(loginUserId);
         List<Long> roleIdList = userRoleDOS.stream().map(UserRoleDO::getRoleId).collect(Collectors.toList());
         List<RoleDO> roleList = roleService.getRoleList(roleIdList);
-        List<String> roleCodeList = roleList.stream().map(RoleDO::getCode).collect(Collectors.toList());
+        List<String> roleCodeList = roleList.stream().filter(role -> Integer.valueOf(0).equals(role.getStatus())).map(RoleDO::getCode).collect(Collectors.toList());
         boolean b = roleService.hasAnySuperAdmin(roleIdList);
         if (b || roleCodeList.contains("contract-manager")) {
             creator = null;

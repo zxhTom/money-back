@@ -24,6 +24,17 @@ import java.util.Map;
 
 @Component
 public class QRCodeGenerator {
+    private static final java.util.concurrent.Semaphore ENCODERS = new java.util.concurrent.Semaphore(4);
+
+    public static void validateRequest(String content, int width, int height) {
+        if (content == null || content.length() > 2048 || content.trim().isEmpty()
+                || content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 2048
+                || width < 64 || height < 64 || width > 1024 || height > 1024
+                || (long) width * height > 1048576L) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400,
+                    "二维码内容不能为空且不超过2048字节，宽高需在64至1024像素之间");
+        }
+    }
 
     /**
      * 生成二维码字节数组
@@ -33,6 +44,8 @@ public class QRCodeGenerator {
      * @return 二维码图片的字节数组
      */
     public byte[] generateQRCodeImage(String content, int width, int height) {
+        validateRequest(content, width, height);
+        if (!ENCODERS.tryAcquire()) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(429, "二维码生成繁忙，请稍后再试");
         try {
             Map<EncodeHintType, Object> hints = new HashMap<>();
             hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H);
@@ -47,7 +60,9 @@ public class QRCodeGenerator {
 
             return outputStream.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("生成二维码失败: " + e.getMessage(), e);
+            throw new RuntimeException("生成二维码失败", e);
+        } finally {
+            ENCODERS.release();
         }
     }
 

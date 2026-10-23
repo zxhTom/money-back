@@ -247,7 +247,8 @@ public class RoleServiceImpl implements RoleService {
         RoleServiceImpl self = getSelf();
         return ids.stream().anyMatch(id -> {
             RoleDO role = self.getRoleFromCache(id);
-            return role != null && RoleCodeEnum.isSuperAdmin(role.getCode());
+            return role != null && CommonStatusEnum.ENABLE.getStatus().equals(role.getStatus())
+                    && RoleCodeEnum.isSuperAdmin(role.getCode());
         });
     }
 

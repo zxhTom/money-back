@@ -41,6 +41,8 @@ public class QRCodeController {
     /**
      * 生成二维码图片接口
      */
+    @cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter(time = 60, count = 60,
+            keyResolver = cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.ClientIpRateLimiterKeyResolver.class)
     @GetMapping("/generateQRCodeUrl")
     @PermitAll
     @TenantIgnore
@@ -49,6 +51,7 @@ public class QRCodeController {
             @RequestParam(defaultValue = "300") int width,
             @RequestParam(defaultValue = "300") int height) {
 
+        QRCodeGenerator.validateRequest(content, width, height);
         try {
             try {
                 int i = content.indexOf("?");
@@ -64,7 +67,7 @@ public class QRCodeController {
                 // 2. 调用SDK生成链接[citation:1]
                 content = wxMaService.getLinkService().generateUrlLink(request);
             } catch (Exception e) {
-
+                // 普通支付链接无法转换小程序链接时，保留原始二维码内容。
             }
             byte[] qrCodeImage = qrCodeGenerator.generateQRCodeImage(content, width, height);
             String file = fileService.createFile(qrCodeImage, UUID.randomUUID().toString(),
@@ -74,14 +77,17 @@ public class QRCodeController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setContentDispositionFormData("filename", "qrcode.png");
             return success(file);
+        } catch (cn.iocoder.yudao.framework.common.exception.ServiceException e) {
+            throw e;
         } catch (Exception e) {
-            e.printStackTrace();
             return error(HttpStatus.INTERNAL_SERVER_ERROR.value(),"error");
         }
     }
     /**
      * 生成二维码图片接口
      */
+    @cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter(time = 60, count = 60,
+            keyResolver = cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.ClientIpRateLimiterKeyResolver.class)
     @GetMapping("/generate")
     @PermitAll
     @TenantIgnore
@@ -90,16 +96,17 @@ public class QRCodeController {
             @RequestParam(defaultValue = "300") int width,
             @RequestParam(defaultValue = "300") int height) {
 
+        QRCodeGenerator.validateRequest(content, width, height);
         try {
             byte[] qrCodeImage = qrCodeGenerator.generateQRCodeImage(content, width, height);
-            String file = fileService.createFile(qrCodeImage, UUID.randomUUID().toString(),
-                    "demo", "png");
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.IMAGE_PNG);
             headers.setContentDispositionFormData("filename", "qrcode.png");
 
             return success(qrCodeImage);
+        } catch (cn.iocoder.yudao.framework.common.exception.ServiceException e) {
+            throw e;
         } catch (Exception e) {
             return error(HttpStatus.INTERNAL_SERVER_ERROR.value(),"");
         }
@@ -108,18 +115,23 @@ public class QRCodeController {
     /**
      * 生成Base64格式的二维码
      */
+    @cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter(time = 60, count = 60,
+            keyResolver = cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.ClientIpRateLimiterKeyResolver.class)
     @GetMapping("/generate-base64")
     public CommonResult<String> generateQRCodeBase64(
             @RequestParam String content,
             @RequestParam(defaultValue = "300") int width,
             @RequestParam(defaultValue = "300") int height) {
 
+        QRCodeGenerator.validateRequest(content, width, height);
         try {
             byte[] qrCodeImage = qrCodeGenerator.generateQRCodeImage(content, width, height);
             String base64Image = java.util.Base64.getEncoder().encodeToString(qrCodeImage);
             String result = "data:image/png;base64," + base64Image;
 
             return success(result);
+        } catch (cn.iocoder.yudao.framework.common.exception.ServiceException e) {
+            throw e;
         } catch (Exception e) {
             return error(HttpStatus.INTERNAL_SERVER_ERROR.value(),"");
         }
@@ -128,8 +140,11 @@ public class QRCodeController {
     /**
      * 生成带文本描述的二维码
      */
+    @cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter(time = 60, count = 60,
+            keyResolver = cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.ClientIpRateLimiterKeyResolver.class)
     @PostMapping("/generate-with-text")
     public CommonResult<byte[]> generateQRCodeWithText(@RequestBody QRCodeRequest request) {
+        QRCodeGenerator.validateRequest(request.getContent(), request.getWidth(), request.getHeight());
         try {
             byte[] qrCodeImage = qrCodeGenerator.generateQRCodeImage(
                     request.getContent(),
@@ -141,6 +156,8 @@ public class QRCodeController {
             headers.setContentType(MediaType.IMAGE_PNG);
 
             return success(qrCodeImage);
+        } catch (cn.iocoder.yudao.framework.common.exception.ServiceException e) {
+            throw e;
         } catch (Exception e) {
             return error(HttpStatus.INTERNAL_SERVER_ERROR.value(),"");
         }
