@@ -29,6 +29,13 @@ public interface FileMapper extends BaseMapperX<FileDO> {
                 .apply(tenantId != null, "creator IN (SELECT CAST(id AS CHAR) FROM system_users WHERE tenant_id = {0} AND deleted = 0)", tenantId));
     }
 
+    default java.util.List<FileDO> selectScopedFiles(java.util.Collection<Long> ids, Long uploaderId, Long tenantId) {
+        return selectList(new LambdaQueryWrapperX<FileDO>()
+                .in(FileDO::getId, ids)
+                .eqIfPresent(FileDO::getCreator, uploaderId == null ? null : String.valueOf(uploaderId))
+                .apply(tenantId != null, "creator IN (SELECT CAST(id AS CHAR) FROM system_users WHERE tenant_id = {0} AND deleted = 0)", tenantId));
+    }
+
     default FileDO selectByTraceId(String traceId) {
         return selectOne(FileDO::getAuditTraceId, traceId);
     }

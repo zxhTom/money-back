@@ -89,7 +89,7 @@ public class FileConfigServiceImpl implements FileConfigService {
         FileConfigDO config = validateFileConfigExists(updateReqVO.getId());
         // 更新
         FileConfigDO updateObj = FileConfigConvert.INSTANCE.convert(updateReqVO)
-                .setConfig(parseClientConfig(config.getStorage(), updateReqVO.getConfig()));
+                .setConfig(parseClientConfig(config.getStorage(), FileConfigSecretPolicy.mergeUpdate(config.getConfig(), updateReqVO.getConfig())));
         fileConfigMapper.updateById(updateObj);
 
         // 清空缓存

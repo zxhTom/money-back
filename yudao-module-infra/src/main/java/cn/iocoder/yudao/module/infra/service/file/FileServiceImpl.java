@@ -61,6 +61,9 @@ public class FileServiceImpl implements FileService {
     @Resource
     private cn.iocoder.yudao.module.infra.dal.mysql.file.FileContentMapper privateContents;
 
+    @Resource
+    private FileUploadGrantService uploadGrants;
+
     private static boolean isPrivateContractPath(String path) {
         return path != null && path.startsWith("private/contracts/");
     }
@@ -75,11 +78,53 @@ public class FileServiceImpl implements FileService {
     public PageResult<FileDO> getFilePage(FilePageReqVO pageReqVO) {
         Long actor = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
         if (actor == null) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "请先登录");
-        if (security.hasAnyRoles("super_admin")) return fileMapper.selectScopedPage(pageReqVO, null, null);
+        if (security.hasAnyRoles("super_admin")) {
+            PageResult<FileDO> page = fileMapper.selectScopedPage(pageReqVO, null, null);
+            page.getList().forEach(this::prepareDownloadReference);
+            return page;
+        }
         Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
         if (tenantId == null || tenantId <= 0) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "缺少租户身份");
         boolean tenantManager = security.hasAnyRoles("tenant_admin", "contract-manager");
-        return fileMapper.selectScopedPage(pageReqVO, tenantManager ? null : actor, tenantId);
+        PageResult<FileDO> page = fileMapper.selectScopedPage(pageReqVO, tenantManager ? null : actor, tenantId);
+        page.getList().forEach(this::prepareDownloadReference);
+        return page;
+    }
+
+    private void prepareDownloadReference(FileDO file) {
+        if (isPrivateContractPath(file.getPath())) {
+            if (file.getConfigId() == null || file.getCreator() == null || !file.getCreator().matches("[0-9]+")
+                    || !file.getPath().startsWith("private/contracts/" + file.getCreator() + "/")) { file.setUrl(null); return; }
+            file.setUrl("/admin-api/infra/file/" + file.getConfigId() + "/get/"
+                    + org.springframework.web.util.UriUtils.encodePath(file.getPath(), java.nio.charset.StandardCharsets.UTF_8));
+        } else if (privateReference(file.getUrl())) file.setUrl(null);
+    }
+
+    private boolean privateReference(String url) {
+        if (url == null) return false;
+        try {
+            String path = new java.net.URI(url).getRawPath();
+            for (int i = 0; i < 3 && path != null; i++) {
+                if (path.replace('\\', '/').toLowerCase(java.util.Locale.ROOT).contains("/private/contracts/")) return true;
+                String decoded = java.net.URLDecoder.decode(path.replace("+", "%2B"), "UTF-8");
+                if (decoded.equals(path)) break;
+                path = decoded;
+            }
+            return false;
+        } catch (Exception ex) { return true; }
+    }
+
+    private void requireFileAccess(java.util.List<FileDO> files) {
+        Long actor = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+        if (actor == null) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "请先登录");
+        if (security.hasAnyRoles("super_admin")) return;
+        Long tenant = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+        if (tenant == null || tenant <= 0) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "缺少租户身份");
+        if (files.isEmpty()) return;
+        java.util.List<Long> ids = files.stream().map(FileDO::getId).collect(java.util.stream.Collectors.toList());
+        boolean manager = security.hasAnyRoles("tenant_admin", "contract-manager");
+        java.util.List<FileDO> allowed = fileMapper.selectScopedFiles(ids, manager ? null : actor, tenant);
+        if (allowed.size() != files.size()) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "不能删除其他用户或租户的文件");
     }
 
     private String validateUploadDirectory(String directory) {
@@ -227,7 +272,7 @@ public class FileServiceImpl implements FileService {
             FileClient client = fileConfigService.getFileClient(file.getConfigId());
             if (client != null) {
                 if (isPrivateContractPath(file.getPath())) privateContents.deleteByConfigIdAndPath(file.getConfigId(), file.getPath());
-        else client.delete(file.getPath());
+                else client.delete(file.getPath());
             }
         } catch (Exception ex) {
             log.error("[updateAuditByTraceId][file({}) 删除违规文件失败]", file.getId(), ex);
@@ -274,12 +319,14 @@ public class FileServiceImpl implements FileService {
         directory = validateUploadDirectory(directory);
         if (isPrivateContractPath(directory)) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "合同附件请使用私有上传接口");
         // 1. 生成上传的 path，需要保证唯一
-        String path = generateUploadPath(name, directory);
+        String path = generateUploadPath(cn.hutool.core.util.IdUtil.fastSimpleUUID()
+                + (cn.hutool.core.util.StrUtil.isBlank(cn.hutool.core.io.FileUtil.extName(name)) ? "" : "." + cn.hutool.core.io.FileUtil.extName(name)), directory);
 
         // 2. 获取文件预签名地址
         FileClient fileClient = fileConfigService.getMasterFileClient();
         String uploadUrl = fileClient.presignPutUrl(path);
         String visitUrl = fileClient.presignGetUrl(path, null);
+        uploadGrants.issue(fileClient.getId(), path, visitUrl);
         return new FilePresignedUrlRespVO().setConfigId(fileClient.getId())
                 .setPath(path).setUploadUrl(uploadUrl).setUrl(visitUrl);
     }
@@ -292,10 +339,11 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public Long createFile(FileCreateReqVO createReqVO) {
-        if (isPrivateContractPath(createReqVO.getPath())) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "私有附件不能通过通用文件登记创建");
-        createReqVO.setUrl(HttpUtils.removeUrlQuery(createReqVO.getUrl())); // 目的：移除私有桶情况下，URL 的签名参数
+        if (isPrivateContractPath(createReqVO.getPath()) || privateReference(createReqVO.getUrl())) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "私有附件不能通过通用文件登记创建");
+        createReqVO.setUrl(uploadGrants.verify(createReqVO.getConfigId(), createReqVO.getPath(), createReqVO.getUrl()));
         FileDO file = BeanUtils.toBean(createReqVO, FileDO.class);
         fileMapper.insert(file);
+        uploadGrants.complete(file.getConfigId(), file.getPath());
         return file.getId();
     }
 
@@ -303,6 +351,7 @@ public class FileServiceImpl implements FileService {
     public void deleteFile(Long id) throws Exception {
         // 校验存在
         FileDO file = validateFileExists(id);
+        requireFileAccess(java.util.Collections.singletonList(file));
 
         // 从文件存储器中删除
         FileClient client = fileConfigService.getFileClient(file.getConfigId());
@@ -318,14 +367,15 @@ public class FileServiceImpl implements FileService {
     @SneakyThrows
     public void deleteFileList(List<Long> ids) {
         // 删除文件
-        List<FileDO> files = fileMapper.selectByIds(ids);
+        List<FileDO> files = fileMapper.selectByIds(new java.util.HashSet<>(ids));
+        requireFileAccess(files);
         for (FileDO file : files) {
             // 获取客户端
             FileClient client = fileConfigService.getFileClient(file.getConfigId());
             Assert.notNull(client, "客户端({}) 不能为空", file.getPath());
             // 删除文件
             if (isPrivateContractPath(file.getPath())) privateContents.deleteByConfigIdAndPath(file.getConfigId(), file.getPath());
-        else client.delete(file.getPath());
+            else client.delete(file.getPath());
         }
 
         // 删除记录

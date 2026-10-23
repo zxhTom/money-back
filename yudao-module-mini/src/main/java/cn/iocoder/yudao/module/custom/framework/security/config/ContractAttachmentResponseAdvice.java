@@ -38,7 +38,19 @@ public class ContractAttachmentResponseAdvice implements ResponseBodyAdvice<Obje
         if (value instanceof Iterable) { for (Object row : (Iterable<?>) value) sign(row, request, depth + 1); return; }
         if (value instanceof cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO) {
             cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO file = (cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO) value;
-            file.setUrl(attachments.signForAuthorizedResponse(file.getUrl(), request));
+            String path = file.getPath();
+            if (path != null && path.startsWith("private/contracts/") && file.getConfigId() != null && file.getUrl() != null) {
+                String canonical = "/admin-api/infra/file/" + file.getConfigId() + "/get/"
+                        + org.springframework.web.util.UriUtils.encodePath(path, java.nio.charset.StandardCharsets.UTF_8);
+                file.setUrl(attachments.signForAuthorizedResponse(canonical, request));
+            } else if (file.getUrl() != null) {
+                // Never turn an arbitrary URL on public metadata into a private download capability.
+                try {
+                    String raw = new java.net.URI(file.getUrl()).getRawPath();
+                    String decoded = raw == null ? "" : java.net.URLDecoder.decode(raw.replace("+", "%2B"), "UTF-8");
+                    if (decoded.contains("/private/contracts/")) file.setUrl(null);
+                } catch (Exception ex) { file.setUrl(null); }
+            }
             return;
         }
         if (!value.getClass().getName().startsWith("cn.iocoder.yudao.module.custom.")) return;

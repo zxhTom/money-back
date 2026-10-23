@@ -83,7 +83,7 @@ class LeakBoundaryRegressionTest {
         }
     }
     FileMapper files;SecurityFrameworkService security;FileServiceImpl service;
-    void files()throws Exception {files=mock(FileMapper.class);security=mock(SecurityFrameworkService.class);service=new FileServiceImpl();inject(service,"fileMapper",files);inject(service,"security",security);}
+    void files()throws Exception {files=mock(FileMapper.class);security=mock(SecurityFrameworkService.class);service=new FileServiceImpl();inject(service,"fileMapper",files);inject(service,"security",security);when(files.selectScopedPage(any(),any(),any())).thenReturn(new PageResult<>(Collections.emptyList(),0L));}
     @Test void ordinaryFileQueryIsLimitedToSelfAndTenant()throws Exception{files();FilePageReqVO q=new FilePageReqVO();service.getFilePage(q);verify(files).selectScopedPage(q,42L,1L);}
     @Test void tenantAdministratorKeepsTenantWideFileManagement()throws Exception{files();when(security.hasAnyRoles("tenant_admin","contract-manager")).thenReturn(true);FilePageReqVO q=new FilePageReqVO();service.getFilePage(q);verify(files).selectScopedPage(q,null,1L);}
     @Test void platformAdministratorKeepsGlobalFileManagement()throws Exception{files();when(security.hasAnyRoles("super_admin")).thenReturn(true);FilePageReqVO q=new FilePageReqVO();service.getFilePage(q);verify(files).selectScopedPage(q,null,null);}
@@ -142,6 +142,7 @@ class LeakBoundaryRegressionTest {
         cn.iocoder.yudao.module.infra.dal.mysql.file.FileContentMapper content=mock(cn.iocoder.yudao.module.infra.dal.mysql.file.FileContentMapper.class);
         inject(svc,"fileMapper",mapper);inject(svc,"fileConfigService",configs);inject(svc,"privateContents",content);
         when(mapper.selectById(7L)).thenReturn(new FileDO().setId(7L).setConfigId(28L).setPath("private/contracts/42/a.pdf"));when(configs.getFileClient(28L)).thenReturn(client);
+        SecurityFrameworkService ss=mock(SecurityFrameworkService.class);when(ss.hasAnyRoles("super_admin")).thenReturn(true);inject(svc,"security",ss);
         svc.deleteFile(7L);verify(content).deleteByConfigIdAndPath(28L,"private/contracts/42/a.pdf");verify(client,never()).delete(anyString());verify(mapper).deleteById(7L);
     }
 
@@ -151,7 +152,7 @@ class LeakBoundaryRegressionTest {
         inject(advice,"attachments",signer);
         javax.servlet.http.HttpServletRequest request=mock(javax.servlet.http.HttpServletRequest.class);when(request.getRequestURI()).thenReturn("/admin-api/infra/file/page");
         when(signer.signForAuthorizedResponse(anyString(),eq(request))).thenReturn("https://staging.toms.chat/private-fixture?signature=synthetic");
-        cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO row=new cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO();row.setUrl("/admin-api/infra/file/28/get/private/contracts/42/a.pdf");
+        cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO row=new cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO();row.setPath("private/contracts/42/a.pdf");row.setConfigId(28L);row.setUrl("/admin-api/infra/file/28/get/private/contracts/42/a.pdf");
         Object body=cn.iocoder.yudao.framework.common.pojo.CommonResult.success(new PageResult<>(Collections.singletonList(row),1L));
         advice.beforeBodyWrite(body,null,org.springframework.http.MediaType.APPLICATION_JSON,null,new org.springframework.http.server.ServletServerHttpRequest(request),null);
         assertTrue(row.getUrl().contains("signature=synthetic"));verify(signer).signForAuthorizedResponse(anyString(),eq(request));

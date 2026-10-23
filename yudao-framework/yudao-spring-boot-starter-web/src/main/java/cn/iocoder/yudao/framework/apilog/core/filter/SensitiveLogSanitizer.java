@@ -11,7 +11,7 @@ public final class SensitiveLogSanitizer {
     private static final Set<String> PRIVATE_KEYS = new HashSet<>(Arrays.asList(
         "password", "passwd", "pwd", "paypassword", "oldpassword", "newpassword",
         "oldpaypassword", "newpaypassword", "passwordhash", "token", "accesstoken",
-        "refreshtoken", "code", "verifycode", "emailcode", "smscode", "signature", "authorization", "secret", "clientsecret", "apikey",
+        "refreshtoken", "accesskey", "accesssecret", "secretkey", "privatekey", "passphrase", "code", "verifycode", "emailcode", "smscode", "signature", "authorization", "secret", "clientsecret", "apikey",
         "indebtedname", "indebtedid", "creditorname", "creditorid", "salary",
         "targetname", "targetidcard", "contactinfo", "realname", "username", "idno", "idcard", "idnodisplay", "mobile", "email", "address"));
     private SensitiveLogSanitizer() {}

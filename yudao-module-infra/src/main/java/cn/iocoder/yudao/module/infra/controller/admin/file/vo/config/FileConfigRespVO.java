@@ -23,7 +23,7 @@ public class FileConfigRespVO {
     private Boolean master;
 
     @Schema(description = "存储配置", requiredMode = Schema.RequiredMode.REQUIRED)
-    private FileClientConfig config;
+    private java.util.Map<String, Object> config;
 
     @Schema(description = "备注", example = "我是备注")
     private String remark;
