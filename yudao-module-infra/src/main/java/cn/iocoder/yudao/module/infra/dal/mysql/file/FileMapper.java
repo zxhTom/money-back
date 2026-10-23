@@ -16,11 +16,17 @@ import org.apache.ibatis.annotations.Mapper;
 public interface FileMapper extends BaseMapperX<FileDO> {
 
     default PageResult<FileDO> selectPage(FilePageReqVO reqVO) {
+        return selectScopedPage(reqVO, null, null);
+    }
+
+    default PageResult<FileDO> selectScopedPage(FilePageReqVO reqVO, Long uploaderId, Long tenantId) {
         return selectPage(reqVO, new LambdaQueryWrapperX<FileDO>()
+                .eqIfPresent(FileDO::getCreator, uploaderId == null ? null : String.valueOf(uploaderId))
                 .likeIfPresent(FileDO::getPath, reqVO.getPath())
                 .likeIfPresent(FileDO::getType, reqVO.getType())
                 .betweenIfPresent(FileDO::getCreateTime, reqVO.getCreateTime())
-                .orderByDesc(FileDO::getId));
+                .orderByDesc(FileDO::getId)
+                .apply(tenantId != null, "creator IN (SELECT CAST(id AS CHAR) FROM system_users WHERE tenant_id = {0} AND deleted = 0)", tenantId));
     }
 
     default FileDO selectByTraceId(String traceId) {

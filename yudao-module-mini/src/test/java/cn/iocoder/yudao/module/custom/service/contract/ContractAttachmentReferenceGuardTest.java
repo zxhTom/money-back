@@ -34,12 +34,13 @@ class ContractAttachmentReferenceGuardTest {
         assertThrows(AccessDeniedException.class,() -> guard.validate(file(99).replace("test.png","other.png"),file(99)));
     }
     @Test void managementKeepsAttachmentManagement() {
-        when(security.hasAnyRoles("super_admin","tenant_admin","contract-manager")).thenReturn(true);
+        when(security.hasAnyRoles("super_admin")).thenReturn(true);
         assertDoesNotThrow(() -> guard.validate(file(99),null));
     }
     @Test void emptyAndLegacyPublicAttachmentsKeepWorking() {
         assertDoesNotThrow(() -> guard.validate(null,null));assertDoesNotThrow(() -> guard.validate("",file(99)));
-        assertDoesNotThrow(() -> guard.validate("https://org.toms.chat/legacy/test.png",null));
+        assertThrows(AccessDeniedException.class,() -> guard.validate("https://org.toms.chat/legacy/test.png",null));
+        assertDoesNotThrow(() -> guard.validate("https://org.toms.chat/legacy/test.png","https://org.toms.chat/legacy/test.png"));
     }
     @Test void traversalCannotReuseAnotherPrivateDirectory() {
         assertThrows(AccessDeniedException.class,() -> guard.validate(file(42).replace("/20261021/","/../99/"),null));
@@ -60,5 +61,14 @@ class ContractAttachmentReferenceGuardTest {
         assertDoesNotThrow(() -> service.updateContract(input));verify(mapper).updateById(any(ContractDO.class));
         clearInvocations(mapper);input.setFile(file(99).replace("test.png","other.png"));
         assertThrows(AccessDeniedException.class,() -> service.updateContract(input));verify(mapper,never()).updateById(any(ContractDO.class));
+    }
+
+    @Test void tenantAdministratorCanUseSameTenantUploadsButNotOtherTenants()throws Exception {
+        when(security.hasAnyRoles("tenant_admin","contract-manager")).thenReturn(true);
+        cn.iocoder.yudao.module.system.service.user.AdminUserService users=mock(cn.iocoder.yudao.module.system.service.user.AdminUserService.class);inject(guard,"users",users);
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO owner=new cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO();owner.setTenantId(1L);when(users.getUser(99L)).thenReturn(owner);
+        try {assertDoesNotThrow(()->guard.validate(file(99),null));owner.setTenantId(2L);assertThrows(AccessDeniedException.class,()->guard.validate(file(99),null));}
+        finally {cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();}
     }
 }

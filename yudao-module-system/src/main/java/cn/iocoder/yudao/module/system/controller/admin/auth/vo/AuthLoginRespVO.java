@@ -20,6 +20,19 @@ public class AuthLoginRespVO {
     private Long userId;
     private AdminUserDO user;
 
+    /** Response-only copy: never mutate the entity/cache used by password verification. */
+    public AdminUserDO getUser() {
+        return safeUser(user);
+    }
+
+    public static AdminUserDO safeUser(AdminUserDO source) {
+        if (source == null) return null;
+        AdminUserDO safe = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(source, AdminUserDO.class);
+        safe.setPassword(null);
+        safe.setPayPassword(null);
+        return safe;
+    }
+
     @Schema(description = "访问令牌", requiredMode = Schema.RequiredMode.REQUIRED, example = "happy")
     private String accessToken;
 

@@ -59,14 +59,35 @@ public class FileServiceImpl implements FileService {
     private FileMapper fileMapper;
 
     @Resource
+    private cn.iocoder.yudao.module.infra.dal.mysql.file.FileContentMapper privateContents;
+
+    private static boolean isPrivateContractPath(String path) {
+        return path != null && path.startsWith("private/contracts/");
+    }
+
+    @Resource
     private ObjectProvider<FileContentAuditor> auditorProvider;
+
+    @Resource
+    private cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService security;
 
     @Override
     public PageResult<FileDO> getFilePage(FilePageReqVO pageReqVO) {
-        return fileMapper.selectPage(pageReqVO);
+        Long actor = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+        if (actor == null) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "请先登录");
+        if (security.hasAnyRoles("super_admin")) return fileMapper.selectScopedPage(pageReqVO, null, null);
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+        if (tenantId == null || tenantId <= 0) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "缺少租户身份");
+        boolean tenantManager = security.hasAnyRoles("tenant_admin", "contract-manager");
+        return fileMapper.selectScopedPage(pageReqVO, tenantManager ? null : actor, tenantId);
     }
 
     private String validateUploadDirectory(String directory) {
+        if ("contract".equals(directory) || "contracts".equals(directory)) {
+            Long actor = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+            if (actor == null) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "请先登录");
+            directory = "private/contracts/" + actor;
+        }
         if (directory == null || directory.isEmpty()) return directory;
         if (directory.contains("..") || directory.contains("\\") || directory.contains("%") || directory.startsWith("/") || directory.contains("//")) {
             throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "非法上传目录");
@@ -120,6 +141,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     @SneakyThrows
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public String createFile(byte[] content, String name, String directory, String type) {
         directory = validateUploadDirectory(directory);
         // 0. 上传安全校验（防 jsp/html/war/exe 等上传攻击）
@@ -145,7 +167,16 @@ public class FileServiceImpl implements FileService {
         // 2.2 上传到文件存储器
         FileClient client = fileConfigService.getMasterFileClient();
         Assert.notNull(client, "客户端(master) 不能为空");
-        String url = client.upload(content, path, type);
+        String url;
+        if (isPrivateContractPath(path)) {
+            // Private documents never inherit the master S3 bucket's public ACL or direct URL.
+            if (content.length > 16777215) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "私有附件不能超过16MB");
+            privateContents.insert(new cn.iocoder.yudao.module.infra.dal.dataobject.file.FileContentDO()
+                    .setConfigId(client.getId()).setPath(path).setContent(content));
+            url = "/admin-api/infra/file/" + client.getId() + "/get/" + path;
+        } else {
+            url = client.upload(content, path, type);
+        }
 
         // 3. 保存到数据库
         FileDO file = new FileDO().setConfigId(client.getId())
@@ -195,7 +226,8 @@ public class FileServiceImpl implements FileService {
         try {
             FileClient client = fileConfigService.getFileClient(file.getConfigId());
             if (client != null) {
-                client.delete(file.getPath());
+                if (isPrivateContractPath(file.getPath())) privateContents.deleteByConfigIdAndPath(file.getConfigId(), file.getPath());
+        else client.delete(file.getPath());
             }
         } catch (Exception ex) {
             log.error("[updateAuditByTraceId][file({}) 删除违规文件失败]", file.getId(), ex);
@@ -240,6 +272,7 @@ public class FileServiceImpl implements FileService {
     @SneakyThrows
     public FilePresignedUrlRespVO presignPutUrl(String name, String directory) {
         directory = validateUploadDirectory(directory);
+        if (isPrivateContractPath(directory)) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "合同附件请使用私有上传接口");
         // 1. 生成上传的 path，需要保证唯一
         String path = generateUploadPath(name, directory);
 
@@ -259,6 +292,7 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public Long createFile(FileCreateReqVO createReqVO) {
+        if (isPrivateContractPath(createReqVO.getPath())) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "私有附件不能通过通用文件登记创建");
         createReqVO.setUrl(HttpUtils.removeUrlQuery(createReqVO.getUrl())); // 目的：移除私有桶情况下，URL 的签名参数
         FileDO file = BeanUtils.toBean(createReqVO, FileDO.class);
         fileMapper.insert(file);
@@ -273,7 +307,8 @@ public class FileServiceImpl implements FileService {
         // 从文件存储器中删除
         FileClient client = fileConfigService.getFileClient(file.getConfigId());
         Assert.notNull(client, "客户端({}) 不能为空", file.getConfigId());
-        client.delete(file.getPath());
+        if (isPrivateContractPath(file.getPath())) privateContents.deleteByConfigIdAndPath(file.getConfigId(), file.getPath());
+        else client.delete(file.getPath());
 
         // 删除记录
         fileMapper.deleteById(id);
@@ -289,7 +324,8 @@ public class FileServiceImpl implements FileService {
             FileClient client = fileConfigService.getFileClient(file.getConfigId());
             Assert.notNull(client, "客户端({}) 不能为空", file.getPath());
             // 删除文件
-            client.delete(file.getPath());
+            if (isPrivateContractPath(file.getPath())) privateContents.deleteByConfigIdAndPath(file.getConfigId(), file.getPath());
+        else client.delete(file.getPath());
         }
 
         // 删除记录
@@ -306,6 +342,11 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public byte[] getFileContent(Long configId, String path) throws Exception {
+        if (isPrivateContractPath(path)) {
+            List<cn.iocoder.yudao.module.infra.dal.dataobject.file.FileContentDO> rows = privateContents.selectListByConfigIdAndPath(configId, path);
+            return rows == null ? null : rows.stream().max(java.util.Comparator.comparing(cn.iocoder.yudao.module.infra.dal.dataobject.file.FileContentDO::getId))
+                    .map(cn.iocoder.yudao.module.infra.dal.dataobject.file.FileContentDO::getContent).orElse(null);
+        }
         FileClient client = fileConfigService.getFileClient(configId);
         Assert.notNull(client, "客户端({}) 不能为空", configId);
         return client.getContent(path);

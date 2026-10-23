@@ -31,7 +31,7 @@ public class ContractFileController {
     FileService fileService;
     @PostMapping("/upload")
     @Operation(summary = "上传文件", description = "模式一：后端上传文件")
-    @PreAuthorize("@ss.hasPermission('custom:contract:update')")
+    @PreAuthorize("@ss.hasAnyPermissions('custom:contract:create','custom:contract:update')")
     public CommonResult<String> uploadFile(@Valid FileUploadReqVO uploadReqVO) throws Exception {
         MultipartFile file = uploadReqVO.getFile();
         byte[] content = IoUtil.readBytes(file.getInputStream());

@@ -137,18 +137,30 @@ public class MyBatisUtils {
         return new Column(tableName + StringPool.DOT + column);
     }
 
-    /**
-     * 跨数据库的 find_in_set 实现
-     *
-     * @param column 字段名称
-     * @param value  查询值(不带单引号)
-     * @return sql
-     */
-    public static String findInSet(String column, Object value) {
-        DbType dbType = JdbcUtils.getDbType();
-        return DbTypeEnum.getFindInSetTemplate(dbType)
+    /** SQL fragment for Wrapper.apply(fragment, value); the value must be bound separately. */
+    public static String findInSet(String column) {
+        return findInSet(JdbcUtils.getDbType(), column);
+    }
+
+    public static String findInSet(DbType dbType, String column) {
+        if (column == null || !column.matches("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)?")) {
+            throw new IllegalArgumentException("Invalid FIND_IN_SET column");
+        }
+        String template = DbTypeEnum.getFindInSetTemplate(dbType);
+        if (StrUtil.isBlank(template)) throw new IllegalArgumentException("FIND_IN_SET not supported for this database");
+        return template
                 .replace("#{column}", column)
-                .replace("#{value}", StrUtil.toString(value));
+                .replace("'#{value}'", "{0}")
+                .replace("#{value}", "{0}");
+    }
+
+    /** Binary compatibility for old numeric-only IoT callers; strings must use parameter binding. */
+    @Deprecated
+    public static String findInSet(String column, Object value) {
+        if (!(value instanceof Number) || !String.valueOf(value).matches("-?[0-9]+")) {
+            throw new IllegalArgumentException("Use findInSet(column) and bind the value with Wrapper.apply");
+        }
+        return findInSet(column).replace("{0}", String.valueOf(value));
     }
 
     /**

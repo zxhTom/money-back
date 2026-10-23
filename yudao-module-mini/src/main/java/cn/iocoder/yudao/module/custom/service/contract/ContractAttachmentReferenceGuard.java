@@ -16,11 +16,15 @@ import java.util.regex.Pattern;
 public class ContractAttachmentReferenceGuard {
     private static final Pattern PRIVATE = Pattern.compile("^/admin-api/infra/file/[0-9]+/get/private/contracts/([0-9]+)/.+$");
     @Resource private SecurityFrameworkService security;
+    @Resource private cn.iocoder.yudao.module.system.service.user.AdminUserService users;
 
     public void validate(String requested, String previous) {
         if (StrUtil.isBlank(requested)) return;
         String path = path(requested);
-        if (!path.contains("/get/private/contracts/")) return; // Existing public/legacy attachments remain supported.
+        if (!path.contains("/get/private/contracts/")) {
+            if (StrUtil.isNotBlank(previous) && path.equals(path(previous))) return; // Retain existing legacy attachments only.
+            throw denied();
+        }
         Matcher match = PRIVATE.matcher(path);
         if (!match.matches() || path.contains("..") || path.contains("//") || path.contains("\\") || path.contains("%")) {
             throw denied();
@@ -29,8 +33,14 @@ public class ContractAttachmentReferenceGuard {
         if (StrUtil.isNotBlank(previous) && path.equals(path(previous))) return;
         Long actor = SecurityFrameworkUtils.getLoginUserId();
         if (actor == null) throw denied();
-        if (String.valueOf(actor).equals(match.group(1))
-                || security.hasAnyRoles("super_admin", "tenant_admin", "contract-manager")) return;
+        if (String.valueOf(actor).equals(match.group(1)) || security.hasAnyRoles("super_admin")) return;
+        if (security.hasAnyRoles("tenant_admin", "contract-manager")) {
+            Long tenant = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+            try {
+                cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO owner = users.getUser(Long.valueOf(match.group(1)));
+                if (tenant != null && owner != null && tenant.equals(owner.getTenantId())) return;
+            } catch (NumberFormatException ignored) { }
+        }
         throw denied();
     }
     private String path(String url) {

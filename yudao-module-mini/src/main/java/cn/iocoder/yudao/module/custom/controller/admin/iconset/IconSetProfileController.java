@@ -53,14 +53,14 @@ public class IconSetProfileController {
 
     @PostMapping("/create")
     @Operation(summary = "创建图标集配置")
-    @PreAuthorize("@ss.hasPermission('custom:icon-set:create')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:icon-set:create')")
     public CommonResult<Long> createIconSetProfile(@Valid @RequestBody IconSetProfileSaveReqVO createReqVO) {
         return success(iconSetProfileService.createIconSetProfile(createReqVO));
     }
 
     @PutMapping("/update")
     @Operation(summary = "更新图标集配置")
-    @PreAuthorize("@ss.hasPermission('custom:icon-set:update')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:icon-set:update')")
     public CommonResult<Boolean> updateIconSetProfile(@Valid @RequestBody IconSetProfileSaveReqVO updateReqVO) {
         iconSetProfileService.updateIconSetProfile(updateReqVO);
         return success(true);
@@ -69,7 +69,7 @@ public class IconSetProfileController {
     @DeleteMapping("/delete")
     @Operation(summary = "删除图标集配置")
     @Parameter(name = "id", description = "编号", required = true, example = "1")
-    @PreAuthorize("@ss.hasPermission('custom:icon-set:delete')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:icon-set:delete')")
     public CommonResult<Boolean> deleteIconSetProfile(@RequestParam("id") Long id) {
         iconSetProfileService.deleteIconSetProfile(id);
         return success(true);
@@ -78,7 +78,7 @@ public class IconSetProfileController {
     @PutMapping("/use")
     @Operation(summary = "切换生效图标集")
     @Parameter(name = "id", description = "编号", required = true, example = "1")
-    @PreAuthorize("@ss.hasPermission('custom:icon-set:use')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:icon-set:use')")
     public CommonResult<Boolean> useIconSetProfile(@RequestParam("id") Long id) {
         iconSetProfileService.useIconSetProfile(id);
         return success(true);
@@ -86,7 +86,7 @@ public class IconSetProfileController {
 
     @PostMapping("/clone")
     @Operation(summary = "基于预设图标集克隆一份自定义图标集")
-    @PreAuthorize("@ss.hasPermission('custom:icon-set:create')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('custom:icon-set:create')")
     public CommonResult<Long> cloneIconSetProfile(@Valid @RequestBody IconSetCloneReqVO cloneReqVO) {
         return success(iconSetProfileService.cloneAsCustom(cloneReqVO));
     }

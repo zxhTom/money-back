@@ -99,7 +99,6 @@ public class WechatLoginController {
         if (!sessionResponse.isSuccess()) {
             return ApiResponse.error("微信登录失败: " + sessionResponse.getErrmsg());
         }
-        log.info(JSON.toJSONString(sessionResponse));
         String openid = sessionResponse.getOpenid();
         String unionid = sessionResponse.getUnionid();
         CombineUser combineUser = miniUserService.selectMiniUserOrInitUserWithPrefix(request.getAppId(), openid,unionid, "wechat");
@@ -178,6 +177,7 @@ public class WechatLoginController {
     public static class WechatLoginResponse {
         private String accessToken;
         private AdminUserDO user;
+        public AdminUserDO getUser() { return AuthLoginRespVO.safeUser(user); }
         private boolean registed;
         private String openid;
     }

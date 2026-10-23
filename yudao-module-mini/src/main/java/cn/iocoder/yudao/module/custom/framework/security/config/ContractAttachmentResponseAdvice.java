@@ -16,7 +16,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.*;
 
 /** Signs attachments only after the business controller has authorized the contract response. */
-@RestControllerAdvice(basePackages="cn.iocoder.yudao.module.custom.controller")
+@RestControllerAdvice(basePackages={"cn.iocoder.yudao.module.custom.controller", "cn.iocoder.yudao.module.infra.controller.admin.file"})
 public class ContractAttachmentResponseAdvice implements ResponseBodyAdvice<Object> {
     @Resource private ContractAttachmentAccessInterceptor attachments;
     @Override public boolean supports(MethodParameter method, Class<? extends HttpMessageConverter<?>> converter) { return true; }
@@ -24,7 +24,7 @@ public class ContractAttachmentResponseAdvice implements ResponseBodyAdvice<Obje
                                            ServerHttpRequest request, ServerHttpResponse response) {
         if (request instanceof ServletServerHttpRequest) {
             HttpServletRequest servlet = ((ServletServerHttpRequest) request).getServletRequest();
-            if (servlet.getRequestURI().endsWith("/files/contract/upload") && body instanceof CommonResult) {
+            if ((servlet.getRequestURI().endsWith("/files/contract/upload") || servlet.getRequestURI().endsWith("/infra/file/upload")) && body instanceof CommonResult) {
                 CommonResult result = (CommonResult) body;
                 if (result.getCode() == 0 && result.getData() instanceof String) result.setData(attachments.signForAuthorizedResponse((String) result.getData(), servlet));
             } else sign(body, servlet, 0);
@@ -36,6 +36,11 @@ public class ContractAttachmentResponseAdvice implements ResponseBodyAdvice<Obje
         if (value instanceof CommonResult) { sign(((CommonResult<?>) value).getData(), request, depth + 1); return; }
         if (value instanceof PageResult) { sign(((PageResult<?>) value).getList(), request, depth + 1); return; }
         if (value instanceof Iterable) { for (Object row : (Iterable<?>) value) sign(row, request, depth + 1); return; }
+        if (value instanceof cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO) {
+            cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO file = (cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileRespVO) value;
+            file.setUrl(attachments.signForAuthorizedResponse(file.getUrl(), request));
+            return;
+        }
         if (!value.getClass().getName().startsWith("cn.iocoder.yudao.module.custom.")) return;
         try {
             java.lang.reflect.Method getter = value.getClass().getMethod("getFile");
