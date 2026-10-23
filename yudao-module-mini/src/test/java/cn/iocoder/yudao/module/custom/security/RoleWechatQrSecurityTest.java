@@ -89,6 +89,14 @@ class RoleWechatQrSecurityTest {
     @Test void normalShareQrStillGeneratesPngWithoutUnusedStorageWrites()throws Exception {
         QRCodeController controller=new QRCodeController();inject(controller,"qrCodeGenerator",new QRCodeGenerator());FileService files=mock(FileService.class);inject(controller,"fileService",files);byte[] png=controller.generateQRCode("https://fixture.invalid/contract",300,300).getData();assertEquals((byte)0x89,png[0]);java.awt.image.BufferedImage image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));assertEquals(300,image.getWidth());assertEquals(300,image.getHeight());verifyNoInteractions(files);
     }
+    @Test void miniShareUrlEndpointKeepsLinkConversionAndStoredUrlResponse()throws Exception {
+        QRCodeController controller=new QRCodeController();inject(controller,"qrCodeGenerator",new QRCodeGenerator());FileService files=mock(FileService.class);inject(controller,"fileService",files);
+        cn.binarywang.wx.miniapp.api.WxMaService wx=mock(cn.binarywang.wx.miniapp.api.WxMaService.class,RETURNS_DEEP_STUBS);inject(controller,"wxMaService",wx);
+        when(wx.getLinkService().generateUrlLink(any(cn.binarywang.wx.miniapp.bean.urllink.GenerateUrlLinkRequest.class))).thenReturn("https://fixture.invalid/wx-link");
+        when(files.createFile(any(byte[].class),anyString(),eq("demo"),eq("png"))).thenReturn("https://fixture.invalid/demo/qr.png");
+        assertEquals("https://fixture.invalid/demo/qr.png",controller.generateQRCodeUrl("pages/share?id=fixture",300,300).getData());
+        org.mockito.ArgumentCaptor<cn.binarywang.wx.miniapp.bean.urllink.GenerateUrlLinkRequest> request=org.mockito.ArgumentCaptor.forClass(cn.binarywang.wx.miniapp.bean.urllink.GenerateUrlLinkRequest.class);verify(wx.getLinkService()).generateUrlLink(request.capture());assertEquals("pages/share",request.getValue().getPath());assertEquals("id=fixture",request.getValue().getQuery());
+    }
     @Test void encoderConcurrencyIsBoundedAndSlotsReleasedAfterFailure()throws Exception {
         Field f=QRCodeGenerator.class.getDeclaredField("ENCODERS");f.setAccessible(true);Semaphore slots=(Semaphore)f.get(null);assertTrue(slots.tryAcquire(4));try{ServiceException e=assertThrows(ServiceException.class,()->new QRCodeGenerator().generateQRCodeImage("fixture",300,300));assertEquals(429,e.getCode());}finally{slots.release(4);}assertThrows(RuntimeException.class,()->new QRCodeGenerator().generateQRCodeImage(String.join("",Collections.nCopies(2000,"x")),300,300));assertEquals(4,slots.availablePermits());assertTrue(new QRCodeGenerator().generateQRCodeImage("fixture",300,300).length>0);
     }
