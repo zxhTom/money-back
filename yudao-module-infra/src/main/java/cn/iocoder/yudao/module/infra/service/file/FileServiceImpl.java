@@ -103,7 +103,7 @@ public class FileServiceImpl implements FileService {
     private boolean privateReference(String url) {
         if (url == null) return false;
         try {
-            String path = new java.net.URI(url).getRawPath();
+            String path = new java.net.URI(url.replace(" ", "%20")).getRawPath();
             for (int i = 0; i < 3 && path != null; i++) {
                 if (path.replace('\\', '/').toLowerCase(java.util.Locale.ROOT).contains("/private/contracts/")) return true;
                 String decoded = java.net.URLDecoder.decode(path.replace("+", "%2B"), "UTF-8");
@@ -218,7 +218,8 @@ public class FileServiceImpl implements FileService {
             if (content.length > 16777215) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "私有附件不能超过16MB");
             privateContents.insert(new cn.iocoder.yudao.module.infra.dal.dataobject.file.FileContentDO()
                     .setConfigId(client.getId()).setPath(path).setContent(content));
-            url = "/admin-api/infra/file/" + client.getId() + "/get/" + path;
+            url = "/admin-api/infra/file/" + client.getId() + "/get/"
+                    + org.springframework.web.util.UriUtils.encodePath(path, java.nio.charset.StandardCharsets.UTF_8);
         } else {
             url = client.upload(content, path, type);
         }

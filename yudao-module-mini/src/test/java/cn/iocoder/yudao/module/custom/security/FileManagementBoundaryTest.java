@@ -114,6 +114,11 @@ class FileManagementBoundaryTest {
         FileDO forged=row(1,"42","public/fixture.pdf"), own=row(2,"42","private/contracts/42/own file.pdf"), wrongOwner=row(3,"42","private/contracts/777/foreign.pdf");
         when(mapper.selectScopedPage(any(),eq(42L),eq(1L))).thenReturn(new PageResult<>(Arrays.asList(forged,own,wrongOwner),3L));service.getFilePage(new FilePageReqVO());assertNull(forged.getUrl());assertNull(wrongOwner.getUrl());assertEquals("/admin-api/infra/file/28/get/private/contracts/42/own%20file.pdf",own.getUrl());
     }
+    @Test void ordinaryPublicAndPrivateFilenamesWithSpacesRemainUsable() {
+        FileDO publicFile=row(1,"42","avatar/客户 照片.png").setUrl("https://storage.example.invalid/avatar/客户 照片.png");
+        when(mapper.selectScopedPage(any(),eq(42L),eq(1L))).thenReturn(new PageResult<>(Collections.singletonList(publicFile),1L));service.getFilePage(new FilePageReqVO());assertNotNull(publicFile.getUrl());assertTrue(publicFile.getUrl().contains("照片"));
+        String url=service.createFile("%PDF-synthetic".getBytes(java.nio.charset.StandardCharsets.UTF_8),"测试 附件.pdf","contract","application/pdf");assertTrue(url.contains("%20"));assertTrue(url.contains("private/contracts/42/"));assertFalse(url.contains(" "));
+    }
     @Test void responseSignerNeverSignsPrivateUrlOnPublicMetadata()throws Exception {
         cn.iocoder.yudao.module.custom.framework.security.config.ContractAttachmentResponseAdvice advice=new cn.iocoder.yudao.module.custom.framework.security.config.ContractAttachmentResponseAdvice();
         cn.iocoder.yudao.module.custom.framework.security.interceptor.ContractAttachmentAccessInterceptor signer=mock(cn.iocoder.yudao.module.custom.framework.security.interceptor.ContractAttachmentAccessInterceptor.class);inject(advice,"attachments",signer);
