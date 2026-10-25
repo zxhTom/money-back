@@ -57,6 +57,8 @@ public class FileConfigServiceImplTest extends BaseDbUnitTest {
     private Validator validator;
     @MockBean
     private FileClientFactory fileClientFactory;
+    @MockBean
+    private cn.iocoder.yudao.module.infra.framework.security.core.PlatformFileConfigGuard platformFileConfigGuard;
 
     @Test
     public void testCreateFileConfig_success() {

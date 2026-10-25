@@ -18,9 +18,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.HashMap;
 import java.util.Map;
-import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import javax.annotation.Resource;
-import java.util.Base64;
+import cn.iocoder.yudao.module.custom.service.face.FaceAuthSessionGuard;
+import cn.iocoder.yudao.module.custom.service.face.evidence.FaceEvidenceService;
+import cn.iocoder.yudao.module.custom.dal.dataobject.face.FaceEvidenceDO;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -40,7 +42,13 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
     private String planId;
 
     @Resource
-    private FileApi fileApi;
+    private FaceAuthSessionGuard faceAuthSessionGuard;
+
+    @Resource
+    private FaceEvidenceService faceEvidenceService;
+
+    @Resource
+    private IdCardCipherService idCardCipherService;
 
     // 百度云获取 access_token 的地址 (需提前获取)
     private static final String ACCESS_TOKEN_URL = "https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=%s&client_secret=%s";
@@ -101,67 +109,160 @@ public class BaiduFaceAuthServiceImpl implements BaiduFaceAuthService {
         return resultJson.getBoolean("success"); // 成功返回 true[citation:4]
     }
     @Override
-    public Map<String, Object> queryFaceAuthResult(String verifyToken) throws Exception {
+    public Map<String, Object> queryFaceAuthResult(String verifyToken) {
         // H5 方案的权威结果查询，不是单次人脸实名认证 V4 的图片核验接口。
         String url = QUERY_RESULT_URL;
-
-        // 构建请求参数（根据百度云最新文档调整）
-        Map<String, String> params = new HashMap<>();
-        params.put("verify_token", verifyToken);
-        // 可能还需要其他参数，如plan_id等
-
-        // 获取access_token并发送请求
-        String accessToken = getAccessToken(); // 复用之前的getAccessToken方法
-        String resultStr = sendPost(url + "?access_token=" + accessToken,
-                JSON.toJSONString(params));
-
-        JSONObject result = JSON.parseObject(resultStr);
-
         Map<String, Object> response = new HashMap<>();
 
-        // 解析百度云返回结果（结构需参照官方文档）
-        if (Boolean.TRUE.equals(result.get("success"))
-                && result.getJSONObject("result") != null
-                && result.getJSONObject("result").getJSONObject("verify_result") != null) {
-            JSONObject verifyResult = result.getJSONObject("result");
-            // passed 是内部统一字段，只能由已认证的百度 result/detail 响应派生。
-            verifyResult.put("passed", true);
-            response.put("success", true);
-            response.put("data", verifyResult); // 包含passed、score、reason等
+        try {
+            // 构建请求参数（根据百度云最新文档调整）
+            Map<String, String> params = new HashMap<>();
+            params.put("verify_token", verifyToken);
 
-            // [新增] 异步提取并保存存证视频和最佳人脸图片到后端 MinIO
+            // 获取 access_token 并发送请求（网络与 token 获取置于统一异常边界）
+            String accessToken = getAccessToken();
+            String resultStr = sendPost(url + "?access_token=" + accessToken,
+                    JSON.toJSONString(params));
+
+            JSONObject result;
             try {
-                if (verifyResult.containsKey("video")) {
-                    String videoBase64 = verifyResult.getString("video");
-                    byte[] videoBytes = Base64.getDecoder().decode(videoBase64);
-                    String videoUrl = fileApi.createFile(videoBytes, verifyToken + ".mp4");
-                    response.put("videoUrl", videoUrl);
-                    log.info("[FaceAuth] 成功提取人脸认证存证视频, 链接: {}", videoUrl);
-                }
-                
-                if (verifyResult.containsKey("best_image") && verifyResult.getJSONObject("best_image").containsKey("pic")) {
-                    String picBase64 = verifyResult.getJSONObject("best_image").getString("pic");
-                    byte[] picBytes = Base64.getDecoder().decode(picBase64);
-                    String picUrl = fileApi.createFile(picBytes, verifyToken + ".jpg");
-                    response.put("picUrl", picUrl);
-                    log.info("[FaceAuth] 成功提取最佳人脸截图, 链接: {}", picUrl);
+                result = JSON.parseObject(resultStr);
+                if (result == null) {
+                    throw new IllegalArgumentException("Provider响应非JSON对象");
                 }
             } catch (Exception e) {
-                log.error("[FaceAuth] 提取人脸认证存证视频/图片失败", e);
+                log.error("[FaceAuth] 解析核身提供商响应失败: error={}", e.getClass().getSimpleName());
+                response.put("success", false);
+                response.put("message", "核身提供商响应解析失败");
+                return response;
             }
-            
-        } else {
+
+            // 解析百度云返回结果（结构需参照官方文档，脱敏异常与类型边界）
+            Object successObj = result.get("success");
+            boolean isSuccess = Boolean.TRUE.equals(successObj);
+            JSONObject resultObj = result.getJSONObject("result");
+
+            if (isSuccess
+                    && resultObj != null
+                    && resultObj.getJSONObject("verify_result") != null) {
+                JSONObject verifyResult = resultObj;
+
+                // 结构校验：若包含 idcard_confirm，必须是合法的 JSONObject 结构，否则进入外层固定安全失败
+                String confirmedId = null;
+                if (verifyResult.containsKey("idcard_confirm")) {
+                    Object idConfirmObj = verifyResult.get("idcard_confirm");
+                    if (!(idConfirmObj instanceof JSONObject)) {
+                        throw new IllegalArgumentException("idcard_confirm 类型不合法");
+                    }
+                    JSONObject idcardConfirm = (JSONObject) idConfirmObj;
+                    confirmedId = idcardConfirm.getString("idcard_number");
+                }
+
+                // passed 是内部统一字段，只能由已认证的百度 result/detail 响应派生。
+                verifyResult.put("passed", true);
+                response.put("success", true);
+                response.put("data", verifyResult); // 包含passed、score、reason等
+
+                // 提取媒体 base64 用于私有存证保存，随后无论类型是否合法彻底从返回数据中移除
+                String videoBase64 = null;
+                if (verifyResult.containsKey("video")) {
+                    Object videoObj = verifyResult.remove("video");
+                    if (videoObj instanceof String) {
+                        videoBase64 = (String) videoObj;
+                    }
+                }
+
+                String picBase64 = null;
+                if (verifyResult.containsKey("best_image")) {
+                    Object bestImageObj = verifyResult.remove("best_image");
+                    if (bestImageObj instanceof JSONObject) {
+                        JSONObject bestImage = (JSONObject) bestImageObj;
+                        Object picObj = bestImage.get("pic");
+                        if (picObj instanceof String) {
+                            picBase64 = (String) picObj;
+                        }
+                    }
+                }
+
+                // 保存到独立私有存证库（根据可信 Redis 会话解析归属，并核验 provider 确认的证件号）
+                FaceAuthSessionGuard.SessionOwner owner = null;
+                try {
+                    owner = faceAuthSessionGuard.getTrustedOwner(verifyToken);
+                } catch (Exception e) {
+                    log.error("[FaceAuth] 解析会话归属异常: {}", e.getClass().getSimpleName());
+                }
+
+                if (owner != null && confirmedId != null && faceAuthSessionGuard.matchesIdentity(owner, confirmedId)) {
+                    try {
+                        if (videoBase64 != null) {
+                            FaceEvidenceDO videoEvidence = faceEvidenceService.saveEvidence(
+                                    owner.getTenantId(), owner.getUserId(), verifyToken, "video", videoBase64);
+                            if (videoEvidence != null) {
+                                response.put("videoEvidenceId", videoEvidence.getId());
+                                response.put("videoEvidenceUrl", "/admin-api/api/faceAuth/evidence/" + videoEvidence.getId());
+                            }
+                        }
+                        if (picBase64 != null) {
+                            FaceEvidenceDO picEvidence = faceEvidenceService.saveEvidence(
+                                    owner.getTenantId(), owner.getUserId(), verifyToken, "best_image", picBase64);
+                            if (picEvidence != null) {
+                                response.put("picEvidenceId", picEvidence.getId());
+                                response.put("picEvidenceUrl", "/admin-api/api/faceAuth/evidence/" + picEvidence.getId());
+                            }
+                        }
+                    } catch (Exception e) {
+                        // 不在日志中输出完整异常堆栈或消息，避免泄漏敏感凭证或身份；存证异常不破坏已认证结果
+                        log.error("[FaceAuth] 保存存证异常: {}", e.getClass().getSimpleName());
+                    }
+                } else if (owner != null && confirmedId != null) {
+                    log.warn("[FaceAuth] 提供商确认身份与可信会话不一致，拒绝本次认证结果");
+                    response.put("success", false);
+                    response.put("message", "核身身份与会话发起人不一致");
+                    response.remove("data");
+                    return response;
+                } else {
+                    log.warn("[FaceAuth] 会话归属不存在或与提供商确认身份不匹配，跳过存证保存");
+                }
+
+            } else {
+                response.put("success", false);
+                response.put("message", sanitizeProviderMessage(result.get("message")));
+            }
+        } catch (Exception e) {
+            log.error("[FaceAuth] 处理核身结果异常: error={}", e.getClass().getSimpleName());
+            response.clear();
             response.put("success", false);
-            response.put("message", result.getString("message"));
+            response.put("message", "核身提供商响应处理失败");
         }
 
         return response;
     }
 
+    private static String sanitizeProviderMessage(Object msgObj) {
+        if (!(msgObj instanceof String)) {
+            return "核身认证未通过";
+        }
+        String msg = ((String) msgObj).trim();
+        if (msg.isEmpty()) {
+            return "核身认证未通过";
+        }
+        String lower = msg.toLowerCase();
+        if (lower.contains("token") || lower.contains("expired") || lower.contains("expire")) {
+            return "核身流程已失效或过期，请重新发起";
+        }
+        if (lower.contains("idcard") || lower.contains("id_no") || lower.contains("name")
+                || lower.contains("param") || lower.contains("match") || lower.contains("fail")
+                || lower.contains("not pass") || lower.contains("reject") || lower.contains("invalid")
+                || lower.contains("score") || lower.contains("verify") || lower.contains("auth")) {
+            return "核身信息核验不通过，请重试";
+        }
+        return "核身认证未通过";
+    }
+
     /**
      * 通用方法：获取百度云API的访问凭证 (access_token)
      */
-    private String getAccessToken() throws Exception {
+    protected String getAccessToken() throws Exception {
         String url = String.format(ACCESS_TOKEN_URL, apiKey, secretKey);
         String result = sendGet(url);
         JSONObject jsonObject = JSON.parseObject(result);

@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.service.monitor;
 
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.infra.api.websocket.WebSocketSenderApi;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.GlobalIpDiagnoseVO;
 import cn.iocoder.yudao.module.system.controller.admin.monitor.vo.IpUserInfoVO;
@@ -14,6 +15,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -42,6 +44,10 @@ public class GlobalDiagnoseAsyncTask {
     private static final int MULTI_IP_THRESHOLD       = 5;
     private static final int HIGH_FREQ_HOUR_THRESHOLD = 10;
 
+    public static final String RELEASE_LOCK_LUA =
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+    public static final DefaultRedisScript<Long> RELEASE_LOCK_SCRIPT = new DefaultRedisScript<>(RELEASE_LOCK_LUA, Long.class);
+
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Resource private VoidmobIpCheckClient   ipCheckClient;
@@ -51,97 +57,165 @@ public class GlobalDiagnoseAsyncTask {
     @Resource private OperateLogMapper       operateLogMapper;
     @Resource private DataAccessLogMapper    dataAccessLogMapper;
     @Resource private WebSocketSenderApi     webSocketSenderApi;
-
-    // ─── 公开同步入口（无进度汇报）────────────────────────────
+    @Resource private GlobalDiagnoseAccessGuard diagnoseAccessGuard;
 
     public List<GlobalIpDiagnoseVO> scanAllIps(int days) {
-        return doScanCore(days, null);
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+        return scanAllIps(tenantId, days);
+    }
+
+    public List<GlobalIpDiagnoseVO> scanAllIps(Long tenantId, int days) {
+        if (tenantId == null) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "租户信息缺失");
+        }
+        return doScanCore(tenantId, days, null);
     }
 
     public List<UserBehaviorVO> analyzeUserBehavior() {
-        return doAnalyzeCore(null);
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
+        return analyzeUserBehavior(tenantId);
     }
 
-    // ─── 异步入口（WS 进度 + 缓存）─────────────────────────────
+    public List<UserBehaviorVO> analyzeUserBehavior(Long tenantId) {
+        if (tenantId == null) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "租户信息缺失");
+        }
+        return doAnalyzeCore(tenantId, null);
+    }
 
     @Async
-    public void doScanAllIpsAsync(int days, String resultKey, String runningKey) {
+    public void doScanAllIpsAsync(GlobalDiagnoseTaskContext context, String resultKey, String runningKey) {
+        if (context == null || context.getTenantId() == null) {
+            log.error("[GlobalDiagnose] IP扫描任务上下文或租户ID缺失，任务失败关闭");
+            releaseLock(runningKey, context != null ? context.getLockToken() : null);
+            return;
+        }
+        Long tenantId = context.getTenantId();
+        Long userId = context.getUserId();
+        int days = context.getDays() != null ? context.getDays() : 7;
         try {
-            Map<String, Map<Long, IpUserInfoVO>> ipUserMap = buildIpUserMap(days);
-            int total = (int) ipUserMap.keySet().stream().filter(ip -> !isPrivateIp(ip)).count();
+            TenantUtils.execute(tenantId, () -> {
+                try {
+                    Map<String, Map<Long, IpUserInfoVO>> ipUserMap = buildIpUserMap(tenantId, days);
+                    int total = (int) ipUserMap.keySet().stream().filter(ip -> !isPrivateIp(ip)).count();
 
-            List<GlobalIpDiagnoseVO> results = new ArrayList<>();
-            int[] processed = {0};
-            int[] uncachedCount = {0};
+                    List<GlobalIpDiagnoseVO> results = new ArrayList<>();
+                    int[] processed = {0};
+                    int[] uncachedCount = {0};
 
-            for (Map.Entry<String, Map<Long, IpUserInfoVO>> entry : ipUserMap.entrySet()) {
-                String ip = entry.getKey();
-                List<IpUserInfoVO> users = new ArrayList<>(entry.getValue().values());
+                    for (Map.Entry<String, Map<Long, IpUserInfoVO>> entry : ipUserMap.entrySet()) {
+                        String ip = entry.getKey();
+                        List<IpUserInfoVO> users = new ArrayList<>(entry.getValue().values());
 
-                GlobalIpDiagnoseVO vo = buildBaseVo(ip, users);
+                        GlobalIpDiagnoseVO vo = buildBaseVo(ip, users);
 
-                if (isPrivateIp(ip)) {
-                    vo.setRisky(false);
-                    vo.setRisks(Collections.emptyList());
-                    vo.setType("private");
-                    vo.setCountry("内网");
-                    results.add(vo);
-                    continue;
+                        if (isPrivateIp(ip)) {
+                            vo.setRisky(false);
+                            vo.setRisks(Collections.emptyList());
+                            vo.setType("private");
+                            vo.setCountry("内网");
+                            results.add(vo);
+                            continue;
+                        }
+
+                        String cacheKey = String.format(CACHE_KEY, ip);
+                        String cached = stringRedisTemplate.opsForValue().get(cacheKey);
+
+                        if (cached != null) {
+                            vo.setCached(true);
+                            applyCache(vo, cached);
+                        } else if (uncachedCount[0] < MAX_UNCACHED) {
+                            callApiAndFill(vo, ip);
+                            uncachedCount[0]++;
+                        } else {
+                            vo.setError("本次扫描已达外部接口上限，待下次扫描补充");
+                        }
+
+                        results.add(vo);
+                        processed[0]++;
+
+                        sendProgress(context, processed[0], total, "正在检查 " + ip);
+                    }
+
+                    results.sort((a, b) -> Boolean.compare(b.isRisky(), a.isRisky()));
+
+                    GlobalDiagnoseCacheEnvelope envelope = GlobalDiagnoseCacheEnvelope.builder()
+                            .tenantId(tenantId)
+                            .userId(userId)
+                            .taskType("scan-ips")
+                            .days(days)
+                            .createTime(System.currentTimeMillis())
+                            .dataJson(JSON.toJSONString(results))
+                            .build();
+
+                    stringRedisTemplate.opsForValue().set(resultKey, JSON.toJSONString(envelope), 1800, TimeUnit.SECONDS);
+                    sendDone(context, results);
+                    log.info("[GlobalDiagnose] IP扫描完成，tenantId={} userId={} 共{}个IP", tenantId, userId, results.size());
+                } catch (Exception e) {
+                    log.error("[GlobalDiagnose] IP扫描执行异常", e);
+                    sendError(context, "IP扫描处理异常");
                 }
-
-                String cacheKey = String.format(CACHE_KEY, ip);
-                String cached = stringRedisTemplate.opsForValue().get(cacheKey);
-
-                if (cached != null) {
-                    vo.setCached(true);
-                    applyCache(vo, cached);
-                } else if (uncachedCount[0] < MAX_UNCACHED) {
-                    callApiAndFill(vo, ip);
-                    uncachedCount[0]++;
-                } else {
-                    vo.setError("本次扫描已达外部接口上限，待下次扫描补充");
-                }
-
-                results.add(vo);
-                processed[0]++;
-
-                // 每处理一个公网IP推送进度
-                sendProgress("scan-ips", processed[0], total, "正在检查 " + ip);
-            }
-
-            results.sort((a, b) -> Boolean.compare(b.isRisky(), a.isRisky()));
-
-            stringRedisTemplate.opsForValue().set(resultKey, JSON.toJSONString(results), 1800, TimeUnit.SECONDS);
-            sendDone("scan-ips", results);
-            log.info("[GlobalDiagnose] IP扫描完成，共{}个IP", results.size());
+            });
         } catch (Exception e) {
-            log.error("[GlobalDiagnose] IP扫描异常", e);
-            sendError("scan-ips", e.getMessage());
+            log.error("[GlobalDiagnose] IP扫描调度异常", e);
+            sendError(context, "IP扫描任务调度异常");
         } finally {
-            stringRedisTemplate.delete(runningKey);
+            releaseLock(runningKey, context.getLockToken());
         }
     }
 
     @Async
-    public void doAnalyzeBehaviorAsync(String resultKey, String runningKey) {
+    public void doAnalyzeBehaviorAsync(GlobalDiagnoseTaskContext context, String resultKey, String runningKey) {
+        if (context == null || context.getTenantId() == null) {
+            log.error("[GlobalDiagnose] 用户行为分析任务上下文或租户ID缺失，任务失败关闭");
+            releaseLock(runningKey, context != null ? context.getLockToken() : null);
+            return;
+        }
+        Long tenantId = context.getTenantId();
+        Long userId = context.getUserId();
         try {
-            sendProgress("user-behavior", 0, 1, "正在加载用户行为数据...");
-            List<UserBehaviorVO> result = doAnalyzeCore(null);
-            stringRedisTemplate.opsForValue().set(resultKey, JSON.toJSONString(result), 1800, TimeUnit.SECONDS);
-            sendDone("user-behavior", result);
-            log.info("[GlobalDiagnose] 用户行为分析完成，共{}名用户", result.size());
+            TenantUtils.execute(tenantId, () -> {
+                try {
+                    sendProgress(context, 0, 1, "正在加载用户行为数据...");
+                    List<UserBehaviorVO> result = doAnalyzeCore(tenantId, null);
+
+                    GlobalDiagnoseCacheEnvelope envelope = GlobalDiagnoseCacheEnvelope.builder()
+                            .tenantId(tenantId)
+                            .userId(userId)
+                            .taskType("user-behavior")
+                            .createTime(System.currentTimeMillis())
+                            .dataJson(JSON.toJSONString(result))
+                            .build();
+
+                    stringRedisTemplate.opsForValue().set(resultKey, JSON.toJSONString(envelope), 1800, TimeUnit.SECONDS);
+                    sendDone(context, result);
+                    log.info("[GlobalDiagnose] 用户行为分析完成，tenantId={} userId={} 共{}名用户", tenantId, userId, result.size());
+                } catch (Exception e) {
+                    log.error("[GlobalDiagnose] 用户行为分析执行异常", e);
+                    sendError(context, "用户行为分析处理异常");
+                }
+            });
         } catch (Exception e) {
-            log.error("[GlobalDiagnose] 用户行为分析异常", e);
-            sendError("user-behavior", e.getMessage());
+            log.error("[GlobalDiagnose] 用户行为分析调度异常", e);
+            sendError(context, "用户行为分析任务调度异常");
         } finally {
-            stringRedisTemplate.delete(runningKey);
+            releaseLock(runningKey, context.getLockToken());
         }
     }
 
-    // ─── 核心逻辑 ─────────────────────────────────────────────
+    private void releaseLock(String runningKey, String lockToken) {
+        if (runningKey == null || lockToken == null) {
+            return;
+        }
+        try {
+            stringRedisTemplate.execute(RELEASE_LOCK_SCRIPT, Collections.singletonList(runningKey), lockToken);
+        } catch (Exception e) {
+            log.warn("[GlobalDiagnose] 释放锁异常 runningKey={}", runningKey, e);
+        }
+    }
 
-    private List<GlobalIpDiagnoseVO> doScanCore(int days, Consumer<Map<String, Object>> progressReporter) {
-        Map<String, Map<Long, IpUserInfoVO>> ipUserMap = buildIpUserMap(days);
+    private List<GlobalIpDiagnoseVO> doScanCore(Long tenantId, int days, Consumer<Map<String, Object>> progressReporter) {
+        Map<String, Map<Long, IpUserInfoVO>> ipUserMap = buildIpUserMap(tenantId, days);
         int total = ipUserMap.size();
         int[] processed = {0};
         int uncachedCount = 0;
@@ -179,12 +253,11 @@ public class GlobalDiagnoseAsyncTask {
             processed[0]++;
 
             if (progressReporter != null) {
-                Map<String, Object> p = new HashMap<>();
-                p.put("taskType", "scan-ips");
-                p.put("current", processed[0]);
-                p.put("total", total);
-                p.put("message", "正在检查 " + ip);
-                progressReporter.accept(p);
+                Map<String, Object> progress = new HashMap<>();
+                progress.put("processed", processed[0]);
+                progress.put("total", total);
+                progress.put("currentIp", ip);
+                progressReporter.accept(progress);
             }
         }
 
@@ -192,9 +265,9 @@ public class GlobalDiagnoseAsyncTask {
         return results;
     }
 
-    private List<UserBehaviorVO> doAnalyzeCore(Consumer<int[]> progressReporter) {
-        List<LoginUserStatsDO>    stats     = loginLogMapper.selectUserLoginStats();
-        List<Map<String, Object>> hourStats = loginLogMapper.selectUserLoginCountLastHour();
+    private List<UserBehaviorVO> doAnalyzeCore(Long tenantId, Consumer<int[]> progressReporter) {
+        List<LoginUserStatsDO>    stats     = loginLogMapper.selectDiagnoseUserLoginStats(tenantId);
+        List<Map<String, Object>> hourStats = loginLogMapper.selectDiagnoseUserLoginCountLastHour(tenantId);
 
         Map<Long, Integer> hourMap = new HashMap<>();
         for (Map<String, Object> row : hourStats) {
@@ -220,10 +293,10 @@ public class GlobalDiagnoseAsyncTask {
 
             String lastLoginStr = stat.getLastLoginTime() != null ? stat.getLastLoginTime().format(FMT) : null;
             vo.setLastLoginTime(lastLoginStr);
-            vo.setLastLoginIp(loginLogMapper.selectLastLoginIp(userId));
+            vo.setLastLoginIp(loginLogMapper.selectDiagnoseLastLoginIp(tenantId, userId));
             vo.setActivityLevel(calcActivityLevel(lastLoginStr));
 
-            List<String> abnormalIps = findAbnormalIps(userId);
+            List<String> abnormalIps = findAbnormalIps(tenantId, userId);
             vo.setAbnormalIps(abnormalIps);
 
             List<String> reasons = buildSuspiciousReasons(vo);
@@ -245,38 +318,55 @@ public class GlobalDiagnoseAsyncTask {
         return results;
     }
 
-    // ─── WS 工具方法 ──────────────────────────────────────────
-
-    private void sendProgress(String taskType, int current, int total, String message) {
-        Map<String, Object> msg = new LinkedHashMap<>();
-        msg.put("taskType", taskType);
-        msg.put("current", current);
-        msg.put("total", total);
-        msg.put("message", message);
-        webSocketSenderApi.sendObject(UserTypeEnum.ADMIN.getValue(), WS_PROGRESS, msg);
+    private void sendProgress(GlobalDiagnoseTaskContext context, int current, int total, String message) {
+        TenantUtils.execute(context.getTenantId(), () -> {
+            if (!diagnoseAccessGuard.canPushResult(context.getTenantId(), context.getUserId())) {
+                log.info("[GlobalDiagnose] 进度推送前鉴权未通过 tenantId={} userId={}",
+                        context.getTenantId(), context.getUserId());
+                return;
+            }
+            Map<String, Object> msg = new LinkedHashMap<>();
+            msg.put("taskType", context.getTaskType());
+            msg.put("current", current);
+            msg.put("total", total);
+            msg.put("message", message);
+            webSocketSenderApi.sendObject(UserTypeEnum.ADMIN.getValue(), context.getUserId(), WS_PROGRESS, msg);
+        });
     }
 
-    private void sendDone(String taskType, Object data) {
-        Map<String, Object> msg = new LinkedHashMap<>();
-        msg.put("taskType", taskType);
-        msg.put("data", data);
-        webSocketSenderApi.sendObject(UserTypeEnum.ADMIN.getValue(), WS_DONE, msg);
+    private void sendDone(GlobalDiagnoseTaskContext context, Object data) {
+        TenantUtils.execute(context.getTenantId(), () -> {
+            if (!diagnoseAccessGuard.canPushResult(context.getTenantId(), context.getUserId())) {
+                log.info("[GlobalDiagnose] 完成推送前鉴权未通过 tenantId={} userId={}",
+                        context.getTenantId(), context.getUserId());
+                return;
+            }
+            Map<String, Object> msg = new LinkedHashMap<>();
+            msg.put("taskType", context.getTaskType());
+            msg.put("data", data);
+            webSocketSenderApi.sendObject(UserTypeEnum.ADMIN.getValue(), context.getUserId(), WS_DONE, msg);
+        });
     }
 
-    private void sendError(String taskType, String error) {
-        Map<String, Object> msg = new LinkedHashMap<>();
-        msg.put("taskType", taskType);
-        msg.put("error", error);
-        webSocketSenderApi.sendObject(UserTypeEnum.ADMIN.getValue(), WS_ERROR, msg);
+    private void sendError(GlobalDiagnoseTaskContext context, String error) {
+        TenantUtils.execute(context.getTenantId(), () -> {
+            if (!diagnoseAccessGuard.canPushResult(context.getTenantId(), context.getUserId())) {
+                log.info("[GlobalDiagnose] 错误推送前鉴权未通过 tenantId={} userId={}",
+                        context.getTenantId(), context.getUserId());
+                return;
+            }
+            Map<String, Object> msg = new LinkedHashMap<>();
+            msg.put("taskType", context.getTaskType());
+            msg.put("error", error != null ? error : "任务执行失败");
+            webSocketSenderApi.sendObject(UserTypeEnum.ADMIN.getValue(), context.getUserId(), WS_ERROR, msg);
+        });
     }
 
-    // ─── 内部工具 ─────────────────────────────────────────────
-
-    private Map<String, Map<Long, IpUserInfoVO>> buildIpUserMap(int days) {
+    private Map<String, Map<Long, IpUserInfoVO>> buildIpUserMap(Long tenantId, int days) {
         Map<String, Map<Long, IpUserInfoVO>> ipUserMap = new LinkedHashMap<>();
-        mergeRefs(loginLogMapper.selectIpUserRefs(days),      "登录日志",     ipUserMap);
-        mergeRefs(operateLogMapper.selectIpUserRefs(days),    "操作日志",     ipUserMap);
-        mergeRefs(dataAccessLogMapper.selectIpUserRefs(days), "数据访问日志",  ipUserMap);
+        mergeRefs(loginLogMapper.selectDiagnoseIpUserRefs(tenantId, days),      "登录日志",     ipUserMap);
+        mergeRefs(operateLogMapper.selectDiagnoseIpUserRefs(tenantId, days),    "操作日志",     ipUserMap);
+        mergeRefs(dataAccessLogMapper.selectDiagnoseIpUserRefs(tenantId, days), "数据访问日志",  ipUserMap);
         return ipUserMap;
     }
 
@@ -293,10 +383,10 @@ public class GlobalDiagnoseAsyncTask {
                            Map<String, Map<Long, IpUserInfoVO>> ipUserMap) {
         if (rows == null) return;
         for (IpUserRefDO row : rows) {
-            String ip     = row.getIp();
-            Long   userId = row.getUserId();
-            if (ip == null || userId == null) continue;
-
+            String ip = row.getIp();
+            if (ip == null || ip.trim().isEmpty()) continue;
+            Long userId = row.getUserId();
+            if (userId == null) continue;
             String lastSeen = row.getLastSeen();
             String username = row.getUsername();
 
@@ -370,10 +460,10 @@ public class GlobalDiagnoseAsyncTask {
         if (risks != null) { vo.setRisky(!risks.isEmpty()); vo.setRisks(risks); }
     }
 
-    private List<String> findAbnormalIps(Long userId) {
+    private List<String> findAbnormalIps(Long tenantId, Long userId) {
         List<String> allIps = new ArrayList<>();
-        allIps.addAll(loginLogMapper.selectDistinctIpsByUserId(userId));
-        allIps.addAll(dataAccessLogMapper.selectDistinctIpsByUserId(userId));
+        allIps.addAll(loginLogMapper.selectDiagnoseDistinctIpsByUserId(tenantId, userId));
+        allIps.addAll(dataAccessLogMapper.selectDiagnoseDistinctIpsByUserId(tenantId, userId));
 
         return allIps.stream().distinct()
                 .filter(ip -> {

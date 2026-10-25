@@ -121,5 +121,27 @@ public class FaceAuthController {
         return success(baiduFaceAuthService.queryFaceAuthResult(verifyToken));
     }
 
+    @Resource
+    private cn.iocoder.yudao.module.custom.service.face.evidence.FaceEvidenceService faceEvidenceService;
+
+    @GetMapping("/evidence/{id}")
+    public void getFaceEvidence(@PathVariable("id") Long id, javax.servlet.http.HttpServletResponse response) throws Exception {
+        cn.iocoder.yudao.module.custom.dal.dataobject.face.FaceEvidenceDO evidence = faceEvidenceService.getAuthorizedEvidence(id);
+        String mediaType = evidence.getMediaType();
+        String contentType = "video".equalsIgnoreCase(mediaType) ? "video/mp4" : "image/jpeg";
+        String ext = "video".equalsIgnoreCase(mediaType) ? ".mp4" : ".jpg";
+        String filename = cn.hutool.core.util.IdUtil.fastSimpleUUID() + ext;
+
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("Content-Disposition", "inline; filename=\"" + filename + "\"");
+        response.setContentType(contentType);
+        response.setContentLength(evidence.getContent().length);
+
+        response.getOutputStream().write(evidence.getContent());
+        response.getOutputStream().flush();
+    }
+
     // 真正生效的百度回调地址是 MiniCallbackController（/api/mini/callback），这里的 /callback 是未接线的遗留代码，已删除。
 }

@@ -53,5 +53,49 @@ public class FaceAuthSessionGuard {
         }
         throw denied();
     }
+    public static class SessionOwner {
+        private final Long tenantId;
+        private final Long userId;
+        private final String idHash;
+
+        public SessionOwner(Long tenantId, Long userId, String idHash) {
+            this.tenantId = tenantId;
+            this.userId = userId;
+            this.idHash = idHash;
+        }
+
+        public Long getTenantId() { return tenantId; }
+        public Long getUserId() { return userId; }
+        public String getIdHash() { return idHash; }
+    }
+
+    public SessionOwner getTrustedOwner(String token) {
+        if (StrUtil.isBlank(token)) return null;
+        String saved = redis.opsForValue().get(key(token));
+        if (StrUtil.isBlank(saved)) return null;
+        String[] parts = saved.split(":");
+        if (parts.length != 3) return null;
+        try {
+            Long tenantId = Long.parseLong(parts[0]);
+            Long userId = Long.parseLong(parts[1]);
+            String idHash = parts[2];
+            // 拒绝非正 tenant/user 及非 64 位 hex 身份摘要
+            if (tenantId <= 0 || userId <= 0) return null;
+            if (idHash == null || idHash.length() != 64 || !idHash.matches("^[0-9a-fA-F]{64}$")) return null;
+            return new SessionOwner(tenantId, userId, idHash);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    public boolean matchesIdentity(SessionOwner owner, String idCard) {
+        if (owner == null || StrUtil.isBlank(owner.getIdHash()) || StrUtil.isBlank(idCard)) {
+            return false;
+        }
+        String normalizedCipher = cipher.normalizeRequestToCipher(idCard);
+        String candidateHash = DigestUtil.sha256Hex(normalizedCipher);
+        return owner.getIdHash().equalsIgnoreCase(candidateHash);
+    }
+
     private AccessDeniedException denied() { return new AccessDeniedException("无权访问该人脸认证会话，请重新发起本人认证"); }
 }

@@ -43,7 +43,7 @@ public class RiskLockControllerTest extends BaseMockitoUnitTest {
 
         securityFrameworkUtilsMock.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(adminUserId);
 
-        CommonResult<Boolean> result = riskLockController.unlockUser(targetUserId);
+        CommonResult<Boolean> result = riskLockController.unlockUser(targetUserId, "管理员手动处理");
 
         assertTrue(result.isSuccess());
         assertTrue(result.getData());

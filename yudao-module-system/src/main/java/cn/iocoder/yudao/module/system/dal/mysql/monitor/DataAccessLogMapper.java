@@ -30,6 +30,21 @@ public interface DataAccessLogMapper extends BaseMapperX<DataAccessLogDO> {
             "GROUP BY client_ip")
     List<UserIpStatDO> selectIpStatsByUserId(@Param("userId") Long userId);
 
+    /** 近 N 天内：IP → 用户关联（用于全局诊断，显式限定租户） */
+    @Select("SELECT d.client_ip AS ip, d.user_id AS userId, d.username, " +
+            "  MAX(d.access_time) AS lastSeen, MIN(d.access_time) AS firstSeen " +
+            "FROM custom_data_access_log d " +
+            "INNER JOIN system_users u ON u.id = d.user_id AND u.deleted = 0 AND u.tenant_id = #{tenantId} " +
+            "WHERE d.access_time >= DATE_SUB(NOW(), INTERVAL #{days} DAY) " +
+            "  AND d.client_ip IS NOT NULL AND d.client_ip != '' AND d.deleted = 0 " +
+            "GROUP BY d.client_ip, d.user_id, d.username")
+    List<IpUserRefDO> selectDiagnoseIpUserRefs(@Param("tenantId") Long tenantId, @Param("days") int days);
+
+    @Select("SELECT DISTINCT d.client_ip FROM custom_data_access_log d " +
+            "INNER JOIN system_users u ON u.id = d.user_id AND u.deleted = 0 AND u.tenant_id = #{tenantId} " +
+            "WHERE d.user_id = #{userId} AND d.client_ip IS NOT NULL AND d.client_ip != '' AND d.deleted = 0")
+    List<String> selectDiagnoseDistinctIpsByUserId(@Param("tenantId") Long tenantId, @Param("userId") Long userId);
+
     @Select("SELECT client_ip AS ip, user_id AS userId, username, " +
             "  MAX(access_time) AS lastSeen, MIN(access_time) AS firstSeen " +
             "FROM custom_data_access_log " +

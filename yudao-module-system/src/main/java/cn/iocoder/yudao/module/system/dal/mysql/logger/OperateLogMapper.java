@@ -31,6 +31,17 @@ public interface OperateLogMapper extends BaseMapperX<OperateLogDO> {
             "GROUP BY user_ip")
     List<UserIpStatDO> selectIpStatsByUserId(@Param("userId") Long userId);
 
+    /** 近 N 天内：IP → 用户关联（用于全局诊断，通过 system_users 归属限定租户与 ADMIN 用户类型） */
+    @Select("SELECT l.user_ip AS ip, l.user_id AS userId, " +
+            "  MAX(l.create_time) AS lastSeen, MIN(l.create_time) AS firstSeen " +
+            "FROM system_operate_log l " +
+            "INNER JOIN system_users u ON u.id = l.user_id AND u.deleted = 0 AND u.tenant_id = #{tenantId} " +
+            "WHERE l.user_type = 2 " +
+            "  AND l.create_time >= DATE_SUB(NOW(), INTERVAL #{days} DAY) " +
+            "  AND l.user_ip IS NOT NULL AND l.user_ip != '' AND l.deleted = 0 " +
+            "GROUP BY l.user_ip, l.user_id")
+    List<IpUserRefDO> selectDiagnoseIpUserRefs(@Param("tenantId") Long tenantId, @Param("days") int days);
+
     @Select("SELECT user_ip AS ip, user_id AS userId, " +
             "  MAX(create_time) AS lastSeen, MIN(create_time) AS firstSeen " +
             "FROM system_operate_log " +

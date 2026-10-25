@@ -20,8 +20,14 @@ class PrivacyHardeningTest {
  boolean authorize(Class<?> type,String method,boolean permission,boolean role)throws Exception {
   Method m=java.util.Arrays.stream(type.getMethods()).filter(x->x.getName().equals(method)).findFirst().get();
   SecurityFrameworkService ss=mock(SecurityFrameworkService.class);
-  when(ss.hasPermission(anyString())).thenReturn(permission);when(ss.hasAnyRoles(any(String[].class))).thenReturn(role);
-  StandardEvaluationContext context=new StandardEvaluationContext();context.setBeanResolver((ctx,name)->ss);
+  when(ss.hasPermission(anyString())).thenReturn(permission);
+  when(ss.hasAnyRoles(any(String[].class))).thenReturn(role);
+  when(ss.hasAnyRoles(anyString())).thenReturn(role);
+  when(ss.hasAnyRoles(anyString(), anyString())).thenReturn(role);
+  when(ss.hasAnyRoles(anyString(), anyString(), anyString())).thenReturn(role);
+  StandardEvaluationContext context=new StandardEvaluationContext();
+  context.setVariable("ss", ss);
+  context.setBeanResolver((ctx,name)->ss);
   return new SpelExpressionParser().parseExpression(m.getAnnotation(PreAuthorize.class).value()).getValue(context,Boolean.class);
  }
  @Test void ordinaryRoleCannotUseArchiveEvenWhenMenuPermissionGranted()throws Exception{assertFalse(authorize(ArchiveQueryController.class,"query",true,false));assertFalse(authorize(ArchiveQueryController.class,"tables",true,false));assertFalse(authorize(ArchiveQueryController.class,"runNow",true,false));}

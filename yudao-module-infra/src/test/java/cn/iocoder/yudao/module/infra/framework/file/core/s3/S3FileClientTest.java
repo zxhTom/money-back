@@ -14,6 +14,47 @@ import javax.validation.Validation;
 public class S3FileClientTest {
 
     @Test
+    public void testExtractStorageKey_defaultDomainAndPresignKeyExact() {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setAccessKey("admin");
+        config.setAccessSecret("password");
+        config.setBucket("evidence-bucket");
+        config.setDomain(null);
+        config.setEndpoint("http://127.0.0.1:9000");
+        config.setEnablePathStyleAccess(true);
+        config.setEnablePublicAccess(false);
+
+        S3FileClient client = new S3FileClient(10L, config);
+        client.init();
+
+        // 真实 client 提取 storageKey
+        String extracted = client.extractStorageKey("http://127.0.0.1:9000/evidence-bucket/history/face.mp4");
+        org.junit.jupiter.api.Assertions.assertEquals("history/face.mp4", extracted);
+
+        // 包含 literal % 的普通文件正常保留
+        String percentKey = client.extractStorageKey("http://127.0.0.1:9000/evidence-bucket/docs/report_100%_123.pdf");
+        org.junit.jupiter.api.Assertions.assertEquals("docs/report_100%_123.pdf", percentKey);
+
+        // 包含 literal %25, ?, #, +, 尾部空格 的对象正常精确提取，不截断也不被 trim 掉尾空格
+        org.junit.jupiter.api.Assertions.assertEquals("history/face%25.mp4",
+                client.extractStorageKey("http://127.0.0.1:9000/evidence-bucket/history/face%25.mp4"));
+        org.junit.jupiter.api.Assertions.assertEquals("history/face?.mp4",
+                client.extractStorageKey("history/face?.mp4"));
+        org.junit.jupiter.api.Assertions.assertEquals("history/face#1.mp4",
+                client.extractStorageKey("history/face#1.mp4"));
+        org.junit.jupiter.api.Assertions.assertEquals("history/face+tag.mp4",
+                client.extractStorageKey("http://127.0.0.1:9000/evidence-bucket/history/face+tag.mp4"));
+        org.junit.jupiter.api.Assertions.assertEquals("history/face.mp4 ",
+                client.extractStorageKey("history/face.mp4 "));
+
+        // presignGetUrl 正常生成且 key 一致
+        String presigned = client.presignGetUrl("http://127.0.0.1:9000/evidence-bucket/history/face.mp4", 60);
+        org.junit.jupiter.api.Assertions.assertNotNull(presigned);
+        org.junit.jupiter.api.Assertions.assertTrue(presigned.contains("/evidence-bucket/history/face.mp4"));
+        org.junit.jupiter.api.Assertions.assertTrue(presigned.contains("X-Amz-Signature="));
+    }
+
+    @Test
     @Disabled // MinIO，如果要集成测试，可以注释本行
     public void testMinIO() throws Exception {
         S3FileClientConfig config = new S3FileClientConfig();

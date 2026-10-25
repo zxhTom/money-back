@@ -231,27 +231,21 @@ public class ContractServiceImpl implements ContractService {
         return contractMapper.selectPage(pageReqVO);
     }
 
+    @Resource
+    private ContractQueryScope contractQueryScope;
+
     @Override
     public PageResult<ContractDO> getContractPageForListing(ContractPageReqVO pageReqVO) {
         normalizeContractPageIds(pageReqVO);
         Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        if (loginUserId == null) {
+            throw new org.springframework.security.access.AccessDeniedException("当前未登录，无法查询合同");
+        }
         if (teaseGuard.isTeasing(loginUserId)) {
             return ContractTeaseFactory.generateContractPage(loginUserId, pageReqVO);
         }
-        // 安全兜底：未指定具体查询对象（indebtedId/creditorId）时，禁止无限定地列出全库合同，
-        // 退化为"只看自己创建的"（超管/合同管理员按 getSelfContractPage 里的规则不受限）。
-        // 小程序信用查询等按身份证查某人明细的场景始终会带 indebtedId/creditorId，不受影响。
-        // 仅用于 /page 这个交互式查询接口；/export-excel 走的是原始 getContractPage，权限更高（custom:contract:export），保持不变。
-        boolean hasPartyFilter = StrUtil.isNotBlank(pageReqVO.getIndebtedId())
-                || StrUtil.isNotBlank(pageReqVO.getCreditorId());
-        if (!hasPartyFilter) {
-            return getSelfContractPage(pageReqVO);
-        }
-        if ((StrUtil.isNotBlank(pageReqVO.getIndebtedId()) && !creditQueryAccessChecker.canQueryCredit(pageReqVO.getIndebtedId()))
-                || (StrUtil.isNotBlank(pageReqVO.getCreditorId()) && !creditQueryAccessChecker.canQueryCredit(pageReqVO.getCreditorId()))) {
-            throw new org.springframework.security.access.AccessDeniedException("无权限查询该用户信用信息");
-        }
-        return contractMapper.selectPage(pageReqVO);
+        cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<ContractDO> wrapper = contractQueryScope.buildScopedWrapper(pageReqVO);
+        return contractMapper.selectPage(pageReqVO, wrapper);
     }
 
     private void normalizeContractPageIds(ContractPageReqVO pageReqVO) {

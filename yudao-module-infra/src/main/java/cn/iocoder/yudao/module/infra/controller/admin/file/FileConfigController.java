@@ -32,14 +32,14 @@ public class FileConfigController {
 
     @PostMapping("/create")
     @Operation(summary = "创建文件配置")
-    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:file-config:create')")
+    @PreAuthorize("@platformFileConfigGuard.isPlatformSuperAdmin() and @ss.hasPermission('infra:file-config:create')")
     public CommonResult<Long> createFileConfig(@Valid @RequestBody FileConfigSaveReqVO createReqVO) {
         return success(fileConfigService.createFileConfig(createReqVO));
     }
 
     @PutMapping("/update")
     @Operation(summary = "更新文件配置")
-    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:file-config:update')")
+    @PreAuthorize("@platformFileConfigGuard.isPlatformSuperAdmin() and @ss.hasPermission('infra:file-config:update')")
     public CommonResult<Boolean> updateFileConfig(@Valid @RequestBody FileConfigSaveReqVO updateReqVO) {
         fileConfigService.updateFileConfig(updateReqVO);
         return success(true);
@@ -47,7 +47,7 @@ public class FileConfigController {
 
     @PutMapping("/update-master")
     @Operation(summary = "更新文件配置为 Master")
-    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:file-config:update')")
+    @PreAuthorize("@platformFileConfigGuard.isPlatformSuperAdmin() and @ss.hasPermission('infra:file-config:update')")
     public CommonResult<Boolean> updateFileConfigMaster(@RequestParam("id") Long id) {
         fileConfigService.updateFileConfigMaster(id);
         return success(true);
@@ -56,7 +56,7 @@ public class FileConfigController {
     @DeleteMapping("/delete")
     @Operation(summary = "删除文件配置")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:file-config:delete')")
+    @PreAuthorize("@platformFileConfigGuard.isPlatformSuperAdmin() and @ss.hasPermission('infra:file-config:delete')")
     public CommonResult<Boolean> deleteFileConfig(@RequestParam("id") Long id) {
         fileConfigService.deleteFileConfig(id);
         return success(true);
@@ -65,7 +65,7 @@ public class FileConfigController {
     @DeleteMapping("/delete-list")
     @Operation(summary = "批量删除文件配置")
     @Parameter(name = "ids", description = "编号列表", required = true)
-    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:file-config:delete')")
+    @PreAuthorize("@platformFileConfigGuard.isPlatformSuperAdmin() and @ss.hasPermission('infra:file-config:delete')")
     public CommonResult<Boolean> deleteFileConfigList(@RequestParam("ids") List<Long> ids) {
         fileConfigService.deleteFileConfigList(ids);
         return success(true);
@@ -74,7 +74,7 @@ public class FileConfigController {
     @GetMapping("/get")
     @Operation(summary = "获得文件配置")
     @Parameter(name = "id", description = "编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:file-config:query')")
+    @PreAuthorize("@platformFileConfigGuard.isPlatformSuperAdmin() and @ss.hasPermission('infra:file-config:query')")
     public CommonResult<FileConfigRespVO> getFileConfig(@RequestParam("id") Long id) {
         FileConfigDO config = fileConfigService.getFileConfig(id);
         return success(safeResponse(config));
@@ -82,7 +82,7 @@ public class FileConfigController {
 
     @GetMapping("/page")
     @Operation(summary = "获得文件配置分页")
-    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:file-config:query')")
+    @PreAuthorize("@platformFileConfigGuard.isPlatformSuperAdmin() and @ss.hasPermission('infra:file-config:query')")
     public CommonResult<PageResult<FileConfigRespVO>> getFileConfigPage(@Valid FileConfigPageReqVO pageVO) {
         PageResult<FileConfigDO> pageResult = fileConfigService.getFileConfigPage(pageVO);
         return success(new PageResult<>(pageResult.getList().stream().map(this::safeResponse).collect(java.util.stream.Collectors.toList()), pageResult.getTotal()));
@@ -90,7 +90,7 @@ public class FileConfigController {
 
     @GetMapping("/test")
     @Operation(summary = "测试文件配置是否正确")
-    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:file-config:query')")
+    @PreAuthorize("@platformFileConfigGuard.isPlatformSuperAdmin() and @ss.hasPermission('infra:file-config:query')")
     public CommonResult<String> testFileConfig(@RequestParam("id") Long id) throws Exception {
         String url = fileConfigService.testFileConfig(id);
         return success(url);
