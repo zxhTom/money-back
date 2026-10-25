@@ -7,6 +7,8 @@ import lombok.EqualsAndHashCode;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import javax.validation.constraints.Size;
 
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
 
@@ -23,6 +25,10 @@ public class SecurityAlertPageReqVO extends PageParam {
 
     @Schema(description = "来源IP")
     private String sourceIp;
+
+    @Schema(description = "列表排除的来源IP，最多100个")
+    @Size(max = 100)
+    private List<@Size(max = 45) String> excludedIps;
 
     @Schema(description = "处理状态(0=未处理,1=已处理,2=误报)")
     private Integer handled;

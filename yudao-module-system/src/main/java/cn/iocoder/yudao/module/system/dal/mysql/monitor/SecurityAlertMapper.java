@@ -24,6 +24,9 @@ public interface SecurityAlertMapper extends BaseMapperX<SecurityAlertDO> {
                 .eqIfPresent(SecurityAlertDO::getSourceIp, reqVO.getSourceIp())
                 .eqIfPresent(SecurityAlertDO::getHandled, reqVO.getHandled())
                 .betweenIfPresent(SecurityAlertDO::getCreateTime, reqVO.getCreateTime())
+                .and(reqVO.getExcludedIps() != null && !reqVO.getExcludedIps().isEmpty(),
+                        q -> q.notIn(SecurityAlertDO::getSourceIp, reqVO.getExcludedIps())
+                                .or().isNull(SecurityAlertDO::getSourceIp))
                 .orderByDesc(SecurityAlertDO::getId));
     }
 
