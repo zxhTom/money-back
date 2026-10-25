@@ -190,4 +190,54 @@ public class MiniCallbackControllerTest {
         verify(faceAuthCallbackTokenStore, never()).delete(anyString());
     }
 
+    @Test
+    public void testEndToEndServiceToCallbackMalformedIdcardConfirmNeverLeaksSentinel() throws Exception {
+        ch.qos.logback.classic.Logger rootLogger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(ch.qos.logback.classic.Logger.ROOT_LOGGER_NAME);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender =
+                new ch.qos.logback.core.read.ListAppender<>();
+        appender.start();
+        rootLogger.addAppender(appender);
+
+        try {
+            // 构造真实 BaiduFaceAuthServiceImpl 并通过 Stub 返回包含坏结构与哨兵的响应
+            String badIdcardJson = "{\"success\":true,\"result\":{\"verify_result\":{\"score\":98},"
+                    + "\"idcard_confirm\":\"SENTINEL_IDCARD_MALFORMED_END_TO_END\"}}";
+
+            BaiduFaceAuthService realService = new cn.iocoder.yudao.module.custom.service.face.baidu.impl.BaiduFaceAuthServiceImpl() {
+                @Override protected String sendGet(String url) { return "{\"access_token\":\"test-token\"}"; }
+                @Override protected String sendPost(String url, String body) { return badIdcardJson; }
+            };
+
+            // 使用真实 service 模拟从 controller -> service 调用
+            when(faceAuthCallbackTokenStore.get("idCardPlain")).thenReturn("verifyTokenAbc");
+            when(baiduFaceAuthService.queryFaceAuthResult("verifyTokenAbc"))
+                    .thenAnswer(inv -> realService.queryFaceAuthResult("verifyTokenAbc"));
+
+            controller.handleCallback("success", "idCardPlain", null, response);
+
+            // 1. 回调绝不更新实名状态
+            verify(wechatService, never()).updateVerify(anyString(), anyInt());
+
+            // 2. 捕获的服务及回调全链路日志与 throwable/cause 均不含哨兵值
+            boolean foundSentinel = false;
+            for (ch.qos.logback.classic.spi.ILoggingEvent event : appender.list) {
+                String formatted = event.getFormattedMessage();
+                if (formatted != null && formatted.contains("SENTINEL_IDCARD_MALFORMED_END_TO_END")) {
+                    foundSentinel = true;
+                }
+                if (event.getThrowableProxy() != null) {
+                    String msg = event.getThrowableProxy().getMessage();
+                    if (msg != null && msg.contains("SENTINEL_IDCARD_MALFORMED_END_TO_END")) {
+                        foundSentinel = true;
+                    }
+                }
+            }
+            org.junit.jupiter.api.Assertions.assertFalse(foundSentinel,
+                    "service -> callback 端到端链路日志及异常细节绝不得泄漏哨兵值");
+        } finally {
+            rootLogger.detachAppender(appender);
+        }
+    }
+
 }

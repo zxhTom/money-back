@@ -33,9 +33,12 @@ class FileManagementBoundaryTest {
     static void inject(Object target,String field,Object value)throws Exception {Field f=target.getClass().getDeclaredField(field);f.setAccessible(true);f.set(target,value);}
     void login(long actor,long tenant) {SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(new LoginUser().setId(actor).setUserType(2),null));TenantContextHolder.setTenantId(tenant);}
     FileMapper mapper;FileServiceImpl service;SecurityFrameworkService security;FileConfigService configs;FileClient client;FileContentMapper content;
+    cn.iocoder.yudao.module.infra.service.file.quarantine.FileQuarantineService quarantineService;
     @BeforeEach void setup()throws Exception {
         login(42,1);mapper=mock(FileMapper.class);security=mock(SecurityFrameworkService.class);configs=mock(FileConfigService.class);client=mock(FileClient.class);content=mock(FileContentMapper.class);
+        quarantineService=mock(cn.iocoder.yudao.module.infra.service.file.quarantine.FileQuarantineService.class);
         service=new FileServiceImpl();inject(service,"fileMapper",mapper);inject(service,"security",security);inject(service,"fileConfigService",configs);inject(service,"privateContents",content);
+        inject(service,"fileQuarantineService",quarantineService);
         when(configs.getMasterFileClient()).thenReturn(client);when(configs.getFileClient(28L)).thenReturn(client);when(client.getId()).thenReturn(28L);
         when(mapper.selectScopedFiles(anyCollection(),any(),any())).thenReturn(Collections.emptyList());
     }
@@ -44,12 +47,22 @@ class FileManagementBoundaryTest {
         S3FileClientConfig c=new S3FileClientConfig();c.setEndpoint("https://storage.example.invalid");c.setBucket("fixture");c.setAccessKey("fixture-access-key");c.setAccessSecret("fixture-secret");c.setEnablePathStyleAccess(true);c.setEnablePublicAccess(true);return c;
     }
     @Test void commonPermissionsAloneNeverAuthorizeConfigManagementButAdminRolesKeepPermissions() {
-        StandardEvaluationContext ctx=new StandardEvaluationContext();ctx.setBeanResolver((c,name)->security);when(security.hasPermission(anyString())).thenReturn(true);
+        StandardEvaluationContext ctx=new StandardEvaluationContext();
+        cn.iocoder.yudao.module.infra.framework.security.core.PlatformFileConfigGuard guard = mock(cn.iocoder.yudao.module.infra.framework.security.core.PlatformFileConfigGuard.class);
+        ctx.setBeanResolver((c,name)-> {
+            if ("platformFileConfigGuard".equals(name)) {
+                return guard;
+            }
+            return security;
+        });
+        when(security.hasPermission(anyString())).thenReturn(true);
         int count=0;
         for(Method m:FileConfigController.class.getDeclaredMethods()) {
             PreAuthorize a=m.getAnnotation(PreAuthorize.class);if(a==null)continue;count++;
-            when(security.hasAnyRoles("super_admin","tenant_admin","contract-manager")).thenReturn(false);assertEquals(false,new SpelExpressionParser().parseExpression(a.value()).getValue(ctx));
-            when(security.hasAnyRoles("super_admin","tenant_admin","contract-manager")).thenReturn(true);assertEquals(true,new SpelExpressionParser().parseExpression(a.value()).getValue(ctx));
+            when(guard.isPlatformFileConfigAdmin()).thenReturn(false);
+            when(security.hasAnyRoles("super_admin")).thenReturn(false);assertEquals(false,new SpelExpressionParser().parseExpression(a.value()).getValue(ctx));
+            when(guard.isPlatformFileConfigAdmin()).thenReturn(true);
+            when(security.hasAnyRoles("super_admin")).thenReturn(true);assertEquals(true,new SpelExpressionParser().parseExpression(a.value()).getValue(ctx));
             when(security.hasPermission(anyString())).thenReturn(false);assertEquals(false,new SpelExpressionParser().parseExpression(a.value()).getValue(ctx));when(security.hasPermission(anyString())).thenReturn(true);
         }
         assertEquals(8,count);
@@ -73,6 +86,8 @@ class FileManagementBoundaryTest {
     }
     @Test void realUpdateParserPreservesCredentialsWhileChangingMetadata()throws Exception {
         FileConfigServiceImpl svc=new FileConfigServiceImpl();FileConfigMapper files=mock(FileConfigMapper.class);inject(svc,"fileConfigMapper",files);
+        cn.iocoder.yudao.module.infra.framework.security.core.PlatformFileConfigGuard guard = mock(cn.iocoder.yudao.module.infra.framework.security.core.PlatformFileConfigGuard.class);
+        inject(svc, "platformFileConfigGuard", guard);
         try(javax.validation.ValidatorFactory factory=Validation.buildDefaultValidatorFactory()) {
             inject(svc,"validator",factory.getValidator());when(files.selectById(28L)).thenReturn(new FileConfigDO().setId(28L).setStorage(20).setConfig(config()));
             FileConfigSaveReqVO input=new FileConfigSaveReqVO();input.setId(28L);input.setName("updated");input.setStorage(20);Map<String,Object> values=FileConfigSecretPolicy.masked(config());values.put("accessSecret","");input.setConfig(values);svc.updateFileConfig(input);
@@ -133,4 +148,23 @@ class FileManagementBoundaryTest {
     @Test void tenantManagersKeepSameTenantDeletionButCannotDeleteAcrossTenants()throws Exception {when(security.hasAnyRoles("tenant_admin","contract-manager")).thenReturn(true);FileDO foreign=row(7,"777","avatar/a.png");when(mapper.selectById(7L)).thenReturn(foreign);assertThrows(RuntimeException.class,()->service.deleteFile(7L));verifyNoInteractions(client);when(mapper.selectScopedFiles(Collections.singletonList(7L),null,1L)).thenReturn(Collections.singletonList(foreign));service.deleteFile(7L);verify(client).delete("avatar/a.png");}
     @Test void platformAdminsKeepGlobalBatchDeletionAndDuplicateIdsDoNotFail() {when(security.hasAnyRoles("super_admin")).thenReturn(true);when(mapper.selectByIds(anyCollection())).thenReturn(Collections.singletonList(row(7,"777","avatar/a.png")));assertDoesNotThrow(()->service.deleteFileList(Arrays.asList(7L,7L)));verify(mapper,never()).selectScopedFiles(anyCollection(),any(),any());}
     @Test void anonymousAndMissingTenantDeletionFailClosed() {when(mapper.selectById(7L)).thenReturn(row(7,"42","avatar/a.png"));SecurityContextHolder.clearContext();assertThrows(RuntimeException.class,()->service.deleteFile(7L));login(42,1);TenantContextHolder.clear();assertThrows(RuntimeException.class,()->service.deleteFile(7L));verifyNoInteractions(configs,client,content);}
+
+    @Test
+    void testFileContent_and_presignGetUrl_exactKeyQuarantine() throws Exception {
+        when(quarantineService.isQuarantined(28L, "history/face?.mp4")).thenReturn(true);
+        cn.iocoder.yudao.framework.common.exception.ServiceException ex1 = org.junit.jupiter.api.Assertions.assertThrows(
+                cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.getFileContent(28L, "history/face?.mp4"));
+        assertEquals(403, ex1.getCode());
+
+        when(client.extractStorageKey(anyString())).thenAnswer(i -> {
+            String u = i.getArgument(0);
+            return u.contains("/yudao/") ? u.substring(u.indexOf("/yudao/") + 7) : u;
+        });
+        when(quarantineService.isQuarantined(28L, "history/face%25.mp4")).thenReturn(true);
+        cn.iocoder.yudao.framework.common.exception.ServiceException ex2 = org.junit.jupiter.api.Assertions.assertThrows(
+                cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.presignGetUrl("http://127.0.0.1:9000/yudao/history/face%25.mp4", 60));
+        assertEquals(403, ex2.getCode());
+    }
 }

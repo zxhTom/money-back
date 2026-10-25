@@ -64,8 +64,21 @@ public class FileServiceImpl implements FileService {
     @Resource
     private FileUploadGrantService uploadGrants;
 
+    @Resource
+    private cn.iocoder.yudao.module.infra.service.file.quarantine.FileQuarantineService fileQuarantineService;
+
     private static boolean isPrivateContractPath(String path) {
         return path != null && path.startsWith("private/contracts/");
+    }
+
+    private boolean isPrivateFaceEvidencePath(String path) {
+        if (path == null) return false;
+        if (fileQuarantineService == null) {
+            String normalized = path.replace('\\', '/');
+            while (normalized.startsWith("/")) normalized = normalized.substring(1);
+            return normalized.startsWith("private/face-evidence");
+        }
+        return fileQuarantineService.isPrivateFaceEvidence(path);
     }
 
     @Resource
@@ -80,18 +93,52 @@ public class FileServiceImpl implements FileService {
         if (actor == null) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "请先登录");
         if (security.hasAnyRoles("super_admin")) {
             PageResult<FileDO> page = fileMapper.selectScopedPage(pageReqVO, null, null);
-            page.getList().forEach(this::prepareDownloadReference);
+            prepareDownloadReferences(page.getList());
             return page;
         }
         Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
         if (tenantId == null || tenantId <= 0) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "缺少租户身份");
         boolean tenantManager = security.hasAnyRoles("tenant_admin", "contract-manager");
         PageResult<FileDO> page = fileMapper.selectScopedPage(pageReqVO, tenantManager ? null : actor, tenantId);
-        page.getList().forEach(this::prepareDownloadReference);
+        prepareDownloadReferences(page.getList());
         return page;
     }
 
+    private void prepareDownloadReferences(java.util.List<FileDO> files) {
+        if (fileQuarantineService == null) {
+            files.forEach(file -> file.setUrl(null));
+            return;
+        }
+        java.util.Map<Long, java.util.Set<String>> references = new java.util.HashMap<>();
+        java.util.Map<FileDO, java.util.Set<String>> rowKeys = new java.util.IdentityHashMap<>();
+        for (FileDO file : files) {
+            if (file.getConfigId() == null) continue;
+            java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+            for (String raw : new String[]{file.getPath(), file.getUrl()}) {
+                if (raw != null) keys.addAll(cn.iocoder.yudao.module.infra.service.file.quarantine.FileQuarantineServiceImpl.candidateKeys(
+                        raw, fileQuarantineService.extractStorageKey(file.getConfigId(), raw)));
+            }
+            rowKeys.put(file, keys);
+            references.computeIfAbsent(file.getConfigId(), ignored -> new java.util.LinkedHashSet<>()).addAll(keys);
+        }
+        java.util.Map<Long, java.util.Set<String>> blocked = new java.util.HashMap<>();
+        references.forEach((configId, keys) -> blocked.put(configId,
+                new java.util.HashSet<>(fileQuarantineService.findQuarantinedPaths(configId, keys))));
+        for (FileDO file : files) {
+            if (file.getConfigId() != null && !java.util.Collections.disjoint(
+                    rowKeys.get(file), blocked.get(file.getConfigId()))) {
+                file.setUrl(null);
+            } else {
+                prepareDownloadReference(file);
+            }
+        }
+    }
+
     private void prepareDownloadReference(FileDO file) {
+        if (isPrivateFaceEvidencePath(file.getPath()) || isPrivateFaceEvidencePath(file.getUrl())) {
+            file.setUrl(null);
+            return;
+        }
         if (isPrivateContractPath(file.getPath())) {
             if (file.getConfigId() == null || file.getCreator() == null || !file.getCreator().matches("[0-9]+")
                     || !file.getPath().startsWith("private/contracts/" + file.getCreator() + "/")) { file.setUrl(null); return; }
@@ -142,6 +189,9 @@ public class FileServiceImpl implements FileService {
             if (userId == null || !directory.equals("private/contracts/" + userId)) {
                 throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "不能上传到他人的合同附件目录");
             }
+        }
+        if (directory.startsWith("private/face-evidence") || isPrivateFaceEvidencePath(directory)) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "禁止上传或操作人脸存证目录");
         }
         return directory;
     }
@@ -318,7 +368,9 @@ public class FileServiceImpl implements FileService {
     @SneakyThrows
     public FilePresignedUrlRespVO presignPutUrl(String name, String directory) {
         directory = validateUploadDirectory(directory);
-        if (isPrivateContractPath(directory)) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "合同附件请使用私有上传接口");
+        if (isPrivateContractPath(directory) || isPrivateFaceEvidencePath(directory)) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "私有附件不能通过通用预签名上传");
+        }
         // 1. 生成上传的 path，需要保证唯一
         String path = generateUploadPath(cn.hutool.core.util.IdUtil.fastSimpleUUID()
                 + (cn.hutool.core.util.StrUtil.isBlank(cn.hutool.core.io.FileUtil.extName(name)) ? "" : "." + cn.hutool.core.io.FileUtil.extName(name)), directory);
@@ -335,12 +387,38 @@ public class FileServiceImpl implements FileService {
     @Override
     public String presignGetUrl(String url, Integer expirationSeconds) {
         FileClient fileClient = fileConfigService.getMasterFileClient();
+        if (fileClient != null) {
+            if (fileQuarantineService == null) {
+                throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(500, "隔离防护服务未就绪");
+            }
+            String storageKey = fileClient.extractStorageKey(url);
+            if (isPrivateFaceEvidencePath(storageKey)
+                    || isPrivateFaceEvidencePath(url)
+                    || fileQuarantineService.isQuarantined(fileClient.getId(), storageKey)
+                    || fileQuarantineService.isQuarantined(fileClient.getId(), url)) {
+                throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "禁止对隔离材料或私有存证签名");
+            }
+        }
         return fileClient.presignGetUrl(url, expirationSeconds);
     }
 
     @Override
     public Long createFile(FileCreateReqVO createReqVO) {
-        if (isPrivateContractPath(createReqVO.getPath()) || privateReference(createReqVO.getUrl())) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "私有附件不能通过通用文件登记创建");
+        if (isPrivateContractPath(createReqVO.getPath()) || privateReference(createReqVO.getUrl())
+                || isPrivateFaceEvidencePath(createReqVO.getPath())
+                || isPrivateFaceEvidencePath(createReqVO.getUrl())) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "私有附件不能通过通用文件登记创建");
+        }
+        if (createReqVO.getConfigId() != null && fileQuarantineService != null) {
+            String pathKey = fileQuarantineService.extractStorageKey(createReqVO.getConfigId(), createReqVO.getPath());
+            String urlKey = fileQuarantineService.extractStorageKey(createReqVO.getConfigId(), createReqVO.getUrl());
+            if (fileQuarantineService.isQuarantined(createReqVO.getConfigId(), pathKey)
+                    || fileQuarantineService.isQuarantined(createReqVO.getConfigId(), urlKey)
+                    || fileQuarantineService.isQuarantined(createReqVO.getConfigId(), createReqVO.getPath())
+                    || fileQuarantineService.isQuarantined(createReqVO.getConfigId(), createReqVO.getUrl())) {
+                throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "隔离材料禁止登记创建");
+            }
+        }
         createReqVO.setUrl(uploadGrants.verify(createReqVO.getConfigId(), createReqVO.getPath(), createReqVO.getUrl()));
         FileDO file = BeanUtils.toBean(createReqVO, FileDO.class);
         fileMapper.insert(file);
@@ -393,6 +471,12 @@ public class FileServiceImpl implements FileService {
 
     @Override
     public byte[] getFileContent(Long configId, String path) throws Exception {
+        if (isPrivateFaceEvidencePath(path)) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "人脸存证禁止通过通用接口下载");
+        }
+        if (configId != null && fileQuarantineService != null && fileQuarantineService.isQuarantined(configId, path)) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(403, "该文件已隔离，禁止下载");
+        }
         if (isPrivateContractPath(path)) {
             List<cn.iocoder.yudao.module.infra.dal.dataobject.file.FileContentDO> rows = privateContents.selectListByConfigIdAndPath(configId, path);
             return rows == null ? null : rows.stream().max(java.util.Comparator.comparing(cn.iocoder.yudao.module.infra.dal.dataobject.file.FileContentDO::getId))

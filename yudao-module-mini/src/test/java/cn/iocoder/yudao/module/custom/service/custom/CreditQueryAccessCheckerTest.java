@@ -18,7 +18,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -76,19 +78,19 @@ public class CreditQueryAccessCheckerTest {
     }
 
     @Test
-    public void testCanQueryCredit_noPermission_hasContractRelation_returnsTrue() {
+    public void testCanQueryCredit_noPermission_hasContractRelation_stillReturnsFalse() {
         when(securityFrameworkService.hasPermission("custom:contract:credit-query")).thenReturn(false);
         loginAs(1L);
         AdminUserDO caller = new AdminUserDO();
         caller.setVerified(1);
         caller.setIdNo("callerCipher");
         when(adminUserService.getUser(1L)).thenReturn(caller);
-        lenient().when(idCardCipherService.resolveToPlain(any())).thenAnswer(inv -> {
-            String input = inv.getArgument(0);
-            return "callerCipher".equals(input) ? "110101199001011234" : "110101199002022345";
-        });
-        when(contractMapper.existsContractRelation("110101199001011234", "110101199002022345")).thenReturn(true);
-        assertTrue(checker.canQueryCredit("targetCipher"));
+        // 即使 caller 与 target 存在真实的合同往来关系（或者曾有 relation=true）
+        when(idCardCipherService.sameIdCard("callerCipher", "targetCipher")).thenReturn(false);
+        lenient().when(contractMapper.existsContractRelation(anyString(), anyString())).thenReturn(true);
+        // 按新设计：完全移除 existsContractRelation 作为授权条件，必须拒绝！
+        assertFalse(checker.canQueryCredit("targetCipher"));
+        verifyNoInteractions(contractMapper);
     }
 
     @Test
@@ -99,8 +101,7 @@ public class CreditQueryAccessCheckerTest {
         caller.setVerified(1);
         caller.setIdNo("callerCipher");
         when(adminUserService.getUser(1L)).thenReturn(caller);
-        when(idCardCipherService.resolveToPlain(any())).thenReturn("110101199001011234");
-        when(contractMapper.existsContractRelation(any(), any())).thenReturn(false);
+        when(idCardCipherService.sameIdCard("callerCipher", "targetCipher")).thenReturn(false);
         assertFalse(checker.canQueryCredit("targetCipher"));
     }
 

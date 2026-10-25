@@ -63,4 +63,9 @@ public interface FileClient {
         throw new UnsupportedOperationException("不支持的操作");
     }
 
+    // 从访问 URL 或原始路径提取真实存储 Key
+    default String extractStorageKey(String urlOrPath) {
+        return urlOrPath;
+    }
+
 }

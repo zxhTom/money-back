@@ -127,9 +127,10 @@ class SecurityCompatibilityTest {
  }
  @Test void unverifiedIdentityCannotObtainContactRecommendations()throws Exception{recommendation();AdminUserDO u=user();u.setVerified(0);when(users.getUser(42L)).thenReturn(u);assertThrows(AccessDeniedException.class,()->recommendation.guessYouLike("from","own-id"));verifyNoInteractions(contracts);}
 
- @Test void directCreditDetailCannotBypassRelationshipAuthorization()throws Exception{
+ @Test void directCreditDetailCannotBypassExplicitCreditAuthorization()throws Exception{
   recommendation();cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker checker=mock(cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker.class);
   ContractTeaseGuard tease=mock(ContractTeaseGuard.class);set(recommendation,"creditQueryAccessChecker",checker);set(recommendation,"teaseGuard",tease);
+  cn.iocoder.yudao.module.custom.service.contract.ContractQueryScope scope=new cn.iocoder.yudao.module.custom.service.contract.ContractQueryScope();set(scope,"creditQueryAccessChecker",checker);set(recommendation,"contractQueryScope",scope);
   when(cipher.normalizeRequestToCipher("target")).thenReturn("normalized");
   cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO input=new cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO();input.setCreditorId("target");
   assertThrows(AccessDeniedException.class,()->recommendation.getContractPageForListing(input));verify(contracts,never()).selectPage(any(cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO.class));

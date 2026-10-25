@@ -160,6 +160,12 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
     }
 
 
+    @org.apache.ibatis.annotations.Select("<script>" +
+            "SELECT COALESCE(SUM(salary), 0.0) FROM custom_contract " +
+            "${ew.customSqlSegment} " +
+            "</script>")
+    Double selectSumSalary(@org.apache.ibatis.annotations.Param("ew") com.baomidou.mybatisplus.core.conditions.Wrapper<ContractDO> wrapper);
+
     @org.apache.ibatis.annotations.Select("SELECT indebted_name as targetName, indebted_id as targetIdCard " +
             "FROM custom_contract " +
             "WHERE creditor_id IN (#{myIdCard}, #{plainIdCard}) AND deleted = 0 " +

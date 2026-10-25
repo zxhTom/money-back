@@ -74,8 +74,12 @@ public class FileConfigServiceImpl implements FileConfigService {
     @Resource
     private Validator validator;
 
+    @Resource
+    private cn.iocoder.yudao.module.infra.framework.security.core.PlatformFileConfigGuard platformFileConfigGuard;
+
     @Override
     public Long createFileConfig(FileConfigSaveReqVO createReqVO) {
+        platformFileConfigGuard.requirePlatformFileConfigAdmin();
         FileConfigDO fileConfig = FileConfigConvert.INSTANCE.convert(createReqVO)
                 .setConfig(parseClientConfig(createReqVO.getStorage(), createReqVO.getConfig()))
                 .setMaster(false); // 默认非 master
@@ -85,6 +89,7 @@ public class FileConfigServiceImpl implements FileConfigService {
 
     @Override
     public void updateFileConfig(FileConfigSaveReqVO updateReqVO) {
+        platformFileConfigGuard.requirePlatformFileConfigAdmin();
         // 校验存在
         FileConfigDO config = validateFileConfigExists(updateReqVO.getId());
         // 更新
@@ -99,6 +104,7 @@ public class FileConfigServiceImpl implements FileConfigService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateFileConfigMaster(Long id) {
+        platformFileConfigGuard.requirePlatformFileConfigAdmin();
         // 校验存在
         validateFileConfigExists(id);
         // 更新其它为非 master
@@ -123,6 +129,7 @@ public class FileConfigServiceImpl implements FileConfigService {
 
     @Override
     public void deleteFileConfig(Long id) {
+        platformFileConfigGuard.requirePlatformFileConfigAdmin();
         // 校验存在
         FileConfigDO config = validateFileConfigExists(id);
         if (Boolean.TRUE.equals(config.getMaster())) {
@@ -137,6 +144,7 @@ public class FileConfigServiceImpl implements FileConfigService {
 
     @Override
     public void deleteFileConfigList(List<Long> ids) {
+        platformFileConfigGuard.requirePlatformFileConfigAdmin();
         // 校验是否有主配置
         List<FileConfigDO> configs = fileConfigMapper.selectByIds(ids);
         for (FileConfigDO config : configs) {
@@ -187,6 +195,7 @@ public class FileConfigServiceImpl implements FileConfigService {
 
     @Override
     public String testFileConfig(Long id) throws Exception {
+        platformFileConfigGuard.requirePlatformFileConfigAdmin();
         // 校验存在
         validateFileConfigExists(id);
         // 上传文件

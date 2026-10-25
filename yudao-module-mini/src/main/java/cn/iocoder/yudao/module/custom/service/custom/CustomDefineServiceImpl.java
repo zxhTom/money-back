@@ -221,33 +221,27 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         return null;
     }
 
+    @Autowired
+    private cn.iocoder.yudao.module.custom.service.contract.ContractQueryScope contractQueryScope;
+
     @Override
     public TotalInfosRespVO totalInfos(ContractPageReqVO reqVO) {
         Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
         if (teaseGuard.isTeasing(loginUserId)) {
             return cn.iocoder.yudao.module.custom.service.contract.ContractTeaseFactory.generateTotalInfos(loginUserId, reqVO);
         }
-        LambdaQueryWrapperX<ContractDO> contractDOLambdaQueryWrapperX = new LambdaQueryWrapperX<ContractDO>()
-                .likeIfPresent(ContractDO::getIndebtedName, reqVO.getIndebtedName())
-                .eqIfPresent(ContractDO::getIndebtedId, reqVO.getIndebtedId())
-                .likeIfPresent(ContractDO::getCreditorName, reqVO.getCreditorName())
-                .eqIfPresent(ContractDO::getCreditorId, reqVO.getCreditorId())
-                .eqIfPresent(ContractDO::getDescription, reqVO.getDescription())
-                .eqIfPresent(ContractDO::getStatus, reqVO.getStatus())
-                .betweenIfPresent(ContractDO::getCreateTime, reqVO.getCreateTime())
-                .betweenIfPresent(ContractDO::getStartDate, reqVO.getStartDate())
-                .betweenIfPresent(ContractDO::getEndDate, reqVO.getEndDate())
-                .eqIfPresent(ContractDO::getReturnType, reqVO.getReturnType())
-                .eqIfPresent(ContractDO::getReasonType, reqVO.getReasonType())
-                .eqIfPresent(ContractDO::getDetailReason, reqVO.getDetailReason())
-                .eqIfPresent(ContractDO::getSalary, reqVO.getSalary())
-                .eqIfPresent(ContractDO::getTariff, reqVO.getTariff())
-                .eqIfPresent(ContractDO::getFile, reqVO.getFile())
-                .orderByDesc(ContractDO::getId);
-        List<ContractDO> contractDOS = contractMapper.selectList(contractDOLambdaQueryWrapperX);
+        if (reqVO != null) {
+            if (StrUtil.isNotBlank(reqVO.getIndebtedId())) {
+                reqVO.setIndebtedId(idCardCipherService.normalizeRequestToCipher(reqVO.getIndebtedId()));
+            }
+            if (StrUtil.isNotBlank(reqVO.getCreditorId())) {
+                reqVO.setCreditorId(idCardCipherService.normalizeRequestToCipher(reqVO.getCreditorId()));
+            }
+        }
+        LambdaQueryWrapperX<ContractDO> wrapper = contractQueryScope.buildScopedWrapper(reqVO, false);
+        Double sum = contractMapper.selectSumSalary(wrapper);
         TotalInfosRespVO totalInfosRespVO = new TotalInfosRespVO();
-        Double sum = contractDOS.stream().mapToDouble(ContractDO::getSalary).sum();
-        totalInfosRespVO.setTotalSalary(sum);
+        totalInfosRespVO.setTotalSalary(sum != null ? sum : 0.0);
         return totalInfosRespVO;
     }
 

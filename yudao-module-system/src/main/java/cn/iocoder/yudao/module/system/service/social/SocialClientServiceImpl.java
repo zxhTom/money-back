@@ -172,11 +172,11 @@ public class SocialClientServiceImpl implements SocialClientService {
         AuthCallback authCallback = AuthCallback.builder().code(code).state(state).build();
         // 执行请求
         AuthResponse<?> authResponse = authRequest.login(authCallback);
-        log.info("[getAuthUser][请求社交平台 type({}) request({}) response({})]", socialType,
-                toJsonString(authCallback), toJsonString(authResponse));
         if (!authResponse.ok()) {
+            log.warn("[getAuthUser][请求社交平台失败 type({}) code({})]", socialType, authResponse.getCode());
             throw exception(SOCIAL_USER_AUTH_FAILURE, authResponse.getMsg());
         }
+        log.info("[getAuthUser][请求社交平台成功 type({})]", socialType);
         return (AuthUser) authResponse.getData();
     }
 
