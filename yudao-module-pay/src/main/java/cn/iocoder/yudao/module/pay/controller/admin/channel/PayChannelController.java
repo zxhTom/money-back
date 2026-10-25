@@ -33,6 +33,7 @@ public class PayChannelController {
 
     @PostMapping("/create")
     @Operation(summary = "创建支付渠道 ")
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
     @PreAuthorize("@ss.hasPermission('pay:channel:create')")
     public CommonResult<Long> createChannel(@Valid @RequestBody PayChannelCreateReqVO createReqVO) {
         return success(channelService.createChannel(createReqVO));
@@ -40,6 +41,7 @@ public class PayChannelController {
 
     @PutMapping("/update")
     @Operation(summary = "更新支付渠道 ")
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
     @PreAuthorize("@ss.hasPermission('pay:channel:update')")
     public CommonResult<Boolean> updateChannel(@Valid @RequestBody PayChannelUpdateReqVO updateReqVO) {
         channelService.updateChannel(updateReqVO);

@@ -39,6 +39,10 @@ public class SmsChannelServiceImpl implements SmsChannelService {
 
     @Override
     public Long createSmsChannel(SmsChannelSaveReqVO createReqVO) {
+        if (cn.hutool.core.util.StrUtil.isBlank(createReqVO.getApiKey()) || "********".equals(createReqVO.getApiKey())
+                || "********".equals(createReqVO.getApiSecret())) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0(400, "新增短信渠道需填写有效的 API 凭据");
+        }
         SmsChannelDO channel = BeanUtils.toBean(createReqVO, SmsChannelDO.class);
         smsChannelMapper.insert(channel);
         return channel.getId();
@@ -47,9 +51,11 @@ public class SmsChannelServiceImpl implements SmsChannelService {
     @Override
     public void updateSmsChannel(SmsChannelSaveReqVO updateReqVO) {
         // 校验存在
-        validateSmsChannelExists(updateReqVO.getId());
+        SmsChannelDO current = validateSmsChannelExists(updateReqVO.getId());
         // 更新
         SmsChannelDO updateObj = BeanUtils.toBean(updateReqVO, SmsChannelDO.class);
+        if (cn.hutool.core.util.StrUtil.isBlank(updateObj.getApiKey()) || "********".equals(updateObj.getApiKey())) updateObj.setApiKey(current.getApiKey());
+        if (cn.hutool.core.util.StrUtil.isBlank(updateObj.getApiSecret()) || "********".equals(updateObj.getApiSecret())) updateObj.setApiSecret(current.getApiSecret());
         smsChannelMapper.updateById(updateObj);
     }
 

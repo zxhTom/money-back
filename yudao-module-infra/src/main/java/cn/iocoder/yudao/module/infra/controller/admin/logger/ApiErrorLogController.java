@@ -43,7 +43,7 @@ public class ApiErrorLogController {
             @Parameter(name = "id", description = "编号", required = true, example = "1024"),
             @Parameter(name = "processStatus", description = "处理状态", required = true, example = "1")
     })
-    @PreAuthorize("@ss.hasPermission('infra:api-error-log:update-status')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:api-error-log:update-status')")
     public CommonResult<Boolean> updateApiErrorLogProcess(@RequestParam("id") Long id,
                                                           @RequestParam("processStatus") Integer processStatus) {
         apiErrorLogService.updateApiErrorLogProcess(id, processStatus, getLoginUserId());
@@ -52,7 +52,7 @@ public class ApiErrorLogController {
 
     @GetMapping("/page")
     @Operation(summary = "获得 API 错误日志分页")
-    @PreAuthorize("@ss.hasPermission('infra:api-error-log:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:api-error-log:query')")
     public CommonResult<PageResult<ApiErrorLogRespVO>> getApiErrorLogPage(@Valid ApiErrorLogPageReqVO pageReqVO) {
         PageResult<ApiErrorLogDO> pageResult = apiErrorLogService.getApiErrorLogPage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ApiErrorLogRespVO.class));
@@ -60,7 +60,7 @@ public class ApiErrorLogController {
 
     @GetMapping("/export-excel")
     @Operation(summary = "导出 API 错误日志 Excel")
-    @PreAuthorize("@ss.hasPermission('infra:api-error-log:export')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:api-error-log:export')")
     @ApiAccessLog(operateType = EXPORT)
     public void exportApiErrorLogExcel(@Valid ApiErrorLogPageReqVO exportReqVO,
                                        HttpServletResponse response) throws IOException {

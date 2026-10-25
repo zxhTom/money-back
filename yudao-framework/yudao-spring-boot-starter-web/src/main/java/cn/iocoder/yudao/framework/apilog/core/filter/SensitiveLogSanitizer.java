@@ -11,7 +11,7 @@ public final class SensitiveLogSanitizer {
     private static final Set<String> PRIVATE_KEYS = new HashSet<>(Arrays.asList(
         "password", "passwd", "pwd", "paypassword", "oldpassword", "newpassword",
         "oldpaypassword", "newpaypassword", "passwordhash", "token", "accesstoken",
-        "refreshtoken", "sessionkey", "accesskey", "accesssecret", "secretkey", "privatekey", "passphrase", "code", "verifycode", "emailcode", "smscode", "signature", "authorization", "secret", "clientsecret", "apikey",
+        "refreshtoken", "sessionkey", "accesskey", "accesssecret", "secretkey", "privatekey", "passphrase", "code", "verifycode", "emailcode", "smscode", "signature", "authorization", "secret", "clientsecret", "apikey", "apisecret", "appsecret", "mchkey", "apiv3key", "privatekeycontent", "keycontent", "encryptkey", "signingkey",
         "indebtedname", "indebtedid", "creditorname", "creditorid", "salary",
         "targetname", "targetidcard", "contactinfo", "realname", "username", "idno", "idcard", "idnodisplay", "mobile", "email", "address"));
     private SensitiveLogSanitizer() {}
@@ -28,11 +28,20 @@ public final class SensitiveLogSanitizer {
         if (node == null || node.isNull()) return node;
         if (depth > 32) return TextNode.valueOf("[REDACTED: nesting limit]");
         if (node.isObject()) {
+            JsonNode configKey = node.has("configKey") ? node.get("configKey") : node.get("key");
+            if (configKey != null && configKey.isTextual()) {
+                String name = normalize(configKey.textValue());
+                if (name.contains("password") || name.contains("secret") || name.contains("credential")
+                        || name.contains("token") || name.contains("privatekey") || name.contains("encryptkey")
+                        || name.contains("apikey") || name.contains("mchkey")) {
+                    ((com.fasterxml.jackson.databind.node.ObjectNode) node).remove("value");
+                }
+            }
             Iterator<Map.Entry<String, JsonNode>> it = node.fields();
             while (it.hasNext()) {
                 Map.Entry<String, JsonNode> field = it.next();
                 String key = normalize(field.getKey());
-                if (PRIVATE_KEYS.contains(key) || key.endsWith("password") || key.endsWith("token") || extra.contains(key)) it.remove();
+                if (PRIVATE_KEYS.contains(key) || key.endsWith("password") || key.endsWith("token") || key.endsWith("secret") || key.endsWith("privatekey") || extra.contains(key)) it.remove();
                 else field.setValue(clean(field.getValue(), extra, depth + 1));
             }
         } else if (node.isArray()) {

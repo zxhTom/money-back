@@ -38,7 +38,7 @@ public class ApiAccessLogController {
 
     @GetMapping("/page")
     @Operation(summary = "获得API 访问日志分页")
-    @PreAuthorize("@ss.hasPermission('infra:api-access-log:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:api-access-log:query')")
     public CommonResult<PageResult<ApiAccessLogRespVO>> getApiAccessLogPage(@Valid ApiAccessLogPageReqVO pageReqVO) {
         PageResult<ApiAccessLogDO> pageResult = apiAccessLogService.getApiAccessLogPage(pageReqVO);
         return success(BeanUtils.toBean(pageResult, ApiAccessLogRespVO.class));
@@ -46,7 +46,7 @@ public class ApiAccessLogController {
 
     @GetMapping("/export-excel")
     @Operation(summary = "导出API 访问日志 Excel")
-    @PreAuthorize("@ss.hasPermission('infra:api-access-log:export')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('infra:api-access-log:export')")
     @ApiAccessLog(operateType = EXPORT)
     public void exportApiAccessLogExcel(@Valid ApiAccessLogPageReqVO exportReqVO,
                                         HttpServletResponse response) throws IOException {

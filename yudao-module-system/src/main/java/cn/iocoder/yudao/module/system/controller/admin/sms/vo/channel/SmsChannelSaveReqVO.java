@@ -29,7 +29,6 @@ public class SmsChannelSaveReqVO {
     private String remark;
 
     @Schema(description = "短信 API 的账号", requiredMode = Schema.RequiredMode.REQUIRED, example = "yudao")
-    @NotNull(message = "短信 API 的账号不能为空")
     private String apiKey;
 
     @Schema(description = "短信 API 的密钥", example = "yuanma")

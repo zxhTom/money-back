@@ -32,14 +32,16 @@ public class SmsChannelController {
 
     @PostMapping("/create")
     @Operation(summary = "创建短信渠道")
-    @PreAuthorize("@ss.hasPermission('system:sms-channel:create')")
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:sms-channel:create')")
     public CommonResult<Long> createSmsChannel(@Valid @RequestBody SmsChannelSaveReqVO createReqVO) {
         return success(smsChannelService.createSmsChannel(createReqVO));
     }
 
     @PutMapping("/update")
     @Operation(summary = "更新短信渠道")
-    @PreAuthorize("@ss.hasPermission('system:sms-channel:update')")
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:sms-channel:update')")
     public CommonResult<Boolean> updateSmsChannel(@Valid @RequestBody SmsChannelSaveReqVO updateReqVO) {
         smsChannelService.updateSmsChannel(updateReqVO);
         return success(true);
@@ -48,7 +50,7 @@ public class SmsChannelController {
     @DeleteMapping("/delete")
     @Operation(summary = "删除短信渠道")
     @Parameter(name = "id", description = "编号", required = true)
-    @PreAuthorize("@ss.hasPermission('system:sms-channel:delete')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:sms-channel:delete')")
     public CommonResult<Boolean> deleteSmsChannel(@RequestParam("id") Long id) {
         smsChannelService.deleteSmsChannel(id);
         return success(true);
@@ -57,7 +59,7 @@ public class SmsChannelController {
     @DeleteMapping("/delete-list")
     @Parameter(name = "ids", description = "编号列表", required = true)
     @Operation(summary = "批量删除短信渠道")
-    @PreAuthorize("@ss.hasPermission('system:sms-channel:delete')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:sms-channel:delete')")
     public CommonResult<Boolean> deleteSmsChannelList(@RequestParam("ids") List<Long> ids) {
         smsChannelService.deleteSmsChannelList(ids);
         return success(true);
@@ -66,27 +68,36 @@ public class SmsChannelController {
     @GetMapping("/get")
     @Operation(summary = "获得短信渠道")
     @Parameter(name = "id", description = "编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('system:sms-channel:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:sms-channel:query')")
     public CommonResult<SmsChannelRespVO> getSmsChannel(@RequestParam("id") Long id) {
         SmsChannelDO channel = smsChannelService.getSmsChannel(id);
-        return success(BeanUtils.toBean(channel, SmsChannelRespVO.class));
+        return success(safeResponse(channel));
     }
 
     @GetMapping("/page")
     @Operation(summary = "获得短信渠道分页")
-    @PreAuthorize("@ss.hasPermission('system:sms-channel:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:sms-channel:query')")
     public CommonResult<PageResult<SmsChannelRespVO>> getSmsChannelPage(@Valid SmsChannelPageReqVO pageVO) {
         PageResult<SmsChannelDO> pageResult = smsChannelService.getSmsChannelPage(pageVO);
-        return success(BeanUtils.toBean(pageResult, SmsChannelRespVO.class));
+        return success(new PageResult<>(pageResult.getList().stream().map(this::safeResponse).collect(java.util.stream.Collectors.toList()), pageResult.getTotal()));
     }
 
     @GetMapping({"/list-all-simple", "/simple-list"})
     @Operation(summary = "获得短信渠道精简列表", description = "包含被禁用的短信渠道")
-    @PreAuthorize("@ss.hasPermission('system:sms-channel:query')")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin','contract-manager') and @ss.hasPermission('system:sms-channel:query')")
     public CommonResult<List<SmsChannelSimpleRespVO>> getSimpleSmsChannelList() {
         List<SmsChannelDO> list = smsChannelService.getSmsChannelList();
         list.sort(Comparator.comparing(SmsChannelDO::getId));
         return success(BeanUtils.toBean(list, SmsChannelSimpleRespVO.class));
+    }
+
+    private SmsChannelRespVO safeResponse(SmsChannelDO channel) {
+        SmsChannelRespVO response = BeanUtils.toBean(channel, SmsChannelRespVO.class);
+        if (response != null) {
+            if (channel.getApiKey() != null && !channel.getApiKey().isEmpty()) response.setApiKey("********");
+            if (channel.getApiSecret() != null && !channel.getApiSecret().isEmpty()) response.setApiSecret("********");
+        }
+        return response;
     }
 
 }
