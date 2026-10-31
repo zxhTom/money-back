@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractPageReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveReqVO;
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessBatchRespVO;
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO;
 import cn.iocoder.yudao.module.custom.controller.admin.wechat.vo.TemplateVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
@@ -38,7 +40,10 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -498,12 +503,7 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     public cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessYouLike(String direction, String myIdCard) {
-        Long userId = SecurityFrameworkUtils.getLoginUserId();
-        AdminUserDO caller = userId == null ? null : adminUserService.getUser(userId);
-        if (caller == null || !Integer.valueOf(1).equals(caller.getVerified()) || StrUtil.isBlank(caller.getIdNo())
-                || !idCardCipherService.sameIdCard(caller.getIdNo(), myIdCard)) {
-            throw new org.springframework.security.access.AccessDeniedException("只能查询本人的联系人推荐");
-        }
+        AdminUserDO caller = requireGuessCaller(myIdCard);
         // Existing clients send either the stored cipher or a decrypted identity.
         // Query both historical storage shapes, but never return the stored plaintext.
         String stored = caller.getIdNo();
@@ -530,6 +530,77 @@ public class ContractServiceImpl implements ContractService {
             result.setTargetIdCard(idCardCipherService.requestToStoredCipher(result.getTargetIdCard()));
         }
         return result;
+    }
+
+    private AdminUserDO requireGuessCaller(String myIdCard) {
+        Long userId = SecurityFrameworkUtils.getLoginUserId();
+        AdminUserDO caller = userId == null ? null : adminUserService.getUser(userId);
+        if (caller == null || !Integer.valueOf(1).equals(caller.getVerified()) || StrUtil.isBlank(caller.getIdNo())
+                || !idCardCipherService.sameIdCard(caller.getIdNo(), myIdCard)) {
+            throw new org.springframework.security.access.AccessDeniedException("只能查询本人的联系人推荐");
+        }
+        return caller;
+    }
+
+    @Override
+    public ContractGuessBatchRespVO guessYouLikeBatch(String direction, String myIdCard, int page) {
+        AdminUserDO caller = requireGuessCaller(myIdCard);
+        ContractGuessBatchRespVO batch = new ContractGuessBatchRespVO();
+        batch.setItems(new ArrayList<>());
+        if (page < 0 || page > 20 || !("from".equals(direction) || "to".equals(direction))) {
+            return batch;
+        }
+        String stored = caller.getIdNo();
+        String plain = idCardCipherService.resolveToPlain(caller.getIdNo());
+        boolean choosingDebtor = "from".equals(direction);
+        List<ContractGuessRespVO> contacts = choosingDebtor
+                ? contractMapper.guessActiveDebtors(stored, plain, caller.getId(), caller.getTenantId())
+                : contractMapper.guessActiveCreditors(stored, plain, caller.getId(), caller.getTenantId());
+        List<ContractGuessRespVO> newcomers = contractMapper.guessNewLoggedInUsers(stored, plain, caller.getId(), caller.getTenantId());
+        Map<String, ContractGuessRespVO> contactById = new LinkedHashMap<>();
+        Map<String, ContractGuessRespVO> newcomerById = new LinkedHashMap<>();
+        if (contacts != null) {
+            for (ContractGuessRespVO contact : contacts) addGuessCandidate(contactById, contact, stored);
+        }
+        if (newcomers != null) {
+            for (ContractGuessRespVO newcomer : newcomers) addGuessCandidate(newcomerById, newcomer, stored);
+        }
+        contactById.keySet().forEach(newcomerById::remove);
+        List<ContractGuessRespVO> ordered = new ArrayList<>();
+        List<ContractGuessRespVO> newcomerList = new ArrayList<>(newcomerById.values());
+        int newcomerIndex = 0;
+        for (ContractGuessRespVO contact : contactById.values()) {
+            ordered.add(contact);
+            if (ordered.size() % 10 == 9 && newcomerIndex < newcomerList.size()) {
+                ordered.add(newcomerList.get(newcomerIndex++));
+            }
+        }
+        while (newcomerIndex < newcomerList.size()) ordered.add(newcomerList.get(newcomerIndex++));
+        if (ordered.isEmpty()) {
+            ContractGuessRespVO legacy = choosingDebtor ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
+            if (legacy != null) ordered.add(legacy);
+        }
+        int start = page * 3;
+        if (start >= ordered.size()) return batch;
+        int end = Math.min(start + 3, ordered.size());
+        List<ContractGuessRespVO> items = new ArrayList<>();
+        for (ContractGuessRespVO source : ordered.subList(start, end)) {
+            ContractGuessRespVO item = new ContractGuessRespVO();
+            item.setTargetName(source.getTargetName());
+            item.setTargetIdCardDisplay(idCardCipherService.maskFromStored(source.getTargetIdCard()));
+            item.setTargetIdCard(idCardCipherService.requestToStoredCipher(source.getTargetIdCard()));
+            items.add(item);
+        }
+        batch.setItems(items);
+        batch.setHasMore(end < ordered.size());
+        return batch;
+    }
+
+    private void addGuessCandidate(Map<String, ContractGuessRespVO> candidates, ContractGuessRespVO candidate, String ownIdCard) {
+        if (candidate == null || StrUtil.isBlank(candidate.getTargetName()) || StrUtil.isBlank(candidate.getTargetIdCard())
+                || idCardCipherService.sameIdCard(ownIdCard, candidate.getTargetIdCard())) return;
+        String id = idCardCipherService.resolveToPlain(candidate.getTargetIdCard());
+        if (StrUtil.isNotBlank(id)) candidates.putIfAbsent(id, candidate);
     }
 
 }

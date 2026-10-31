@@ -99,4 +99,6 @@ public interface ContractService {
      */
     cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessYouLike(String direction, String myIdCard);
 
+    cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessBatchRespVO guessYouLikeBatch(String direction, String myIdCard, int page);
+
 }

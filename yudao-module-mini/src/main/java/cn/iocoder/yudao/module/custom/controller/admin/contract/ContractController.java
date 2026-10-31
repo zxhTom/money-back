@@ -353,4 +353,13 @@ public class ContractController {
         return CommonResult.success(contractService.guessYouLike(direction, idNo));
     }
 
+    @GetMapping("/guess-you-like/batch")
+    @Operation(summary = "分批推荐合同联系人")
+    public CommonResult<ContractGuessBatchRespVO> guessYouLikeBatch(
+            @RequestParam("direction") String direction,
+            @RequestParam("idNo") String idNo,
+            @RequestParam(value = "page", defaultValue = "0") int page) {
+        return CommonResult.success(contractService.guessYouLikeBatch(direction, idNo, page));
+    }
+
 }

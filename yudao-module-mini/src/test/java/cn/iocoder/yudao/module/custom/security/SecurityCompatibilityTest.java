@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.PayOrderVO;
 import cn.iocoder.yudao.module.custom.controller.admin.device.DeviceModuleAccessController;
 import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO;
+import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessBatchRespVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
 import cn.iocoder.yudao.module.custom.dal.mysql.custom.CustomDefineMapper;
@@ -60,6 +61,27 @@ class SecurityCompatibilityTest {
  @Test void newLoggedInUserGetsSmallExplorationShare()throws Exception{recommendation();when(guessRandom.nextInt(10)).thenReturn(0);ContractGuessRespVO newcomer=new ContractGuessRespVO();newcomer.setTargetIdCard("new-id");when(contracts.guessNewLoggedInUser("stored-id","plain-id",42L,1L)).thenReturn(newcomer);assertSame(newcomer,recommendation.guessYouLike("from","own-id"));verify(contracts,never()).guessActiveDebtor(anyString(),anyString(),anyLong(),anyLong());verify(contracts,never()).guessDebtor(anyString(),anyString());}
  @Test void missingNewUserFallsBackToLoggedInContractContact()throws Exception{recommendation();when(guessRandom.nextInt(10)).thenReturn(0);ContractGuessRespVO contact=new ContractGuessRespVO();contact.setTargetIdCard("contact-id");when(contracts.guessActiveDebtor("stored-id","plain-id",42L,1L)).thenReturn(contact);assertSame(contact,recommendation.guessYouLike("from","own-id"));verify(contracts).guessNewLoggedInUser("stored-id","plain-id",42L,1L);verify(contracts,never()).guessDebtor(anyString(),anyString());}
  @Test void creditorRecommendationFallsBackWhenNobodyIsLoggedIn()throws Exception{recommendation();ContractGuessRespVO legacy=new ContractGuessRespVO();legacy.setTargetIdCard("legacy-id");when(contracts.guessCreditor("stored-id","plain-id")).thenReturn(legacy);assertSame(legacy,recommendation.guessYouLike("to","own-id"));verify(contracts).guessActiveCreditor("stored-id","plain-id",42L,1L);}
+ @Test void batchPaginatesDistinctContactsAndExcludesCaller()throws Exception{
+  recommendation();
+  ContractGuessRespVO self=new ContractGuessRespVO();self.setTargetName("self alias");self.setTargetIdCard("self-id");
+  ContractGuessRespVO a=new ContractGuessRespVO();a.setTargetName("A");a.setTargetIdCard("a-id");
+  ContractGuessRespVO b=new ContractGuessRespVO();b.setTargetName("B");b.setTargetIdCard("b-id");
+  ContractGuessRespVO c=new ContractGuessRespVO();c.setTargetName("C");c.setTargetIdCard("c-id");
+  ContractGuessRespVO d=new ContractGuessRespVO();d.setTargetName("D");d.setTargetIdCard("d-id");
+  when(contracts.guessActiveDebtors("stored-id","plain-id",42L,1L)).thenReturn(java.util.Arrays.asList(self,a,b,c));
+  when(contracts.guessNewLoggedInUsers("stored-id","plain-id",42L,1L)).thenReturn(java.util.Collections.singletonList(d));
+  when(cipher.sameIdCard("stored-id","self-id")).thenReturn(true);
+  for(String id:new String[]{"a-id","b-id","c-id","d-id"}){
+   when(cipher.resolveToPlain(id)).thenReturn(id);
+   when(cipher.requestToStoredCipher(id)).thenReturn("encrypted-"+id);
+  }
+  ContractGuessBatchRespVO first=recommendation.guessYouLikeBatch("from","own-id",0);
+  assertEquals(3,first.getItems().size());assertTrue(first.isHasMore());
+  assertEquals("A",first.getItems().get(0).getTargetName());
+  ContractGuessBatchRespVO second=recommendation.guessYouLikeBatch("from","own-id",1);
+  assertEquals(1,second.getItems().size());assertEquals("D",second.getItems().get(0).getTargetName());assertFalse(second.isHasMore());
+  assertEquals("encrypted-d-id",second.getItems().get(0).getTargetIdCard());
+ }
  AdminUserServiceImpl profiles;AdminUserMapper userMapper;UserProfileUpdateReqVO profile;
  void profile()throws Exception{profiles=new AdminUserServiceImpl();userMapper=mock(AdminUserMapper.class);cipher=mock(IdCardCipherService.class);when(userMapper.selectById(42L)).thenReturn(user());when(userMapper.update(any(AdminUserDO.class),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);set(profiles,"userMapper",userMapper);set(profiles,"idCardCipherService",cipher);profile=new UserProfileUpdateReqVO();}
  @Test void verifiedIdentityChangeIsDeniedBeforeDatabaseWrite()throws Exception{profile();profile.setRealname("Other Person");assertThrows(AccessDeniedException.class,()->profiles.updateUserProfile(42L,profile));verify(userMapper,never()).updateById(any(AdminUserDO.class));}
