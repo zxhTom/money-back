@@ -169,6 +169,7 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
     @org.apache.ibatis.annotations.Select("SELECT indebted_name as targetName, indebted_id as targetIdCard " +
             "FROM custom_contract " +
             "WHERE creditor_id IN (#{myIdCard}, #{plainIdCard}) AND deleted = 0 " +
+            "AND indebted_id NOT IN (#{myIdCard}, #{plainIdCard}) " +
             "GROUP BY indebted_name, indebted_id " +
             "ORDER BY count(*) DESC, max(create_time) DESC, sum(salary) DESC " +
             "LIMIT 1")
@@ -177,6 +178,7 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
     @org.apache.ibatis.annotations.Select("SELECT creditor_name as targetName, creditor_id as targetIdCard " +
             "FROM custom_contract " +
             "WHERE indebted_id IN (#{myIdCard}, #{plainIdCard}) AND deleted = 0 " +
+            "AND creditor_id NOT IN (#{myIdCard}, #{plainIdCard}) " +
             "GROUP BY creditor_name, creditor_id " +
             "ORDER BY count(*) DESC, max(create_time) DESC, sum(salary) DESC " +
             "LIMIT 1")
@@ -191,32 +193,37 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
     @org.apache.ibatis.annotations.Select("SELECT c.indebted_name AS targetName, c.indebted_id AS targetIdCard " +
             "FROM custom_contract c " +
             "JOIN system_users u ON u.id_no = c.indebted_id AND u.tenant_id = #{tenantId} " +
-            "AND u.deleted = 0 AND u.status = 0 " +
+            "AND u.deleted = 0 AND u.status = 0 AND u.id != #{callerId} " +
             "JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
             "WHERE c.creditor_id IN (#{myIdCard}, #{plainIdCard}) AND c.tenant_id = #{tenantId} AND c.deleted = 0 " +
+            "AND c.indebted_id NOT IN (#{myIdCard}, #{plainIdCard}) " +
             "GROUP BY c.indebted_name, c.indebted_id, u.id, u.login_date, t.login_time " +
-            "ORDER BY COALESCE(u.login_date, t.login_time) DESC, MAX(c.create_time) DESC, COUNT(*) DESC LIMIT 1")
+            "ORDER BY COUNT(*) DESC, COALESCE(u.login_date, t.login_time) DESC, MAX(c.create_time) DESC LIMIT 1")
     ContractGuessRespVO guessActiveDebtor(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
                                           @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
+                                          @org.apache.ibatis.annotations.Param("callerId") Long callerId,
                                           @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
     @org.apache.ibatis.annotations.Select("SELECT c.creditor_name AS targetName, c.creditor_id AS targetIdCard " +
             "FROM custom_contract c " +
             "JOIN system_users u ON u.id_no = c.creditor_id AND u.tenant_id = #{tenantId} " +
-            "AND u.deleted = 0 AND u.status = 0 " +
+            "AND u.deleted = 0 AND u.status = 0 AND u.id != #{callerId} " +
             "JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
             "WHERE c.indebted_id IN (#{myIdCard}, #{plainIdCard}) AND c.tenant_id = #{tenantId} AND c.deleted = 0 " +
+            "AND c.creditor_id NOT IN (#{myIdCard}, #{plainIdCard}) " +
             "GROUP BY c.creditor_name, c.creditor_id, u.id, u.login_date, t.login_time " +
-            "ORDER BY COALESCE(u.login_date, t.login_time) DESC, MAX(c.create_time) DESC, COUNT(*) DESC LIMIT 1")
+            "ORDER BY COUNT(*) DESC, COALESCE(u.login_date, t.login_time) DESC, MAX(c.create_time) DESC LIMIT 1")
     ContractGuessRespVO guessActiveCreditor(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
                                             @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
+                                            @org.apache.ibatis.annotations.Param("callerId") Long callerId,
                                             @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
     @org.apache.ibatis.annotations.Select("SELECT u.realname AS targetName, u.id_no AS targetIdCard " +
             "FROM system_users u JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
             "WHERE u.tenant_id = #{tenantId} AND u.id != #{callerId} AND u.deleted = 0 " +
+            "AND u.id_no NOT IN (#{myIdCard}, #{plainIdCard}) " +
             "AND u.status = 0 AND u.verified = 1 AND u.id_no IS NOT NULL AND u.id_no != '' " +
             "AND u.realname IS NOT NULL AND u.realname != '' " +
             "AND u.create_time >= DATE_SUB(NOW(), INTERVAL 14 DAY) " +

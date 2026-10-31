@@ -514,12 +514,12 @@ public class ContractServiceImpl implements ContractService {
         boolean tryNewUserFirst = recommendationRandom.nextInt(10) == 0;
         cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO result = tryNewUserFirst
                 ? contractMapper.guessNewLoggedInUser(stored, plain, caller.getId(), caller.getTenantId())
-                : (choosingDebtor ? contractMapper.guessActiveDebtor(stored, plain, caller.getTenantId())
-                        : contractMapper.guessActiveCreditor(stored, plain, caller.getTenantId()));
+                : (choosingDebtor ? contractMapper.guessActiveDebtor(stored, plain, caller.getId(), caller.getTenantId())
+                        : contractMapper.guessActiveCreditor(stored, plain, caller.getId(), caller.getTenantId()));
         if (result == null) {
             result = tryNewUserFirst
-                    ? (choosingDebtor ? contractMapper.guessActiveDebtor(stored, plain, caller.getTenantId())
-                            : contractMapper.guessActiveCreditor(stored, plain, caller.getTenantId()))
+                    ? (choosingDebtor ? contractMapper.guessActiveDebtor(stored, plain, caller.getId(), caller.getTenantId())
+                            : contractMapper.guessActiveCreditor(stored, plain, caller.getId(), caller.getTenantId()))
                     : contractMapper.guessNewLoggedInUser(stored, plain, caller.getId(), caller.getTenantId());
         }
         if (result == null) {
