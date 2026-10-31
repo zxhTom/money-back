@@ -83,6 +83,8 @@ public class ContractServiceImpl implements ContractService {
     private ContractAttachmentReferenceGuard attachmentReferenceGuard;
     @Resource
     private cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker creditQueryAccessChecker;
+
+    private Random recommendationRandom = new Random();
     @Resource
     private ContractTeaseGuard teaseGuard;
 
@@ -506,8 +508,23 @@ public class ContractServiceImpl implements ContractService {
         // Query both historical storage shapes, but never return the stored plaintext.
         String stored = caller.getIdNo();
         String plain = idCardCipherService.resolveToPlain(caller.getIdNo());
-        cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO result =
-                "from".equals(direction) ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
+        boolean choosingDebtor = "from".equals(direction);
+        // Most requests favor a known contract contact. One in ten explores a newly
+        // registered, logged-in user; an empty pool immediately tries the other pool.
+        boolean tryNewUserFirst = recommendationRandom.nextInt(10) == 0;
+        cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO result = tryNewUserFirst
+                ? contractMapper.guessNewLoggedInUser(stored, plain, caller.getId(), caller.getTenantId())
+                : (choosingDebtor ? contractMapper.guessActiveDebtor(stored, plain, caller.getTenantId())
+                        : contractMapper.guessActiveCreditor(stored, plain, caller.getTenantId()));
+        if (result == null) {
+            result = tryNewUserFirst
+                    ? (choosingDebtor ? contractMapper.guessActiveDebtor(stored, plain, caller.getTenantId())
+                            : contractMapper.guessActiveCreditor(stored, plain, caller.getTenantId()))
+                    : contractMapper.guessNewLoggedInUser(stored, plain, caller.getId(), caller.getTenantId());
+        }
+        if (result == null) {
+            result = choosingDebtor ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
+        }
         if (result != null) {
             result.setTargetIdCardDisplay(idCardCipherService.maskFromStored(result.getTargetIdCard()));
             result.setTargetIdCard(idCardCipherService.requestToStoredCipher(result.getTargetIdCard()));

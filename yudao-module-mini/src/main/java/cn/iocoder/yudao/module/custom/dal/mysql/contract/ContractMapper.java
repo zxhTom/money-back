@@ -182,4 +182,51 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
             "LIMIT 1")
     cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO guessCreditor(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard, @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard);
 
+    // A valid, unrevoked token establishes login status; login_date records the actual login.
+    String LOGGED_IN_USERS = "SELECT user_id, MAX(create_time) AS login_time FROM system_oauth2_access_token " +
+            "WHERE tenant_id = #{tenantId} AND user_type = 2 AND deleted = 0 AND expires_time > NOW() " +
+            "GROUP BY user_id";
+
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
+    @org.apache.ibatis.annotations.Select("SELECT c.indebted_name AS targetName, c.indebted_id AS targetIdCard " +
+            "FROM custom_contract c " +
+            "JOIN system_users u ON u.id_no = c.indebted_id AND u.tenant_id = #{tenantId} " +
+            "AND u.deleted = 0 AND u.status = 0 " +
+            "JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
+            "WHERE c.creditor_id IN (#{myIdCard}, #{plainIdCard}) AND c.tenant_id = #{tenantId} AND c.deleted = 0 " +
+            "GROUP BY c.indebted_name, c.indebted_id, u.id, u.login_date, t.login_time " +
+            "ORDER BY COALESCE(u.login_date, t.login_time) DESC, MAX(c.create_time) DESC, COUNT(*) DESC LIMIT 1")
+    ContractGuessRespVO guessActiveDebtor(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
+                                          @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
+                                          @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
+
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
+    @org.apache.ibatis.annotations.Select("SELECT c.creditor_name AS targetName, c.creditor_id AS targetIdCard " +
+            "FROM custom_contract c " +
+            "JOIN system_users u ON u.id_no = c.creditor_id AND u.tenant_id = #{tenantId} " +
+            "AND u.deleted = 0 AND u.status = 0 " +
+            "JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
+            "WHERE c.indebted_id IN (#{myIdCard}, #{plainIdCard}) AND c.tenant_id = #{tenantId} AND c.deleted = 0 " +
+            "GROUP BY c.creditor_name, c.creditor_id, u.id, u.login_date, t.login_time " +
+            "ORDER BY COALESCE(u.login_date, t.login_time) DESC, MAX(c.create_time) DESC, COUNT(*) DESC LIMIT 1")
+    ContractGuessRespVO guessActiveCreditor(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
+                                            @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
+                                            @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
+
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
+    @org.apache.ibatis.annotations.Select("SELECT u.realname AS targetName, u.id_no AS targetIdCard " +
+            "FROM system_users u JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
+            "WHERE u.tenant_id = #{tenantId} AND u.id != #{callerId} AND u.deleted = 0 " +
+            "AND u.status = 0 AND u.verified = 1 AND u.id_no IS NOT NULL AND u.id_no != '' " +
+            "AND u.realname IS NOT NULL AND u.realname != '' " +
+            "AND u.create_time >= DATE_SUB(NOW(), INTERVAL 14 DAY) " +
+            "AND NOT EXISTS (SELECT 1 FROM custom_contract c WHERE c.tenant_id = #{tenantId} AND c.deleted = 0 " +
+            "AND ((c.creditor_id IN (#{myIdCard}, #{plainIdCard}) AND c.indebted_id = u.id_no) " +
+            "OR (c.indebted_id IN (#{myIdCard}, #{plainIdCard}) AND c.creditor_id = u.id_no))) " +
+            "ORDER BY COALESCE(u.login_date, t.login_time) DESC, u.create_time DESC LIMIT 1")
+    ContractGuessRespVO guessNewLoggedInUser(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
+                                              @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
+                                              @org.apache.ibatis.annotations.Param("callerId") Long callerId,
+                                              @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
+
 }
