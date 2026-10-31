@@ -79,6 +79,41 @@ public class ContractController {
         return success(result);
     }
 
+    @GetMapping("/admin-create-users")
+    @Operation(summary = "【小程序】管理员代拟合同搜索本租户用户")
+    @PreAuthorize("@ss.hasPermission('custom:contract:create') and @ss.hasAnyRoles('super_admin','tenant_admin','contract-manager')")
+    @ApiAccessLog(responseEnable = false)
+    public CommonResult<List<Map<String, String>>> adminCreateUsers(
+            @RequestParam(value = "keyword", defaultValue = "") String keyword) {
+        List<Map<String, String>> result = new ArrayList<>();
+        String search = keyword.trim().toLowerCase(java.util.Locale.ROOT);
+        if (search.isEmpty()) return success(result);
+        if (search.length() > 64) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
+                    .exception0(400, "搜索词过长");
+        }
+        Long tenantId = requiredTenantId();
+        List<AdminUserDO> users = contractAdminUserService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
+        if (users == null) return success(result);
+        for (AdminUserDO user : users) {
+            if (!java.util.Objects.equals(tenantId, user.getTenantId())
+                    || !org.springframework.util.StringUtils.hasText(user.getRealname())
+                    || !org.springframework.util.StringUtils.hasText(user.getIdNo())) continue;
+            String username = user.getUsername() == null ? "" : user.getUsername();
+            if (!user.getRealname().toLowerCase(java.util.Locale.ROOT).contains(search)
+                    && !username.toLowerCase(java.util.Locale.ROOT).contains(search)) continue;
+            Map<String, String> item = new HashMap<>();
+            item.put("id", String.valueOf(user.getId()));
+            item.put("username", username);
+            item.put("realname", user.getRealname());
+            item.put("idNo", idCardCipherService.storedToCipherForResponse(user.getIdNo()));
+            item.put("idNoDisplay", idCardCipherService.maskFromStored(user.getIdNo()));
+            result.add(item);
+            if (result.size() == 20) break;
+        }
+        return success(result);
+    }
+
 
     private Long requiredTenantId() {
         Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getTenantId();
