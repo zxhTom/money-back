@@ -23,17 +23,22 @@ class ContractGuessFeedbackStoreTest {
     @SuppressWarnings("unchecked")
     void externalTokenIsBoundToCallerAndDirectionAndWorksOnce() throws Exception {
         ContractGuessFeedbackStore store = new ContractGuessFeedbackStore();
-        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        ConcurrentHashMap<String, String> entries = new ConcurrentHashMap<>();
+        StringRedisTemplate redis = mock(StringRedisTemplate.class, call -> {
+            if ("execute".equals(call.getMethod().getName())) {
+                java.util.List<String> keys = call.getArgument(1);
+                return entries.remove(keys.get(0));
+            }
+            return RETURNS_DEFAULTS.answer(call);
+        });
         ValueOperations<String, String> values = mock(ValueOperations.class);
         when(redis.opsForValue()).thenReturn(values);
         Field field = store.getClass().getDeclaredField("redis");
         field.setAccessible(true);
         field.set(store, redis);
-        ConcurrentHashMap<String, String> entries = new ConcurrentHashMap<>();
         doAnswer(call -> { entries.put(call.getArgument(0), call.getArgument(1)); return null; })
                 .when(values).set(anyString(), anyString(), eq(30L), eq(TimeUnit.MINUTES));
         when(values.get(anyString())).thenAnswer(call -> entries.get(call.getArgument(0)));
-        when(values.getAndDelete(anyString())).thenAnswer(call -> entries.remove(call.getArgument(0)));
 
         String token = store.createExternalToken(1L, 42L, "from", 13L);
         assertEquals(13L, store.peekExternalToken(1L, 42L, "from", token));
@@ -49,7 +54,9 @@ class ContractGuessFeedbackStoreTest {
     @SuppressWarnings("unchecked")
     void onlyAnOfferedCandidateCanBeCountedOnce() throws Exception {
         ContractGuessFeedbackStore store = new ContractGuessFeedbackStore();
-        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        AtomicReference<String> offered = new AtomicReference<>();
+        StringRedisTemplate redis = mock(StringRedisTemplate.class, call ->
+                "execute".equals(call.getMethod().getName()) ? offered.getAndSet(null) : RETURNS_DEFAULTS.answer(call));
         ValueOperations<String, String> values = mock(ValueOperations.class);
         ZSetOperations<String, String> scores = mock(ZSetOperations.class);
         HashOperations<String, Object, Object> last = mock(HashOperations.class);
@@ -59,10 +66,8 @@ class ContractGuessFeedbackStoreTest {
         Field field = store.getClass().getDeclaredField("redis");
         field.setAccessible(true);
         field.set(store, redis);
-        AtomicReference<String> offered = new AtomicReference<>();
         doAnswer(call -> { offered.set(call.getArgument(1)); return null; })
                 .when(values).set(anyString(), anyString(), eq(30L), eq(TimeUnit.MINUTES));
-        when(values.getAndDelete(anyString())).thenAnswer(call -> offered.getAndSet(null));
 
         String badBatch = store.createImpression(1L, 42L, "from", Collections.singletonMap(9L, "id-9"));
         assertFalse(store.recordSelection(1L, 42L, "from", badBatch, "other-id"));

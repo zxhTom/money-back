@@ -37,6 +37,9 @@ public class ContractGuessFeedbackStore {
     private static final DefaultRedisScript<Long> COUNT_VERIFY = new DefaultRedisScript<>(
             "local n=redis.call('INCR', KEYS[1]); if n == 1 then redis.call('EXPIRE', KEYS[1], 172800) end " +
             "if n > tonumber(ARGV[1]) then return 0 end return 1", Long.class);
+    // Redis 3.2 does not support GETDEL. This Lua command keeps one-time tokens atomic.
+    private static final DefaultRedisScript<String> CONSUME_ONCE = new DefaultRedisScript<>(
+            "local v=redis.call('GET', KEYS[1]); if v then redis.call('DEL', KEYS[1]) end return v", String.class);
 
     @Resource
     private StringRedisTemplate redis;
@@ -72,7 +75,8 @@ public class ContractGuessFeedbackStore {
     public Long consumeExternalToken(Long tenantId, Long callerId, String direction, String token) {
         try {
             String id = UUID.fromString(token).toString();
-            String value = redis.opsForValue().getAndDelete(externalTokenKey(tenantId, callerId, direction, id));
+            String value = redis.execute(CONSUME_ONCE,
+                    Collections.singletonList(externalTokenKey(tenantId, callerId, direction, id)));
             return value == null ? null : Long.valueOf(value);
         } catch (IllegalArgumentException ex) {
             return null;
@@ -151,7 +155,8 @@ public class ContractGuessFeedbackStore {
         if (plainIdCard == null || plainIdCard.isEmpty()) return false;
         try {
             String id = UUID.fromString(impressionId).toString();
-            String offered = redis.opsForValue().getAndDelete(impressionKey(tenantId, callerId, direction, id));
+            String offered = redis.execute(CONSUME_ONCE,
+                    Collections.singletonList(impressionKey(tenantId, callerId, direction, id)));
             if (offered == null) return false;
             String wantedHash = hash(plainIdCard);
             for (String entry : offered.split(",")) {
