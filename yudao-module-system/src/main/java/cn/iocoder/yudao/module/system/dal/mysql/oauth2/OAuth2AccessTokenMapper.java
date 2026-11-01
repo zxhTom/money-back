@@ -17,6 +17,14 @@ import java.util.List;
 @Mapper
 public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO> {
 
+    String ORDINARY_TOKEN_CONDITION = "INSTR(COALESCE(scopes, ''), '" +
+            cn.iocoder.yudao.framework.common.biz.system.oauth2.OAuth2TokenCommonApi.ACCOUNT_IMPERSONATION_SCOPE + "') = 0";
+
+    static boolean isOrdinaryToken(OAuth2AccessTokenDO token) {
+        return token.getScopes() == null || !token.getScopes().contains(
+                cn.iocoder.yudao.framework.common.biz.system.oauth2.OAuth2TokenCommonApi.ACCOUNT_IMPERSONATION_SCOPE);
+    }
+
     @TenantIgnore // 获取 token 的时候，需要忽略租户编号。原因是：一些场景下，可能不会传递 tenant-id 请求头，例如说文件上传、积木报表等等
     default OAuth2AccessTokenDO selectByAccessToken(String accessToken) {
         return selectOne(OAuth2AccessTokenDO::getAccessToken, accessToken);
@@ -36,7 +44,7 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
     @Select("SELECT t.user_id AS userId, COUNT(*) AS tokenCount, u.username " +
             "FROM system_oauth2_access_token t " +
             "LEFT JOIN system_users u ON u.id = t.user_id AND u.deleted = 0 " +
-            "WHERE t.deleted = 0 AND t.expires_time > NOW() " +
+            "WHERE t.deleted = 0 AND t.expires_time > NOW() AND " + ORDINARY_TOKEN_CONDITION + " " +
             "GROUP BY t.user_id, u.username ORDER BY tokenCount DESC LIMIT #{limit}")
     List<UserTokenStatVO> selectTopUsersByTokenCount(@Param("limit") int limit);
 
@@ -51,7 +59,7 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
                 .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now()));
         java.util.Map<Long, Long> countMap = new java.util.LinkedHashMap<>();
         for (OAuth2AccessTokenDO t : tokens) {
-            countMap.merge(t.getUserId(), 1L, Long::sum);
+            if (isOrdinaryToken(t)) countMap.merge(t.getUserId(), 1L, Long::sum);
         }
         List<UserTokenStatVO> result = new java.util.ArrayList<>();
         countMap.forEach((uid, cnt) -> {
@@ -69,6 +77,7 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
                 .eqIfPresent(OAuth2AccessTokenDO::getUserType, reqVO.getUserType())
                 .likeIfPresent(OAuth2AccessTokenDO::getClientId, reqVO.getClientId())
                 .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now())
+                .apply(ORDINARY_TOKEN_CONDITION)
                 .orderByDesc(OAuth2AccessTokenDO::getId));
     }
 
@@ -80,7 +89,8 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
                 .eq(OAuth2AccessTokenDO::getUserType, cn.iocoder.yudao.framework.common.enums.UserTypeEnum.ADMIN.getValue())
                 .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now()));
         java.util.Map<Long, Long> counts = new java.util.LinkedHashMap<>();
-        tokens.forEach(token -> counts.merge(token.getUserId(), 1L, Long::sum));
+        tokens.stream().filter(OAuth2AccessTokenMapper::isOrdinaryToken)
+                .forEach(token -> counts.merge(token.getUserId(), 1L, Long::sum));
         List<UserTokenStatVO> result = new java.util.ArrayList<>();
         counts.forEach((userId, count) -> {
             UserTokenStatVO stat = new UserTokenStatVO();stat.setUserId(userId);stat.setTokenCount(count);result.add(stat);
@@ -91,13 +101,13 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
     /** 某 IP 下当前有效令牌涉及的不同用户ID（用于"一IP多用户"检测） */
     @TenantIgnore
     @Select("SELECT DISTINCT user_id FROM system_oauth2_access_token " +
-            "WHERE deleted=0 AND expires_time > NOW() AND ip = #{ip}")
+            "WHERE deleted=0 AND expires_time > NOW() AND ip = #{ip} AND " + ORDINARY_TOKEN_CONDITION)
     List<Long> selectDistinctUserIdsByIp(@Param("ip") String ip);
 
     /** 某用户当前有效令牌涉及的不同 IP（用于"一用户多IP"检测） */
     @TenantIgnore
     @Select("SELECT DISTINCT ip FROM system_oauth2_access_token " +
-            "WHERE deleted=0 AND expires_time > NOW() AND user_id = #{userId} AND ip IS NOT NULL AND ip <> ''")
+            "WHERE deleted=0 AND expires_time > NOW() AND user_id = #{userId} AND ip IS NOT NULL AND ip <> '' AND " + ORDINARY_TOKEN_CONDITION)
     List<String> selectDistinctIpsByUserId(@Param("userId") Long userId);
 
     /** 给定一批用户，取其当前有效（未过期、有 IP）的令牌；聚合在 Service 层做，避免动态 SQL */
@@ -110,7 +120,8 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
                 .in(OAuth2AccessTokenDO::getUserId, userIds)
                 .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now())
                 .isNotNull(OAuth2AccessTokenDO::getIp)
-                .ne(OAuth2AccessTokenDO::getIp, ""));
+                .ne(OAuth2AccessTokenDO::getIp, "")
+                .apply(ORDINARY_TOKEN_CONDITION));
     }
 
     /** 给定一批 IP，取其上当前有效的令牌 */
@@ -121,7 +132,8 @@ public interface OAuth2AccessTokenMapper extends BaseMapperX<OAuth2AccessTokenDO
         }
         return selectList(new LambdaQueryWrapperX<OAuth2AccessTokenDO>()
                 .in(OAuth2AccessTokenDO::getIp, ips)
-                .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now()));
+                .gt(OAuth2AccessTokenDO::getExpiresTime, LocalDateTime.now())
+                .apply(ORDINARY_TOKEN_CONDITION));
     }
 
 }

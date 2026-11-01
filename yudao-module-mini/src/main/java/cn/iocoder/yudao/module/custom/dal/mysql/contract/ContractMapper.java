@@ -187,6 +187,8 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
     // A valid, unrevoked token establishes login status; login_date records the actual login.
     String LOGGED_IN_USERS = "SELECT user_id, MAX(create_time) AS login_time FROM system_oauth2_access_token " +
             "WHERE tenant_id = #{tenantId} AND user_type = 2 AND deleted = 0 AND expires_time > NOW() " +
+            "AND INSTR(COALESCE(scopes, ''), '" +
+            cn.iocoder.yudao.framework.common.biz.system.oauth2.OAuth2TokenCommonApi.ACCOUNT_IMPERSONATION_SCOPE + "') = 0 " +
             "GROUP BY user_id";
 
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
