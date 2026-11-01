@@ -32,9 +32,13 @@ class ContractGuessFeedbackStoreTest {
         ConcurrentHashMap<String, String> entries = new ConcurrentHashMap<>();
         doAnswer(call -> { entries.put(call.getArgument(0), call.getArgument(1)); return null; })
                 .when(values).set(anyString(), anyString(), eq(30L), eq(TimeUnit.MINUTES));
+        when(values.get(anyString())).thenAnswer(call -> entries.get(call.getArgument(0)));
         when(values.getAndDelete(anyString())).thenAnswer(call -> entries.remove(call.getArgument(0)));
 
         String token = store.createExternalToken(1L, 42L, "from", 13L);
+        assertEquals(13L, store.peekExternalToken(1L, 42L, "from", token));
+        assertEquals(13L, store.peekExternalToken(1L, 42L, "from", token));
+        assertNull(store.peekExternalToken(1L, 99L, "from", token));
         assertNull(store.consumeExternalToken(1L, 99L, "from", token));
         assertNull(store.consumeExternalToken(1L, 42L, "to", token));
         assertEquals(13L, store.consumeExternalToken(1L, 42L, "from", token));

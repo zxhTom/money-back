@@ -87,17 +87,17 @@ class SecurityCompatibilityTest {
   ContractGuessRespVO a=new ContractGuessRespVO();a.setTargetName("A");a.setTargetIdCard("a-id");a.setTargetUserId(10L);a.setRelationCount(4L);
   ContractGuessRespVO b=new ContractGuessRespVO();b.setTargetName("B");b.setTargetIdCard("b-id");b.setTargetUserId(11L);b.setRelationCount(1L);
   ContractGuessRespVO c=new ContractGuessRespVO();c.setTargetName("C");c.setTargetIdCard("c-id");c.setTargetUserId(12L);c.setRelationCount(2L);
-  ContractGuessRespVO issuer=new ContractGuessRespVO();issuer.setTargetName("Issuer");issuer.setTargetIdCard("issuer-id");issuer.setTargetUserId(13L);issuer.setIssuedCount(40L);
+  ContractGuessRespVO issuer=new ContractGuessRespVO();issuer.setTargetName("Issuer");issuer.setTargetIdCard("110101199001011234");issuer.setTargetUserId(13L);issuer.setIssuedCount(40L);
   when(contracts.guessActiveDebtors("stored-id","plain-id",42L,1L)).thenReturn(java.util.Arrays.asList(a,b,c));
   when(contracts.guessActiveIssuers("stored-id","plain-id",42L,1L)).thenReturn(java.util.Collections.singletonList(issuer));
   when(feedback.selectionCounts(1L,42L,"from")).thenReturn(java.util.Collections.singletonMap(11L,20.0));
   when(feedback.reserveExternalExposure(1L,42L,13L)).thenReturn(true);
   when(feedback.createExternalToken(1L,42L,"from",13L)).thenReturn("opaque-token");
-  for(String id:new String[]{"a-id","b-id","c-id","issuer-id"})when(cipher.resolveToPlain(id)).thenReturn(id);
+  for(String id:new String[]{"a-id","b-id","c-id","110101199001011234"})when(cipher.resolveToPlain(id)).thenReturn(id);
   ContractGuessBatchRespVO result=recommendation.guessYouLikeBatch("from","own-id",0,true);
   assertEquals(2,result.getPrivacyVersion());assertEquals(3,result.getItems().size());assertEquals("B",result.getItems().get(0).getTargetName());
-  assertEquals("A",result.getItems().get(1).getTargetName());assertEquals("I＊",result.getItems().get(2).getTargetName());
-  assertNull(result.getItems().get(2).getTargetIdCard());assertNull(result.getItems().get(2).getTargetIdCardDisplay());
+  assertEquals("A",result.getItems().get(1).getTargetName());assertEquals("Issuer",result.getItems().get(2).getTargetName());
+  assertNull(result.getItems().get(2).getTargetIdCard());assertEquals("110101□□□□□□□□1234",result.getItems().get(2).getTargetIdCardDisplay());
   assertEquals("opaque-token",result.getItems().get(2).getCandidateToken());
   verify(feedback).createImpression(eq(1L),eq(42L),eq("from"),anyMap());
   String json=new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(result.getItems().get(0));
@@ -105,19 +105,19 @@ class SecurityCompatibilityTest {
  }
  @Test void externalCandidatesFailClosedWhenExposureGuardIsUnavailable()throws Exception{
   recommendation();ContractGuessFeedbackStore feedback=mock(ContractGuessFeedbackStore.class);set(recommendation,"guessFeedbackStore",feedback);
-  ContractGuessRespVO issuer=new ContractGuessRespVO();issuer.setTargetName("Issuer");issuer.setTargetIdCard("issuer-id");issuer.setTargetUserId(13L);
+  ContractGuessRespVO issuer=new ContractGuessRespVO();issuer.setTargetName("Issuer");issuer.setTargetIdCard("110101199001011234");issuer.setTargetUserId(13L);
   when(contracts.guessActiveIssuers("stored-id","plain-id",42L,1L)).thenReturn(java.util.Collections.singletonList(issuer));
-  when(cipher.resolveToPlain("issuer-id")).thenReturn("issuer-id");
+  when(cipher.resolveToPlain("110101199001011234")).thenReturn("110101199001011234");
   ContractGuessBatchRespVO result=recommendation.guessYouLikeBatch("from","own-id",0,true);
   assertTrue(result.getItems().isEmpty());verify(feedback,never()).createExternalToken(anyLong(),anyLong(),anyString(),anyLong());
  }
  @Test void privacyModeStillFallsBackToOwnHistoricalContract()throws Exception{
   recommendation();ContractGuessFeedbackStore feedback=mock(ContractGuessFeedbackStore.class);set(recommendation,"guessFeedbackStore",feedback);
-  ContractGuessRespVO issuer=new ContractGuessRespVO();issuer.setTargetName("Issuer");issuer.setTargetIdCard("issuer-id");issuer.setTargetUserId(13L);
+  ContractGuessRespVO issuer=new ContractGuessRespVO();issuer.setTargetName("Issuer");issuer.setTargetIdCard("110101199001011234");issuer.setTargetUserId(13L);
   ContractGuessRespVO legacy=new ContractGuessRespVO();legacy.setTargetName("Known");legacy.setTargetIdCard("known-id");
   when(contracts.guessActiveIssuers("stored-id","plain-id",42L,1L)).thenReturn(java.util.Collections.singletonList(issuer));
   when(contracts.guessDebtor("stored-id","plain-id")).thenReturn(legacy);
-  when(cipher.resolveToPlain("issuer-id")).thenReturn("issuer-id");when(cipher.resolveToPlain("known-id")).thenReturn("known-id");
+  when(cipher.resolveToPlain("110101199001011234")).thenReturn("110101199001011234");when(cipher.resolveToPlain("known-id")).thenReturn("known-id");
   when(cipher.requestToStoredCipher("known-id")).thenReturn("encrypted-known");
   ContractGuessBatchRespVO result=recommendation.guessYouLikeBatch("from","own-id",0,true);
   assertEquals(1,result.getItems().size());assertEquals("Known",result.getItems().get(0).getTargetName());
@@ -133,19 +133,25 @@ class SecurityCompatibilityTest {
   when(feedback.recordSelection(1L,42L,"from","impression","target-plain")).thenReturn(true);
   assertTrue(recommendation.recordGuessSelection("from","own-id","target","impression"));
  }
- @Test void externalCandidateNeedsBoundTokenAndActiveSameTenantUser()throws Exception{
+ @Test void externalCandidateNeedsCorrectMiddleDigitsAndSameTenant()throws Exception{
   recommendation();ContractGuessFeedbackStore feedback=mock(ContractGuessFeedbackStore.class);set(recommendation,"guessFeedbackStore",feedback);
-  assertThrows(AccessDeniedException.class,()->recommendation.resolveGuessCandidate("from","other-id","token"));
+  assertThrows(AccessDeniedException.class,()->recommendation.resolveGuessCandidate("from","other-id","token","19900101"));
+  assertNull(recommendation.resolveGuessCandidate("from","own-id","token",null));
+  verifyNoInteractions(feedback);
+  when(feedback.peekExternalToken(1L,42L,"from","token")).thenReturn(13L);
   when(feedback.consumeExternalToken(1L,42L,"from","token")).thenReturn(13L);
+  when(feedback.allowVerificationAttempt(1L,42L)).thenReturn(true);
   AdminUserDO candidate=user();candidate.setId(13L);candidate.setIdNo("candidate-id");candidate.setRealname("Candidate");candidate.setStatus(0);
   when(users.getUser(13L)).thenReturn(candidate);
-  when(contracts.isGuessCandidateLoggedIn(13L,1L)).thenReturn(true);
+  when(cipher.resolveToPlain("candidate-id")).thenReturn("110101199001011234");
   when(cipher.requestToStoredCipher("candidate-id")).thenReturn("encrypted-candidate");
-  ContractGuessRespVO resolved=recommendation.resolveGuessCandidate("from","own-id","token");
+  assertNull(recommendation.resolveGuessCandidate("from","own-id","token","19900102"));
+  verify(feedback,never()).consumeExternalToken(anyLong(),anyLong(),anyString(),anyString());
+  ContractGuessRespVO resolved=recommendation.resolveGuessCandidate("from","own-id","token","19900101");
   assertEquals("Candidate",resolved.getTargetName());assertEquals("encrypted-candidate",resolved.getTargetIdCard());
   verify(feedback).recordResolvedSelection(1L,42L,"from",13L);
   candidate.setTenantId(2L);
-  assertNull(recommendation.resolveGuessCandidate("from","own-id","token"));
+  assertNull(recommendation.resolveGuessCandidate("from","own-id","token","19900101"));
   verify(feedback,times(1)).recordResolvedSelection(1L,42L,"from",13L);
  }
  AdminUserServiceImpl profiles;AdminUserMapper userMapper;UserProfileUpdateReqVO profile;

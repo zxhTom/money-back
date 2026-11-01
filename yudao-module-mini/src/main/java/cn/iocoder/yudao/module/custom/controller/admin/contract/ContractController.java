@@ -368,7 +368,7 @@ public class ContractController {
     public CommonResult<cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO> resolveGuessCandidate(
             @RequestBody cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessSelectionReqVO reqVO) {
         return CommonResult.success(contractService.resolveGuessCandidate(reqVO.getDirection(), reqVO.getIdNo(),
-                reqVO.getCandidateToken()));
+                reqVO.getCandidateToken(), reqVO.getTargetIdCard()));
     }
 
     @PostMapping("/guess-you-like/selection")

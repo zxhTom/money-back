@@ -616,6 +616,7 @@ public class ContractServiceImpl implements ContractService {
             if (contactById.containsKey(identity) || !privacyV2) {
                 eligible.add(source);
             } else if (guessFeedbackStore != null && source.getTargetUserId() != null
+                    && isGuessIdCard(identity)
                     && guessFeedbackStore.reserveExternalExposure(caller.getTenantId(), caller.getId(), source.getTargetUserId())) {
                 eligible.add(source);
             }
@@ -644,7 +645,8 @@ public class ContractServiceImpl implements ContractService {
                 String token = guessFeedbackStore.createExternalToken(caller.getTenantId(), caller.getId(), direction,
                         source.getTargetUserId());
                 if (token == null) continue;
-                item.setTargetName(maskGuessName(source.getTargetName()));
+                item.setTargetName(source.getTargetName());
+                item.setTargetIdCardDisplay(maskGuessIdentity(identity));
                 item.setCandidateToken(token);
             }
             items.add(item);
@@ -657,24 +659,30 @@ public class ContractServiceImpl implements ContractService {
         return batch;
     }
 
-    private String maskGuessName(String name) {
-        if (StrUtil.isBlank(name) || name.codePointCount(0, name.length()) < 2) return "推荐用户";
-        return name.substring(0, name.offsetByCodePoints(0, 1)) + "＊";
+    private boolean isGuessIdCard(String plain) {
+        return plain != null && plain.matches("[0-9]{17}[0-9Xx]");
+    }
+
+    private String maskGuessIdentity(String plain) {
+        return plain.substring(0, 6) + "□□□□□□□□" + plain.substring(14);
     }
 
     @Override
-    public ContractGuessRespVO resolveGuessCandidate(String direction, String myIdCard, String candidateToken) {
+    public ContractGuessRespVO resolveGuessCandidate(String direction, String myIdCard, String candidateToken, String middleDigits) {
         AdminUserDO caller = requireGuessCaller(myIdCard);
         if (!("from".equals(direction) || "to".equals(direction)) || StrUtil.isBlank(candidateToken)
-                || guessFeedbackStore == null) return null;
-        Long targetId = guessFeedbackStore.consumeExternalToken(caller.getTenantId(), caller.getId(), direction, candidateToken);
+                || guessFeedbackStore == null || middleDigits == null || !middleDigits.matches("[0-9]{8}")) return null;
+        Long targetId = guessFeedbackStore.peekExternalToken(caller.getTenantId(), caller.getId(), direction, candidateToken);
         if (targetId == null || targetId.equals(caller.getId())) return null;
         AdminUserDO target = adminUserService.getUser(targetId);
         if (target == null || !caller.getTenantId().equals(target.getTenantId())
                 || !Integer.valueOf(1).equals(target.getVerified()) || !Integer.valueOf(0).equals(target.getStatus())
                 || Boolean.TRUE.equals(target.getDeleted()) || StrUtil.isBlank(target.getIdNo())
-                || StrUtil.isBlank(target.getRealname())
-                || !contractMapper.isGuessCandidateLoggedIn(targetId, caller.getTenantId())) return null;
+                || StrUtil.isBlank(target.getRealname())) return null;
+        String plain = idCardCipherService.resolveToPlain(target.getIdNo());
+        if (!isGuessIdCard(plain) || !guessFeedbackStore.allowVerificationAttempt(caller.getTenantId(), caller.getId())
+                || !plain.substring(6, 14).equals(middleDigits)) return null;
+        if (!targetId.equals(guessFeedbackStore.consumeExternalToken(caller.getTenantId(), caller.getId(), direction, candidateToken))) return null;
         ContractGuessRespVO selected = new ContractGuessRespVO();
         selected.setTargetName(target.getRealname());
         selected.setTargetIdCardDisplay(idCardCipherService.maskFromStored(target.getIdNo()));

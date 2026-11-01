@@ -29,10 +29,14 @@ public class ContractGuessFeedbackStore {
     private static final String PREFIX = "money:guess:v1:";
     private static final int IMPRESSION_MINUTES = 30;
     private static final int EXTERNAL_DAILY_LIMIT = 3;
+    private static final int VERIFY_DAILY_LIMIT = 15;
     private static final DefaultRedisScript<Long> RESERVE_EXTERNAL = new DefaultRedisScript<>(
             "if redis.call('SISMEMBER', KEYS[1], ARGV[1]) == 1 then return 1 end " +
             "if redis.call('SCARD', KEYS[1]) >= tonumber(ARGV[2]) then return 0 end " +
             "redis.call('SADD', KEYS[1], ARGV[1]); redis.call('EXPIRE', KEYS[1], 172800); return 1", Long.class);
+    private static final DefaultRedisScript<Long> COUNT_VERIFY = new DefaultRedisScript<>(
+            "local n=redis.call('INCR', KEYS[1]); if n == 1 then redis.call('EXPIRE', KEYS[1], 172800) end " +
+            "if n > tonumber(ARGV[1]) then return 0 end return 1", Long.class);
 
     @Resource
     private StringRedisTemplate redis;
@@ -75,6 +79,32 @@ public class ContractGuessFeedbackStore {
         } catch (RuntimeException ex) {
             log.warn("Contract guess candidate token unavailable", ex);
             return null;
+        }
+    }
+
+    public Long peekExternalToken(Long tenantId, Long callerId, String direction, String token) {
+        try {
+            String id = UUID.fromString(token).toString();
+            String value = redis.opsForValue().get(externalTokenKey(tenantId, callerId, direction, id));
+            return value == null ? null : Long.valueOf(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        } catch (RuntimeException ex) {
+            log.warn("Contract guess candidate token unavailable", ex);
+            return null;
+        }
+    }
+
+    public boolean allowVerificationAttempt(Long tenantId, Long callerId) {
+        String day = LocalDate.now(ZoneId.of("Asia/Shanghai")).toString();
+        try {
+            Long allowed = redis.execute(COUNT_VERIFY,
+                    Collections.singletonList(PREFIX + "verify:" + tenantId + ':' + callerId + ':' + day),
+                    Integer.toString(VERIFY_DAILY_LIMIT));
+            return Long.valueOf(1).equals(allowed);
+        } catch (RuntimeException ex) {
+            log.warn("Contract guess verification guard unavailable", ex);
+            return false;
         }
     }
 
