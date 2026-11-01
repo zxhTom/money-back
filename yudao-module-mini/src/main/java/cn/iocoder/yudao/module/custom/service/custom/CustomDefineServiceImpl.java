@@ -24,6 +24,7 @@ import cn.iocoder.yudao.module.custom.dto.ApiResponse;
 import cn.iocoder.yudao.module.custom.dto.Code2SessionResponse;
 import cn.iocoder.yudao.module.custom.dto.MpVO;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
+import cn.iocoder.yudao.module.custom.service.contract.ContractExperienceStore;
 import cn.iocoder.yudao.module.custom.service.wechat.WechatService;
 import cn.iocoder.yudao.module.fee.controller.admin.strategy.vo.FeeCalculationResult;
 import cn.iocoder.yudao.module.fee.service.strategy.FeeCalculationService;
@@ -71,6 +72,7 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSW
 @Service
 @Slf4j
 public class CustomDefineServiceImpl implements CustomDefineService{
+    @Resource private ContractExperienceStore experienceStore;
     @Resource private cn.iocoder.yudao.module.custom.service.contract.ContractPaymentAccessGuard paymentAccessGuard;
     @Resource private cn.iocoder.yudao.module.pay.service.order.PayOrderService payOrderService;
     // 本次进程启动之前的支付单可能属于历史通知重试，确认收到即可，不改历史业务数据。
@@ -212,8 +214,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
 
         BeanUtil.copyProperties(updateObj, contractDO, true);
-        contractMapper.updateById(contractDO);
-        return 1;
+        int updated = contractMapper.updateById(contractDO);
+        if (updated > 0) experienceStore.recordActivity(contractDO.getTenantId(), contractDO.getId(), "AMENDED", "合同内容已调整", "请进入合同详情核对最新内容");
+        return updated;
     }
 
     @Override
@@ -389,6 +392,8 @@ public class CustomDefineServiceImpl implements CustomDefineService{
             ContractDO current = contractMapper.selectById(contractId);
             if (current == null || !Integer.valueOf(2).equals(current.getStatus()))
                 throw new AccessDeniedException("合同状态已变化，请刷新后重试");
+        } else {
+            experienceStore.recordActivity(contractDO.getTenantId(), contractId, "CONFIRMED", "合同确认完成", "合同已进入生效状态");
         }
         return 1;
     }
@@ -433,12 +438,22 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public Integer update(ContractSaveReqVO contractSaveReqVO) {
         normalizeContractIdNos(contractSaveReqVO);
-        ownershipGuard.checkOrThrow(contractMapper.selectById(contractSaveReqVO.getId()), SecurityFrameworkUtils.getLoginUserId());
+        ContractDO previous = contractMapper.selectById(contractSaveReqVO.getId());
+        ownershipGuard.checkOrThrow(previous, SecurityFrameworkUtils.getLoginUserId());
         LoginUser loginUser = SecurityFrameworkUtils.getLoginUser();
         AdminUserDO user = userService.getUser(loginUser.getId());
         ContractDO updateObj = BeanUtils.toBean(contractSaveReqVO, ContractDO.class);
-        contractMapper.updateById(updateObj);
+        int updated = contractMapper.updateById(updateObj);
+        if (updated < 1) return updated;
         ContractDO contractDO = contractMapper.selectById(updateObj.getId());
+        if (!Objects.equals(previous.getStartDate(), contractDO.getStartDate())
+                || !Objects.equals(previous.getEndDate(), contractDO.getEndDate())) {
+            experienceStore.recordActivity(contractDO.getTenantId(), contractDO.getId(), "AMENDED", "合同期限已调整",
+                    "原到期日 " + (previous.getEndDate() == null ? "未设置" : previous.getEndDate().toLocalDate())
+                            + " → 新到期日 " + (contractDO.getEndDate() == null ? "未设置" : contractDO.getEndDate().toLocalDate()));
+        } else {
+            experienceStore.recordActivity(contractDO.getTenantId(), contractDO.getId(), "AMENDED", "合同内容已调整", "请进入合同详情核对最新内容");
+        }
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         TemplateVO templateVO = new TemplateVO();
         templateVO.setIdNo(contractDO.getCreditorId());
@@ -487,7 +502,9 @@ public class CustomDefineServiceImpl implements CustomDefineService{
            //该状态
             contractDO.setStatus(3);
         }
-        contractMapper.updateById(contractDO);
+        int updated = contractMapper.updateById(contractDO);
+        if (updated > 0) experienceStore.recordActivity(contractDO.getTenantId(), contractDO.getId(), "REPAYMENT", "登记还款",
+                "本次 ¥" + debtVO.getSettlementAmount() + " · 累计 ¥" + contractDO.getRefund());
 
 //        AdminUserDO user = userService.getUser(SecurityFrameworkUtils.getLoginUserId());
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -542,7 +559,11 @@ public class CustomDefineServiceImpl implements CustomDefineService{
         } catch (WxErrorException e) {
             e.printStackTrace();
         }
-        return contractMapper.updateById(updateObj);
+        int updated = contractMapper.updateById(updateObj);
+        if (updated > 0) experienceStore.recordActivity(contractDO.getTenantId(), contractDO.getId(), "EXTENSION", "合同展期",
+                "原到期日 " + (contractDO.getEndDate() == null ? "未设置" : contractDO.getEndDate().toLocalDate())
+                        + " → 新到期日 " + (updateObj.getEndDate() == null ? "未设置" : updateObj.getEndDate().toLocalDate()));
+        return updated;
     }
 
     @Override
@@ -829,9 +850,13 @@ public class CustomDefineServiceImpl implements CustomDefineService{
     @Override
     public Integer updateStatus(ContractSaveReqVO contractSaveReqVO) {
         ContractDO contractDO = contractMapper.selectById(contractSaveReqVO.getId());
+        ownershipGuard.checkOrThrow(contractDO, SecurityFrameworkUtils.getLoginUserId());
+        Integer oldStatus = contractDO.getStatus();
         contractDO.setStatus(contractSaveReqVO.getStatus());
-        contractMapper.updateById(contractDO);
-        return 1;
+        int updated = contractMapper.updateById(contractDO);
+        if (updated > 0 && !Objects.equals(oldStatus, contractDO.getStatus()))
+            experienceStore.recordActivity(contractDO.getTenantId(), contractDO.getId(), "STATUS", "合同状态已更新", "请进入合同详情查看当前状态");
+        return updated;
     }
 
     @Override

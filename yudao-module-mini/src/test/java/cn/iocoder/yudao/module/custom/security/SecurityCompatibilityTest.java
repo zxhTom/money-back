@@ -174,7 +174,7 @@ class SecurityCompatibilityTest {
  void flow()throws Exception{
   flow=new CustomDefineServiceImpl();paymentGuard=mock(ContractPaymentAccessGuard.class);demos=mock(PayDemoOrderMapper.class);custom=mock(CustomDefineMapper.class);contracts=mock(ContractMapper.class);ownership=mock(ContractOwnershipGuard.class);
   orders=mock(PayOrderService.class);users=mock(AdminUserService.class);
-  set(flow,"paymentAccessGuard",paymentGuard);set(flow,"payOrderService",orders);set(flow,"userService",users);set(flow,"payDemoOrderMapper",demos);set(flow,"customDefineMapper",custom);set(flow,"contractMapper",contracts);set(flow,"ownershipGuard",ownership);
+  set(flow,"paymentAccessGuard",paymentGuard);set(flow,"payOrderService",orders);set(flow,"userService",users);set(flow,"payDemoOrderMapper",demos);set(flow,"customDefineMapper",custom);set(flow,"contractMapper",contracts);set(flow,"ownershipGuard",ownership);set(flow,"experienceStore",mock(cn.iocoder.yudao.module.custom.service.contract.ContractExperienceStore.class));
   set(flow,"paymentNotifyCutoverTime",java.time.LocalDateTime.MIN);
   order=new PayOrderDO();order.setId(7L);order.setStatus(cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum.SUCCESS.getStatus());order.setUserId(42L);order.setUserType(2);order.setPrice(100);order.setMerchantOrderId("11");order.setCreateTime(java.time.LocalDateTime.of(2026,10,22,19,0));when(paymentGuard.requireOrder(7L)).thenReturn(order);when(orders.getOrder(7L)).thenReturn(order);when(users.getUser(42L)).thenReturn(user());
   PayDemoOrderDO demo=new PayDemoOrderDO();demo.setId(11L);demo.setSpuId(8L);demo.setUserId(42L);demo.setPayOrderId(7L);demo.setPrice(100);
