@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.service.auth;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
@@ -27,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0;
 
 /** Short-lived, actor-bound account switching. The target receives only its own permissions. */
 @Service
@@ -104,7 +107,7 @@ public class AccountImpersonationService {
         AdminUserDO actorUser = userService.getUserSimple(actor.getUserId());
         if (actorUser == null || StrUtil.isBlank(password)
                 || !userService.isPasswordMatch(password, actorUser.getPassword()))
-            throw new AccessDeniedException("管理员密码不正确");
+            throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "当前管理员登录密码不正确");
         AdminUserDO target = targetId == null ? null : userService.getUserSimple(targetId);
         if (target == null || !actor.getTenantId().equals(target.getTenantId())
                 || !CommonStatusEnum.ENABLE.getStatus().equals(target.getStatus())

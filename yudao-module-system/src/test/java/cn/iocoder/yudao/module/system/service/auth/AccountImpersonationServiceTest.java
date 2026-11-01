@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.service.auth;
 
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
@@ -82,7 +83,10 @@ class AccountImpersonationServiceTest {
     }
 
     @Test void passwordAndTenantAreCheckedBeforeIssuingToken() {
-        assertThrows(AccessDeniedException.class, () -> service.start("actor-token", 99L, "wrong"));
+        ServiceException wrongPassword = assertThrows(ServiceException.class,
+                () -> service.start("actor-token", 99L, "wrong"));
+        assertEquals(400, wrongPassword.getCode());
+        assertEquals("当前管理员登录密码不正确", wrongPassword.getMessage());
         targetUser.setTenantId(2L);
         assertThrows(AccessDeniedException.class, () -> service.start("actor-token", 99L, "password"));
         verify(tokens, never()).createAccessToken(anyLong(), anyInt(), anyString(), anyList());
