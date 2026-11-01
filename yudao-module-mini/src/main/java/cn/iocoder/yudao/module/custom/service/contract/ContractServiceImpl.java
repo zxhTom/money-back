@@ -94,7 +94,6 @@ public class ContractServiceImpl implements ContractService {
     @Resource
     private cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker creditQueryAccessChecker;
 
-    private Random recommendationRandom = new Random();
     @Resource
     private ContractGuessFeedbackStore guessFeedbackStore;
     @Resource
@@ -516,19 +515,10 @@ public class ContractServiceImpl implements ContractService {
         String stored = caller.getIdNo();
         String plain = idCardCipherService.resolveToPlain(caller.getIdNo());
         boolean choosingDebtor = "from".equals(direction);
-        // Most requests favor a known contract contact. One in ten explores a newly
-        // registered, logged-in user; an empty pool immediately tries the other pool.
-        boolean tryNewUserFirst = recommendationRandom.nextInt(10) == 0;
-        cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO result = tryNewUserFirst
-                ? contractMapper.guessNewLoggedInUser(stored, plain, caller.getId(), caller.getTenantId())
-                : (choosingDebtor ? contractMapper.guessActiveDebtor(stored, plain, caller.getId(), caller.getTenantId())
-                        : contractMapper.guessActiveCreditor(stored, plain, caller.getId(), caller.getTenantId()));
-        if (result == null) {
-            result = tryNewUserFirst
-                    ? (choosingDebtor ? contractMapper.guessActiveDebtor(stored, plain, caller.getId(), caller.getTenantId())
-                            : contractMapper.guessActiveCreditor(stored, plain, caller.getId(), caller.getTenantId()))
-                    : contractMapper.guessNewLoggedInUser(stored, plain, caller.getId(), caller.getTenantId());
-        }
+        // Older clients cannot safely resolve masked strangers, so serve contract contacts only.
+        ContractGuessRespVO result = choosingDebtor
+                ? contractMapper.guessActiveDebtor(stored, plain, caller.getId(), caller.getTenantId())
+                : contractMapper.guessActiveCreditor(stored, plain, caller.getId(), caller.getTenantId());
         if (result == null) {
             result = choosingDebtor ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
         }
@@ -551,9 +541,15 @@ public class ContractServiceImpl implements ContractService {
 
     @Override
     public ContractGuessBatchRespVO guessYouLikeBatch(String direction, String myIdCard, int page) {
+        return guessYouLikeBatch(direction, myIdCard, page, false);
+    }
+
+    @Override
+    public ContractGuessBatchRespVO guessYouLikeBatch(String direction, String myIdCard, int page, boolean privacyV2) {
         AdminUserDO caller = requireGuessCaller(myIdCard);
         ContractGuessBatchRespVO batch = new ContractGuessBatchRespVO();
         batch.setItems(new ArrayList<>());
+        if (privacyV2) batch.setPrivacyVersion(2);
         if (page < 0 || page > 20 || !("from".equals(direction) || "to".equals(direction))) {
             return batch;
         }
@@ -563,8 +559,10 @@ public class ContractServiceImpl implements ContractService {
         List<ContractGuessRespVO> contacts = choosingDebtor
                 ? contractMapper.guessActiveDebtors(stored, plain, caller.getId(), caller.getTenantId())
                 : contractMapper.guessActiveCreditors(stored, plain, caller.getId(), caller.getTenantId());
-        List<ContractGuessRespVO> issuers = contractMapper.guessActiveIssuers(stored, plain, caller.getId(), caller.getTenantId());
-        List<ContractGuessRespVO> newcomers = contractMapper.guessNewLoggedInUsers(stored, plain, caller.getId(), caller.getTenantId());
+        List<ContractGuessRespVO> issuers = privacyV2
+                ? contractMapper.guessActiveIssuers(stored, plain, caller.getId(), caller.getTenantId()) : Collections.emptyList();
+        List<ContractGuessRespVO> newcomers = privacyV2
+                ? contractMapper.guessNewLoggedInUsers(stored, plain, caller.getId(), caller.getTenantId()) : Collections.emptyList();
         Map<String, ContractGuessRespVO> contactById = new LinkedHashMap<>();
         Map<String, ContractGuessRespVO> issuerById = new LinkedHashMap<>();
         Map<String, ContractGuessRespVO> newcomerById = new LinkedHashMap<>();
@@ -607,29 +605,82 @@ public class ContractServiceImpl implements ContractService {
         }
         if (ordered.isEmpty()) {
             ContractGuessRespVO legacy = choosingDebtor ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
-            if (legacy != null) ordered.add(legacy);
-        }
-        int start = page * 3;
-        if (start >= ordered.size()) return batch;
-        int end = Math.min(start + 3, ordered.size());
-        List<ContractGuessRespVO> items = new ArrayList<>();
-        Map<Long, String> offered = new LinkedHashMap<>();
-        for (ContractGuessRespVO source : ordered.subList(start, end)) {
-            ContractGuessRespVO item = new ContractGuessRespVO();
-            item.setTargetName(source.getTargetName());
-            item.setTargetIdCardDisplay(idCardCipherService.maskFromStored(source.getTargetIdCard()));
-            item.setTargetIdCard(idCardCipherService.requestToStoredCipher(source.getTargetIdCard()));
-            items.add(item);
-            if (source.getTargetUserId() != null) {
-                offered.put(source.getTargetUserId(), idCardCipherService.resolveToPlain(source.getTargetIdCard()));
+            if (legacy != null) {
+                ordered.add(legacy);
+                addGuessCandidate(contactById, legacy, stored);
             }
         }
+        List<ContractGuessRespVO> eligible = new ArrayList<>();
+        for (ContractGuessRespVO source : ordered) {
+            String identity = idCardCipherService.resolveToPlain(source.getTargetIdCard());
+            if (contactById.containsKey(identity) || !privacyV2) {
+                eligible.add(source);
+            } else if (guessFeedbackStore != null && source.getTargetUserId() != null
+                    && guessFeedbackStore.reserveExternalExposure(caller.getTenantId(), caller.getId(), source.getTargetUserId())) {
+                eligible.add(source);
+            }
+        }
+        if (eligible.isEmpty() && privacyV2 && ordered.size() > 0 && contactById.isEmpty()) {
+            ContractGuessRespVO legacy = choosingDebtor ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
+            if (legacy != null && StrUtil.isNotBlank(legacy.getTargetName()) && StrUtil.isNotBlank(legacy.getTargetIdCard())) {
+                addGuessCandidate(contactById, legacy, stored);
+                if (!contactById.isEmpty()) eligible.add(legacy);
+            }
+        }
+        int start = page * 3;
+        if (start >= eligible.size()) return batch;
+        int end = Math.min(start + 3, eligible.size());
+        List<ContractGuessRespVO> items = new ArrayList<>();
+        Map<Long, String> offered = new LinkedHashMap<>();
+        for (ContractGuessRespVO source : eligible.subList(start, end)) {
+            ContractGuessRespVO item = new ContractGuessRespVO();
+            String identity = idCardCipherService.resolveToPlain(source.getTargetIdCard());
+            if (contactById.containsKey(identity) || !privacyV2) {
+                item.setTargetName(source.getTargetName());
+                item.setTargetIdCardDisplay(idCardCipherService.maskFromStored(source.getTargetIdCard()));
+                item.setTargetIdCard(idCardCipherService.requestToStoredCipher(source.getTargetIdCard()));
+                if (source.getTargetUserId() != null) offered.put(source.getTargetUserId(), identity);
+            } else {
+                String token = guessFeedbackStore.createExternalToken(caller.getTenantId(), caller.getId(), direction,
+                        source.getTargetUserId());
+                if (token == null) continue;
+                item.setTargetName(maskGuessName(source.getTargetName()));
+                item.setCandidateToken(token);
+            }
+            items.add(item);
+        }
         batch.setItems(items);
-        batch.setHasMore(end < ordered.size());
+        batch.setHasMore(end < eligible.size());
         if (guessFeedbackStore != null) {
             batch.setImpressionId(guessFeedbackStore.createImpression(caller.getTenantId(), caller.getId(), direction, offered));
         }
         return batch;
+    }
+
+    private String maskGuessName(String name) {
+        if (StrUtil.isBlank(name) || name.codePointCount(0, name.length()) < 2) return "推荐用户";
+        return name.substring(0, name.offsetByCodePoints(0, 1)) + "＊";
+    }
+
+    @Override
+    public ContractGuessRespVO resolveGuessCandidate(String direction, String myIdCard, String candidateToken) {
+        AdminUserDO caller = requireGuessCaller(myIdCard);
+        if (!("from".equals(direction) || "to".equals(direction)) || StrUtil.isBlank(candidateToken)
+                || guessFeedbackStore == null) return null;
+        Long targetId = guessFeedbackStore.consumeExternalToken(caller.getTenantId(), caller.getId(), direction, candidateToken);
+        if (targetId == null || targetId.equals(caller.getId())) return null;
+        AdminUserDO target = adminUserService.getUser(targetId);
+        if (target == null || !caller.getTenantId().equals(target.getTenantId())
+                || !Integer.valueOf(1).equals(target.getVerified()) || !Integer.valueOf(0).equals(target.getStatus())
+                || Boolean.TRUE.equals(target.getDeleted()) || StrUtil.isBlank(target.getIdNo())
+                || StrUtil.isBlank(target.getRealname())
+                || !contractMapper.isGuessCandidateLoggedIn(targetId, caller.getTenantId())) return null;
+        ContractGuessRespVO selected = new ContractGuessRespVO();
+        selected.setTargetName(target.getRealname());
+        selected.setTargetIdCardDisplay(idCardCipherService.maskFromStored(target.getIdNo()));
+        selected.setTargetIdCard(idCardCipherService.requestToStoredCipher(target.getIdNo()));
+        guessFeedbackStore.recordResolvedSelection(caller.getTenantId(), caller.getId(), direction, targetId);
+        return selected;
     }
 
     private List<ContractGuessRespVO> rankGuessCandidates(java.util.Collection<ContractGuessRespVO> candidates,

@@ -307,4 +307,11 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
                                                   @org.apache.ibatis.annotations.Param("callerId") Long callerId,
                                                   @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
+    @org.apache.ibatis.annotations.Select("SELECT COUNT(*) > 0 FROM system_oauth2_access_token " +
+            "WHERE tenant_id = #{tenantId} AND user_id = #{targetId} AND user_type = 2 " +
+            "AND deleted = 0 AND expires_time > NOW()")
+    boolean isGuessCandidateLoggedIn(@org.apache.ibatis.annotations.Param("targetId") Long targetId,
+                                     @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
+
 }

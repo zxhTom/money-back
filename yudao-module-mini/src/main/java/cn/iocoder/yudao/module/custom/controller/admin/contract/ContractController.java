@@ -358,8 +358,17 @@ public class ContractController {
     public CommonResult<ContractGuessBatchRespVO> guessYouLikeBatch(
             @RequestParam("direction") String direction,
             @RequestParam("idNo") String idNo,
-            @RequestParam(value = "page", defaultValue = "0") int page) {
-        return CommonResult.success(contractService.guessYouLikeBatch(direction, idNo, page));
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "privacyVersion", defaultValue = "0") int privacyVersion) {
+        return CommonResult.success(contractService.guessYouLikeBatch(direction, idNo, page, privacyVersion >= 2));
+    }
+
+    @PostMapping("/guess-you-like/resolve")
+    @Operation(summary = "选择一次性推荐候选人")
+    public CommonResult<cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessRespVO> resolveGuessCandidate(
+            @RequestBody cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessSelectionReqVO reqVO) {
+        return CommonResult.success(contractService.resolveGuessCandidate(reqVO.getDirection(), reqVO.getIdNo(),
+                reqVO.getCandidateToken()));
     }
 
     @PostMapping("/guess-you-like/selection")

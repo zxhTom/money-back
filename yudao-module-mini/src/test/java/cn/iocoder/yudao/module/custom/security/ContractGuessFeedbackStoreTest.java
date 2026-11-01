@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -17,6 +18,28 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class ContractGuessFeedbackStoreTest {
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void externalTokenIsBoundToCallerAndDirectionAndWorksOnce() throws Exception {
+        ContractGuessFeedbackStore store = new ContractGuessFeedbackStore();
+        StringRedisTemplate redis = mock(StringRedisTemplate.class);
+        ValueOperations<String, String> values = mock(ValueOperations.class);
+        when(redis.opsForValue()).thenReturn(values);
+        Field field = store.getClass().getDeclaredField("redis");
+        field.setAccessible(true);
+        field.set(store, redis);
+        ConcurrentHashMap<String, String> entries = new ConcurrentHashMap<>();
+        doAnswer(call -> { entries.put(call.getArgument(0), call.getArgument(1)); return null; })
+                .when(values).set(anyString(), anyString(), eq(30L), eq(TimeUnit.MINUTES));
+        when(values.getAndDelete(anyString())).thenAnswer(call -> entries.remove(call.getArgument(0)));
+
+        String token = store.createExternalToken(1L, 42L, "from", 13L);
+        assertNull(store.consumeExternalToken(1L, 99L, "from", token));
+        assertNull(store.consumeExternalToken(1L, 42L, "to", token));
+        assertEquals(13L, store.consumeExternalToken(1L, 42L, "from", token));
+        assertNull(store.consumeExternalToken(1L, 42L, "from", token));
+    }
 
     @Test
     @SuppressWarnings("unchecked")

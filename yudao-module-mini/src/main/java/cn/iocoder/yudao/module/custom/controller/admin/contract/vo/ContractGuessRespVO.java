@@ -17,6 +17,9 @@ public class ContractGuessRespVO {
     @Schema(description = "推荐人身份证脱敏展示（前六位、后四位）")
     private String targetIdCardDisplay;
 
+    /** Opaque, one-time handle for a suggested user without prior contracts. */
+    private String candidateToken;
+
     /** Scoring data is internal and must not change the response read by older clients. */
     @JsonIgnore
     private Long targetUserId;

@@ -12,4 +12,5 @@ public class ContractGuessBatchRespVO {
     private boolean hasMore;
     /** Optional proof of a served batch; older clients ignore it. */
     private String impressionId;
+    private Integer privacyVersion;
 }

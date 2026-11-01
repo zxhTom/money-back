@@ -8,4 +8,5 @@ public class ContractGuessSelectionReqVO {
     private String idNo;
     private String targetIdCard;
     private String impressionId;
+    private String candidateToken;
 }
