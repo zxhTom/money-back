@@ -13,6 +13,7 @@ import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.framework.web.core.handler.GlobalExceptionHandler;
 import cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -29,6 +30,7 @@ import java.io.IOException;
  * @author 芋道源码
  */
 @RequiredArgsConstructor
+@Slf4j
 public class TokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final SecurityProperties securityProperties;
@@ -47,7 +49,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             Integer userType = WebFrameworkUtils.getLoginUserType(request);
             try {
                 // 1.1 基于 token 构建登录用户
-                LoginUser loginUser = buildLoginUserByToken(token, userType);
+                LoginUser loginUser = buildLoginUserByToken(token, userType, request);
                 // 1.2 模拟 Login 功能，方便日常开发调试
                 if (loginUser == null) {
                     loginUser = mockLoginUser(request, token, userType);
@@ -68,7 +70,7 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    private LoginUser buildLoginUserByToken(String token, Integer userType) {
+    private LoginUser buildLoginUserByToken(String token, Integer userType, HttpServletRequest request) {
         try {
             OAuth2AccessTokenCheckRespDTO accessToken = oauth2TokenApi.checkAccessToken(token);
             if (accessToken == null) {
@@ -81,6 +83,18 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                     && ObjectUtil.notEqual(accessToken.getUserType(), userType)) {
                 throw new AccessDeniedException("错误的用户类型");
             }
+            if (accessToken.getScopes() != null
+                    && accessToken.getScopes().contains(OAuth2TokenCommonApi.ACCOUNT_IMPERSONATION_SCOPE)
+                    && restrictedImpersonationPath(org.springframework.web.util.UrlPathHelper.defaultInstance.getPathWithinApplication(request))) {
+                throw new AccessDeniedException("代入会话不能修改登录凭据、微信绑定或身份认证");
+            }
+            if (accessToken.getScopes() != null
+                    && accessToken.getScopes().contains(OAuth2TokenCommonApi.ACCOUNT_IMPERSONATION_SCOPE)) {
+                String actorId = accessToken.getUserInfo() == null ? "unknown"
+                        : accessToken.getUserInfo().getOrDefault("_impersonatorId", "unknown");
+                log.info("[accountSwitch][request] actor={} target={} method={} path={}",
+                        actorId, accessToken.getUserId(), request.getMethod(), request.getRequestURI());
+            }
             // 构建登录用户
             return new LoginUser().setId(accessToken.getUserId()).setUserType(accessToken.getUserType())
                     .setInfo(accessToken.getUserInfo()) // 额外的用户信息
@@ -90,6 +104,16 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
             // 校验 Token 不通过时，考虑到一些接口是无需登录的，所以直接返回 null 即可
             return null;
         }
+    }
+
+    private boolean restrictedImpersonationPath(String path) {
+        return path.startsWith("/admin-api/system/auth/")
+                && !path.equals("/admin-api/system/auth/get-permission-info")
+                && !path.startsWith("/admin-api/system/auth/account-switch/")
+                || path.startsWith("/admin-api/system/user/profile/update-password")
+                || path.startsWith("/admin-api/system/user/profile/update-pay-password")
+                || path.startsWith("/admin-api/custom/contract/dashboard/bindmini2user")
+                || path.startsWith("/admin-api/api/faceAuth/");
     }
 
     /**

@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.oauth2.*;
 import cn.iocoder.yudao.module.system.dal.redis.oauth2.OAuth2AccessTokenRedisDAO;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.service.auth.AccountImpersonationService;
 import org.junit.jupiter.api.*;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
@@ -52,6 +53,20 @@ class TokenLifecycleSecurityTest {
     @Test void disabledAccountCannotRefresh() {
         user.setStatus(1);assertThrows(ServiceException.class,() -> service.refreshAccessToken("synthetic-refresh","default"));noTokenIssued();
         verify(access,never()).deleteByIds(anyCollection());
+    }
+    @Test void impersonationRefreshTokenCannotBecomeAnOrdinaryAccessToken() {
+        renewal.setScopes(Collections.singletonList(AccountImpersonationService.SCOPE));
+        assertThrows(ServiceException.class, () -> service.refreshAccessToken("synthetic-refresh", "default"));
+        noTokenIssued();
+    }
+    @Test void impersonationTokenNeedsItsBoundSessionOnEveryRequest() throws Exception {
+        token.setScopes(Collections.singletonList(AccountImpersonationService.SCOPE));
+        AccountImpersonationService guard = mock(AccountImpersonationService.class);
+        inject("accountImpersonationService", guard);
+        doThrow(new org.springframework.security.access.AccessDeniedException("expired"))
+                .when(guard).validate(token, "synthetic-access");
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.checkAccessToken("synthetic-access"));
     }
     @Test void cachedAccessTokenCannotBypassDisabledStatus() {
         user.setStatus(1);assertThrows(ServiceException.class,() -> service.checkAccessToken("synthetic-access"));

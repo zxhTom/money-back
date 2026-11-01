@@ -25,6 +25,7 @@ import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2RefreshTokenMapper;
 import cn.iocoder.yudao.module.system.dal.redis.oauth2.OAuth2AccessTokenRedisDAO;
 import cn.iocoder.yudao.module.system.service.monitor.MultiLoginRiskChecker;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.service.auth.AccountImpersonationService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,6 +65,7 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     @Resource
     @Lazy // 懒加载，避免循环依赖（checker 会回调 removeAllTokensByUserId）
     private MultiLoginRiskChecker multiLoginRiskChecker;
+    @Resource @Lazy private AccountImpersonationService accountImpersonationService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -83,6 +85,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         OAuth2RefreshTokenDO refreshTokenDO = oauth2RefreshTokenMapper.selectByRefreshToken(refreshToken);
         if (refreshTokenDO == null) {
             throw exception0(GlobalErrorCodeConstants.BAD_REQUEST.getCode(), "无效的刷新令牌");
+        }
+        if (refreshTokenDO.getScopes() != null && refreshTokenDO.getScopes().contains(AccountImpersonationService.SCOPE)) {
+            throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "账号切换令牌不可刷新");
         }
 
         // 校验 Client 匹配
@@ -153,6 +158,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
             throw exception0(GlobalErrorCodeConstants.UNAUTHORIZED.getCode(), "访问令牌已过期");
         }
         validateUserAccount(accessTokenDO.getUserId(), accessTokenDO.getUserType(), accessTokenDO.getTenantId());
+        if (AccountImpersonationService.isImpersonation(accessTokenDO)) {
+            accountImpersonationService.validate(accessTokenDO, accessToken);
+        }
         return accessTokenDO;
     }
 
@@ -224,9 +232,11 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         // 记录到 Redis 中
         oauth2AccessTokenRedisDAO.set(accessTokenDO);
         // 多登录风控（一IP多用户 / 一用户多IP），失败绝不影响登录
-        try {
-            multiLoginRiskChecker.check(accessTokenDO.getUserId(), ip);
-        } catch (Exception ignored) {
+        if (accessTokenDO.getScopes() == null || !accessTokenDO.getScopes().contains(AccountImpersonationService.SCOPE)) {
+            try {
+                multiLoginRiskChecker.check(accessTokenDO.getUserId(), ip);
+            } catch (Exception ignored) {
+            }
         }
         return accessTokenDO;
     }

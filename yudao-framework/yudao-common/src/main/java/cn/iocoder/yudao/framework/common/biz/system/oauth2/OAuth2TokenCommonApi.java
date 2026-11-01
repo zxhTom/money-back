@@ -12,6 +12,7 @@ import javax.validation.Valid;
  * @author 芋道源码
  */
 public interface OAuth2TokenCommonApi {
+    String ACCOUNT_IMPERSONATION_SCOPE = "__account_impersonation__";
 
     /**
      * 创建访问令牌
