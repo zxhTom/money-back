@@ -101,4 +101,6 @@ public interface ContractService {
 
     cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessBatchRespVO guessYouLikeBatch(String direction, String myIdCard, int page);
 
+    boolean recordGuessSelection(String direction, String myIdCard, String targetIdCard, String impressionId);
+
 }

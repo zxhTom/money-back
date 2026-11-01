@@ -237,35 +237,44 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
                                               @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
-    @org.apache.ibatis.annotations.Select("SELECT c.indebted_name AS targetName, c.indebted_id AS targetIdCard " +
+    @org.apache.ibatis.annotations.Select("SELECT MAX(COALESCE(NULLIF(u.realname, ''), c.indebted_name)) AS targetName, " +
+            "c.indebted_id AS targetIdCard, u.id AS targetUserId, COUNT(*) AS relationCount, " +
+            "MAX(c.create_time) AS lastContractTime, " +
+            "MAX(GREATEST(COALESCE(u.login_date, t.login_time), t.login_time)) AS lastLoginTime " +
             "FROM custom_contract c JOIN system_users u ON u.id_no = c.indebted_id " +
             "AND u.tenant_id = #{tenantId} AND u.deleted = 0 AND u.status = 0 AND u.id != #{callerId} " +
             "JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
             "WHERE c.creditor_id IN (#{myIdCard}, #{plainIdCard}) AND c.tenant_id = #{tenantId} AND c.deleted = 0 " +
             "AND c.indebted_id NOT IN (#{myIdCard}, #{plainIdCard}) " +
-            "GROUP BY c.indebted_name, c.indebted_id, u.id, u.login_date, t.login_time " +
-            "ORDER BY COUNT(*) DESC, COALESCE(u.login_date, t.login_time) DESC, MAX(c.create_time) DESC LIMIT 30")
+            "GROUP BY c.indebted_id, u.id, u.login_date, t.login_time " +
+            "ORDER BY COUNT(*) DESC, MAX(GREATEST(COALESCE(u.login_date, t.login_time), t.login_time)) DESC, " +
+            "MAX(c.create_time) DESC LIMIT 30")
     List<ContractGuessRespVO> guessActiveDebtors(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
                                                   @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
                                                   @org.apache.ibatis.annotations.Param("callerId") Long callerId,
                                                   @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
-    @org.apache.ibatis.annotations.Select("SELECT c.creditor_name AS targetName, c.creditor_id AS targetIdCard " +
+    @org.apache.ibatis.annotations.Select("SELECT MAX(COALESCE(NULLIF(u.realname, ''), c.creditor_name)) AS targetName, " +
+            "c.creditor_id AS targetIdCard, u.id AS targetUserId, COUNT(*) AS relationCount, " +
+            "MAX(c.create_time) AS lastContractTime, " +
+            "MAX(GREATEST(COALESCE(u.login_date, t.login_time), t.login_time)) AS lastLoginTime " +
             "FROM custom_contract c JOIN system_users u ON u.id_no = c.creditor_id " +
             "AND u.tenant_id = #{tenantId} AND u.deleted = 0 AND u.status = 0 AND u.id != #{callerId} " +
             "JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
             "WHERE c.indebted_id IN (#{myIdCard}, #{plainIdCard}) AND c.tenant_id = #{tenantId} AND c.deleted = 0 " +
             "AND c.creditor_id NOT IN (#{myIdCard}, #{plainIdCard}) " +
-            "GROUP BY c.creditor_name, c.creditor_id, u.id, u.login_date, t.login_time " +
-            "ORDER BY COUNT(*) DESC, COALESCE(u.login_date, t.login_time) DESC, MAX(c.create_time) DESC LIMIT 30")
+            "GROUP BY c.creditor_id, u.id, u.login_date, t.login_time " +
+            "ORDER BY COUNT(*) DESC, MAX(GREATEST(COALESCE(u.login_date, t.login_time), t.login_time)) DESC, " +
+            "MAX(c.create_time) DESC LIMIT 30")
     List<ContractGuessRespVO> guessActiveCreditors(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
                                                     @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
                                                     @org.apache.ibatis.annotations.Param("callerId") Long callerId,
                                                     @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
-    @org.apache.ibatis.annotations.Select("SELECT u.realname AS targetName, u.id_no AS targetIdCard " +
+    @org.apache.ibatis.annotations.Select("SELECT u.realname AS targetName, u.id_no AS targetIdCard, " +
+            "u.id AS targetUserId, GREATEST(COALESCE(u.login_date, t.login_time), t.login_time) AS lastLoginTime " +
             "FROM system_users u JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
             "WHERE u.tenant_id = #{tenantId} AND u.id != #{callerId} AND u.deleted = 0 AND u.status = 0 " +
             "AND u.id_no NOT IN (#{myIdCard}, #{plainIdCard}) AND u.verified = 1 " +
@@ -274,10 +283,28 @@ public interface ContractMapper extends BaseMapperX<ContractDO> {
             "AND NOT EXISTS (SELECT 1 FROM custom_contract c WHERE c.tenant_id = #{tenantId} AND c.deleted = 0 " +
             "AND ((c.creditor_id IN (#{myIdCard}, #{plainIdCard}) AND c.indebted_id = u.id_no) " +
             "OR (c.indebted_id IN (#{myIdCard}, #{plainIdCard}) AND c.creditor_id = u.id_no))) " +
-            "ORDER BY COALESCE(u.login_date, t.login_time) DESC, u.create_time DESC LIMIT 30")
+            "ORDER BY GREATEST(COALESCE(u.login_date, t.login_time), t.login_time) DESC, u.create_time DESC LIMIT 30")
     List<ContractGuessRespVO> guessNewLoggedInUsers(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
                                                      @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
                                                      @org.apache.ibatis.annotations.Param("callerId") Long callerId,
                                                      @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
+
+    // Active verified issuers broaden discovery without requiring a prior contract with the caller.
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true", illegalSql = "false")
+    @org.apache.ibatis.annotations.Select("SELECT u.realname AS targetName, u.id_no AS targetIdCard, " +
+            "u.id AS targetUserId, COUNT(c.id) AS issuedCount, MAX(c.create_time) AS lastContractTime, " +
+            "GREATEST(COALESCE(u.login_date, t.login_time), t.login_time) AS lastLoginTime " +
+            "FROM system_users u JOIN (" + LOGGED_IN_USERS + ") t ON t.user_id = u.id " +
+            "JOIN custom_contract c ON c.creditor_id = u.id_no AND c.tenant_id = #{tenantId} AND c.deleted = 0 " +
+            "WHERE u.tenant_id = #{tenantId} AND u.id != #{callerId} AND u.deleted = 0 AND u.status = 0 " +
+            "AND u.verified = 1 AND u.id_no IS NOT NULL AND u.id_no != '' " +
+            "AND u.id_no NOT IN (#{myIdCard}, #{plainIdCard}) " +
+            "AND u.realname IS NOT NULL AND u.realname != '' " +
+            "GROUP BY u.id, u.realname, u.id_no, u.login_date, t.login_time " +
+            "ORDER BY COUNT(c.id) DESC, GREATEST(COALESCE(u.login_date, t.login_time), t.login_time) DESC LIMIT 30")
+    List<ContractGuessRespVO> guessActiveIssuers(@org.apache.ibatis.annotations.Param("myIdCard") String myIdCard,
+                                                  @org.apache.ibatis.annotations.Param("plainIdCard") String plainIdCard,
+                                                  @org.apache.ibatis.annotations.Param("callerId") Long callerId,
+                                                  @org.apache.ibatis.annotations.Param("tenantId") Long tenantId);
 
 }

@@ -38,9 +38,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +95,8 @@ public class ContractServiceImpl implements ContractService {
     private cn.iocoder.yudao.module.custom.service.custom.CreditQueryAccessChecker creditQueryAccessChecker;
 
     private Random recommendationRandom = new Random();
+    @Resource
+    private ContractGuessFeedbackStore guessFeedbackStore;
     @Resource
     private ContractTeaseGuard teaseGuard;
 
@@ -556,8 +563,10 @@ public class ContractServiceImpl implements ContractService {
         List<ContractGuessRespVO> contacts = choosingDebtor
                 ? contractMapper.guessActiveDebtors(stored, plain, caller.getId(), caller.getTenantId())
                 : contractMapper.guessActiveCreditors(stored, plain, caller.getId(), caller.getTenantId());
+        List<ContractGuessRespVO> issuers = contractMapper.guessActiveIssuers(stored, plain, caller.getId(), caller.getTenantId());
         List<ContractGuessRespVO> newcomers = contractMapper.guessNewLoggedInUsers(stored, plain, caller.getId(), caller.getTenantId());
         Map<String, ContractGuessRespVO> contactById = new LinkedHashMap<>();
+        Map<String, ContractGuessRespVO> issuerById = new LinkedHashMap<>();
         Map<String, ContractGuessRespVO> newcomerById = new LinkedHashMap<>();
         if (contacts != null) {
             for (ContractGuessRespVO contact : contacts) addGuessCandidate(contactById, contact, stored);
@@ -565,17 +574,37 @@ public class ContractServiceImpl implements ContractService {
         if (newcomers != null) {
             for (ContractGuessRespVO newcomer : newcomers) addGuessCandidate(newcomerById, newcomer, stored);
         }
-        contactById.keySet().forEach(newcomerById::remove);
-        List<ContractGuessRespVO> ordered = new ArrayList<>();
-        List<ContractGuessRespVO> newcomerList = new ArrayList<>(newcomerById.values());
-        int newcomerIndex = 0;
-        for (ContractGuessRespVO contact : contactById.values()) {
-            ordered.add(contact);
-            if (ordered.size() % 10 == 9 && newcomerIndex < newcomerList.size()) {
-                ordered.add(newcomerList.get(newcomerIndex++));
-            }
+        if (issuers != null) {
+            for (ContractGuessRespVO issuer : issuers) addGuessCandidate(issuerById, issuer, stored);
         }
-        while (newcomerIndex < newcomerList.size()) ordered.add(newcomerList.get(newcomerIndex++));
+        for (Map.Entry<String, ContractGuessRespVO> entry : issuerById.entrySet()) {
+            ContractGuessRespVO contact = contactById.get(entry.getKey());
+            if (contact != null) contact.setIssuedCount(entry.getValue().getIssuedCount());
+        }
+        contactById.keySet().forEach(issuerById::remove);
+        contactById.keySet().forEach(newcomerById::remove);
+        issuerById.keySet().forEach(newcomerById::remove);
+        Map<Long, Double> selections = guessFeedbackStore == null ? Collections.emptyMap()
+                : guessFeedbackStore.selectionCounts(caller.getTenantId(), caller.getId(), direction);
+        List<ContractGuessRespVO> contactList = rankGuessCandidates(contactById.values(), selections);
+        List<ContractGuessRespVO> issuerList = rankGuessCandidates(issuerById.values(), selections);
+        List<ContractGuessRespVO> newcomerList = rankGuessCandidates(newcomerById.values(), selections);
+        List<ContractGuessRespVO> ordered = new ArrayList<>();
+        int[] positions = new int[3];
+        List<List<ContractGuessRespVO>> pools = Arrays.asList(contactList, issuerList, newcomerList);
+        // Seven relationship slots, two proven issuers, one new user per ten.
+        int[] schedule = {0, 0, 1, 0, 0, 2, 0, 1, 0, 0};
+        while (positions[0] < contactList.size() || positions[1] < issuerList.size() || positions[2] < newcomerList.size()) {
+            int preferred = schedule[ordered.size() % schedule.length];
+            int pool = positions[preferred] < pools.get(preferred).size() ? preferred : -1;
+            if (pool < 0) {
+                for (int fallback : new int[]{0, 1, 2}) {
+                    if (positions[fallback] < pools.get(fallback).size()) { pool = fallback; break; }
+                }
+            }
+            if (pool < 0) break;
+            ordered.add(pools.get(pool).get(positions[pool]++));
+        }
         if (ordered.isEmpty()) {
             ContractGuessRespVO legacy = choosingDebtor ? contractMapper.guessDebtor(stored, plain) : contractMapper.guessCreditor(stored, plain);
             if (legacy != null) ordered.add(legacy);
@@ -584,16 +613,60 @@ public class ContractServiceImpl implements ContractService {
         if (start >= ordered.size()) return batch;
         int end = Math.min(start + 3, ordered.size());
         List<ContractGuessRespVO> items = new ArrayList<>();
+        Map<Long, String> offered = new LinkedHashMap<>();
         for (ContractGuessRespVO source : ordered.subList(start, end)) {
             ContractGuessRespVO item = new ContractGuessRespVO();
             item.setTargetName(source.getTargetName());
             item.setTargetIdCardDisplay(idCardCipherService.maskFromStored(source.getTargetIdCard()));
             item.setTargetIdCard(idCardCipherService.requestToStoredCipher(source.getTargetIdCard()));
             items.add(item);
+            if (source.getTargetUserId() != null) {
+                offered.put(source.getTargetUserId(), idCardCipherService.resolveToPlain(source.getTargetIdCard()));
+            }
         }
         batch.setItems(items);
         batch.setHasMore(end < ordered.size());
+        if (guessFeedbackStore != null) {
+            batch.setImpressionId(guessFeedbackStore.createImpression(caller.getTenantId(), caller.getId(), direction, offered));
+        }
         return batch;
+    }
+
+    private List<ContractGuessRespVO> rankGuessCandidates(java.util.Collection<ContractGuessRespVO> candidates,
+                                                            Map<Long, Double> selections) {
+        List<ContractGuessRespVO> ranked = new ArrayList<>(candidates);
+        LocalDateTime now = LocalDateTime.now();
+        ranked.sort(Comparator.comparingDouble((ContractGuessRespVO item) -> guessScore(item, selections, now))
+                .reversed().thenComparing(ContractGuessRespVO::getTargetIdCard));
+        return ranked;
+    }
+
+    private double guessScore(ContractGuessRespVO item, Map<Long, Double> selections, LocalDateTime now) {
+        long relations = item.getRelationCount() == null ? 0 : Math.max(0, item.getRelationCount());
+        long issued = item.getIssuedCount() == null ? 0 : Math.max(0, item.getIssuedCount());
+        double selected = item.getTargetUserId() == null ? 0 : selections.getOrDefault(item.getTargetUserId(), 0.0);
+        double score = (relations > 0 ? 160 + 90 * Math.log1p(relations) : 0)
+                + 40 * Math.log1p(issued)
+                + 35 * Math.log1p(Math.min(100, Math.max(0, selected)));
+        if (item.getLastLoginTime() != null) {
+            long hours = Math.max(0, Duration.between(item.getLastLoginTime(), now).toHours());
+            score += 40 * Math.max(0, 1.0 - hours / 168.0);
+        }
+        if (item.getLastContractTime() != null) {
+            long days = Math.max(0, Duration.between(item.getLastContractTime(), now).toDays());
+            score += 20 * Math.max(0, 1.0 - days / 90.0);
+        }
+        return score;
+    }
+
+    @Override
+    public boolean recordGuessSelection(String direction, String myIdCard, String targetIdCard, String impressionId) {
+        AdminUserDO caller = requireGuessCaller(myIdCard);
+        if (!("from".equals(direction) || "to".equals(direction)) || StrUtil.isBlank(targetIdCard)
+                || StrUtil.isBlank(impressionId) || idCardCipherService.sameIdCard(caller.getIdNo(), targetIdCard)
+                || guessFeedbackStore == null) return false;
+        return guessFeedbackStore.recordSelection(caller.getTenantId(), caller.getId(), direction,
+                impressionId, idCardCipherService.resolveToPlain(targetIdCard));
     }
 
     private void addGuessCandidate(Map<String, ContractGuessRespVO> candidates, ContractGuessRespVO candidate, String ownIdCard) {

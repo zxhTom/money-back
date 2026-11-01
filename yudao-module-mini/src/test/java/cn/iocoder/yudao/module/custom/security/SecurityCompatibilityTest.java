@@ -82,6 +82,34 @@ class SecurityCompatibilityTest {
   assertEquals(1,second.getItems().size());assertEquals("D",second.getItems().get(0).getTargetName());assertFalse(second.isHasMore());
   assertEquals("encrypted-d-id",second.getItems().get(0).getTargetIdCard());
  }
+ @Test void batchFavorsContractHistoryAndStillShowsActiveIssuer()throws Exception{
+  recommendation();
+  ContractGuessFeedbackStore feedback=mock(ContractGuessFeedbackStore.class);set(recommendation,"guessFeedbackStore",feedback);
+  ContractGuessRespVO a=new ContractGuessRespVO();a.setTargetName("A");a.setTargetIdCard("a-id");a.setTargetUserId(10L);a.setRelationCount(4L);
+  ContractGuessRespVO b=new ContractGuessRespVO();b.setTargetName("B");b.setTargetIdCard("b-id");b.setTargetUserId(11L);b.setRelationCount(1L);
+  ContractGuessRespVO c=new ContractGuessRespVO();c.setTargetName("C");c.setTargetIdCard("c-id");c.setTargetUserId(12L);c.setRelationCount(2L);
+  ContractGuessRespVO issuer=new ContractGuessRespVO();issuer.setTargetName("Issuer");issuer.setTargetIdCard("issuer-id");issuer.setTargetUserId(13L);issuer.setIssuedCount(40L);
+  when(contracts.guessActiveDebtors("stored-id","plain-id",42L,1L)).thenReturn(java.util.Arrays.asList(a,b,c));
+  when(contracts.guessActiveIssuers("stored-id","plain-id",42L,1L)).thenReturn(java.util.Collections.singletonList(issuer));
+  when(feedback.selectionCounts(1L,42L,"from")).thenReturn(java.util.Collections.singletonMap(11L,20.0));
+  for(String id:new String[]{"a-id","b-id","c-id","issuer-id"})when(cipher.resolveToPlain(id)).thenReturn(id);
+  ContractGuessBatchRespVO result=recommendation.guessYouLikeBatch("from","own-id",0);
+  assertEquals(3,result.getItems().size());assertEquals("B",result.getItems().get(0).getTargetName());
+  assertEquals("A",result.getItems().get(1).getTargetName());assertEquals("Issuer",result.getItems().get(2).getTargetName());
+  verify(feedback).createImpression(eq(1L),eq(42L),eq("from"),anyMap());
+  String json=new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(result.getItems().get(0));
+  assertFalse(json.contains("targetUserId"));assertFalse(json.contains("relationCount"));
+ }
+ @Test void selectionFeedbackRequiresOwnIdentityAndRejectsSelf()throws Exception{
+  recommendation();ContractGuessFeedbackStore feedback=mock(ContractGuessFeedbackStore.class);set(recommendation,"guessFeedbackStore",feedback);
+  assertThrows(AccessDeniedException.class,()->recommendation.recordGuessSelection("from","other-id","target","impression"));
+  when(cipher.sameIdCard("stored-id","stored-id")).thenReturn(true);
+  assertFalse(recommendation.recordGuessSelection("from","own-id","stored-id","impression"));
+  verifyNoInteractions(feedback);
+  when(cipher.resolveToPlain("target")).thenReturn("target-plain");
+  when(feedback.recordSelection(1L,42L,"from","impression","target-plain")).thenReturn(true);
+  assertTrue(recommendation.recordGuessSelection("from","own-id","target","impression"));
+ }
  AdminUserServiceImpl profiles;AdminUserMapper userMapper;UserProfileUpdateReqVO profile;
  void profile()throws Exception{profiles=new AdminUserServiceImpl();userMapper=mock(AdminUserMapper.class);cipher=mock(IdCardCipherService.class);when(userMapper.selectById(42L)).thenReturn(user());when(userMapper.update(any(AdminUserDO.class),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);set(profiles,"userMapper",userMapper);set(profiles,"idCardCipherService",cipher);profile=new UserProfileUpdateReqVO();}
  @Test void verifiedIdentityChangeIsDeniedBeforeDatabaseWrite()throws Exception{profile();profile.setRealname("Other Person");assertThrows(AccessDeniedException.class,()->profiles.updateUserProfile(42L,profile));verify(userMapper,never()).updateById(any(AdminUserDO.class));}

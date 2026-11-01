@@ -10,4 +10,6 @@ import java.util.List;
 public class ContractGuessBatchRespVO {
     private List<ContractGuessRespVO> items;
     private boolean hasMore;
+    /** Optional proof of a served batch; older clients ignore it. */
+    private String impressionId;
 }

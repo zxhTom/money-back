@@ -362,4 +362,12 @@ public class ContractController {
         return CommonResult.success(contractService.guessYouLikeBatch(direction, idNo, page));
     }
 
+    @PostMapping("/guess-you-like/selection")
+    @Operation(summary = "记录已选择的推荐联系人")
+    public CommonResult<Boolean> recordGuessSelection(
+            @RequestBody cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractGuessSelectionReqVO reqVO) {
+        return CommonResult.success(contractService.recordGuessSelection(reqVO.getDirection(), reqVO.getIdNo(),
+                reqVO.getTargetIdCard(), reqVO.getImpressionId()));
+    }
+
 }
