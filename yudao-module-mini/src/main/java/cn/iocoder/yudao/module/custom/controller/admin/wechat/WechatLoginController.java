@@ -15,6 +15,7 @@ import cn.iocoder.yudao.module.system.controller.admin.auth.vo.AuthLoginRespVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.auth.AdminAuthService;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.framework.ratelimiter.core.annotation.RateLimiter;
 import cn.iocoder.yudao.framework.ratelimiter.core.keyresolver.impl.ClientIpRateLimiterKeyResolver;
 import com.alibaba.fastjson.JSON;
@@ -63,6 +64,15 @@ public class WechatLoginController {
 
     @Autowired
     private IdCardCipherService idCardCipherService;
+
+    @Autowired
+    private ConfigApi configApi;
+
+    @GetMapping("/login/account-picker-mode")
+    public ApiResponse getAccountPickerMode() {
+        String mode = configApi.getConfigValueByKey("login.remembered-account-picker-mode");
+        return ApiResponse.success("circle".equalsIgnoreCase(mode) ? "circle" : "list");
+    }
 
     @PostMapping("/send")
     @PreAuthorize("@ss.hasPermission('custom:contract:create')")

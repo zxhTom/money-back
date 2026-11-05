@@ -13,7 +13,8 @@ import lombok.Getter;
 public enum NoticeTypeEnum {
 
     NOTICE(1),
-    ANNOUNCEMENT(2);
+    ANNOUNCEMENT(2),
+    SYSTEM_UPGRADE(3);
 
     /**
      * 类型

@@ -132,6 +132,8 @@ public class WechatServiceImpl implements WechatService {
                 .build();
         if (CollectionUtil.isNotEmpty(templateVO.getDatas())) {
             for (Map.Entry<String, Object> entry : templateVO.getDatas().entrySet()) {
+                // 历史账号可能缺少实名等可选字段，不能让通知模板的空值使业务请求报 500。
+                if (StrUtil.isBlank(entry.getKey()) || entry.getValue() == null) continue;
                 message.addData(new WxMpTemplateData(entry.getKey(), entry.getValue().toString()));
             }
         }

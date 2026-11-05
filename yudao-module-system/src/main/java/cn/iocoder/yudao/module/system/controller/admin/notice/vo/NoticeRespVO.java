@@ -27,4 +27,9 @@ public class NoticeRespVO {
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED, example = "时间戳格式")
     private LocalDateTime createTime;
 
+    private LocalDateTime displayStartTime;
+    private LocalDateTime displayEndTime;
+    private LocalDateTime maintenanceStartTime;
+    private LocalDateTime maintenanceEndTime;
+
 }

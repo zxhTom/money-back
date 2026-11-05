@@ -1,11 +1,11 @@
 package cn.iocoder.yudao.module.custom.controller;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import javax.annotation.security.PermitAll;
 
 @Controller // 注意是@Controller，不是@RestController
 public class IframeController {
@@ -19,7 +19,7 @@ public class IframeController {
      * @return 返回Thymeleaf模板名称 "iframe-viewer"
      */
     @GetMapping("/embed")
-    @PermitAll
+    @PreAuthorize("isAuthenticated()")
     public String embedPage(
             @RequestParam("url") String url, // 必须传入url参数
             @RequestParam(value = "height", required = false, defaultValue = "600") Integer height,

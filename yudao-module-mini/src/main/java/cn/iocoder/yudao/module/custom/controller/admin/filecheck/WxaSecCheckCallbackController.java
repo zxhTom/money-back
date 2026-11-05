@@ -60,7 +60,7 @@ public class WxaSecCheckCallbackController {
                 log.info("[wxaSecCheck][媒体检测回调 traceId={} suggest={}]", msg.getTraceId(), suggest);
             }
         } catch (Exception e) {
-            log.error("[wxaSecCheck][处理回调失败 body={}]", body, e);
+            log.error("[wxaSecCheck][处理回调失败]", e);
         }
         return "success";
     }

@@ -9,6 +9,7 @@ import me.chanjar.weixin.mp.bean.message.WxMpXmlMessage;
 import me.chanjar.weixin.mp.bean.message.WxMpXmlOutMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import javax.annotation.security.PermitAll;
 import javax.servlet.http.HttpServletRequest;
@@ -30,6 +31,7 @@ public class OffcialController {
     @Autowired
     WechatMenuService wechatMenuService;
     @GetMapping("/menu/create")
+    @PreAuthorize("@ss.hasAnyRoles('super_admin','tenant_admin')")
     public String validate(){
         String menu = wechatMenuService.createMenu();
         return menu;
@@ -65,9 +67,6 @@ public class OffcialController {
             @RequestParam(name = "encrypt_type", required = false) String encType,
             @RequestParam(name = "msg_signature", required = false) String msgSignature) {
 
-        log.info("\n接收微信请求：[openid=[{}], [signature=[{}], encType=[{}], msgSignature=[{}], timestamp=[{}], nonce=[{}], requestBody=[\n{}\n] ",
-                openid, signature, encType, msgSignature, timestamp, nonce, requestBody);
-
         // 切换公众号配置（多公众号支持）
         if (!wxMpService.switchover(appid)) {
             throw new IllegalArgumentException(String.format("未找到对应appid=[%s]的配置，请核实！", appid));
@@ -77,6 +76,7 @@ public class OffcialController {
         if (!wxMpService.checkSignature(timestamp, nonce, signature)) {
             throw new IllegalArgumentException("非法请求，可能属于伪造的请求！");
         }
+        log.info("[offcialCallback] 已验证公众号回调 appid={} encrypted={}", appid, "aes".equalsIgnoreCase(encType));
 
         String out = null;
         // 2. 处理加密消息（如果配置了加密）
@@ -84,7 +84,6 @@ public class OffcialController {
             WxMpXmlMessage inMessage = WxMpXmlMessage.fromEncryptedXml(
                     requestBody, wxMpService.getWxMpConfigStorage(),
                     timestamp, nonce, msgSignature);
-            log.debug("\n消息解密后内容为：\n{} ", inMessage.toString());
 
             // 3. >>> **核心步骤：将消息交给路由器，路由器会自动找到对应的Handler！**
 //            WxMpXmlOutMessage outMessage = wxMpMessageRouter.route(inMessage);
@@ -94,7 +93,6 @@ public class OffcialController {
         } else {
             // 4. 处理明文消息
             WxMpXmlMessage inMessage = WxMpXmlMessage.fromXml(requestBody); // **此处将XML字符串解析成对象**
-            log.debug("\n明文消息内容为：\n{} ", inMessage.toString());
 
             // 5. >>> **核心步骤：将消息交给路由器**
 /*

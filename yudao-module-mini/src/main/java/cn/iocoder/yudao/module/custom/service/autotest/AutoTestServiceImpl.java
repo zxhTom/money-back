@@ -5,11 +5,14 @@ import cn.iocoder.yudao.module.custom.controller.admin.contract.vo.ContractSaveR
 import cn.iocoder.yudao.module.custom.controller.admin.custom.vo.ContractPayOrderCreateReqVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.contract.ContractDO;
 import cn.iocoder.yudao.module.custom.dal.mysql.contract.ContractMapper;
+import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.custom.service.contract.ContractService;
 import cn.iocoder.yudao.module.custom.service.custom.CustomDefineService;
 import cn.iocoder.yudao.module.custom.service.face.baidu.BaiduFaceAuthService;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
+import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2AccessTokenMapper;
 import cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO;
 import cn.iocoder.yudao.module.pay.service.order.PayOrderService;
 import cn.iocoder.yudao.module.pay.controller.admin.order.vo.PayOrderSubmitReqVO;
@@ -18,17 +21,25 @@ import cn.iocoder.yudao.module.pay.dal.mysql.demo.PayDemoOrderMapper;
 import cn.iocoder.yudao.module.pay.dal.dataobject.demo.PayDemoOrderDO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Arrays;
+import java.util.Objects;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 @Slf4j
 @Service
 public class AutoTestServiceImpl implements AutoTestService {
     @Resource private cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService securityFrameworkService;
     @Value("${custom.auto-test.enabled:false}") private boolean enabled;
+    @Value("${server.domain:}") private String serverDomain;
 
     @Value("${custom.auto-test.user-a:zxhtom}")
     private String userAUsername;
@@ -66,9 +77,156 @@ public class AutoTestServiceImpl implements AutoTestService {
     @Resource
     private PayDemoOrderMapper payDemoOrderMapper;
 
+    @Resource
+    private IdCardCipherService idCardCipherService;
+
+    @Resource
+    private OAuth2AccessTokenMapper oauth2AccessTokenMapper;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
     @Override
     public boolean hasAdminRole() {
         return securityFrameworkService.hasAnyRoles("super_admin", "tenant_admin");
+    }
+
+    @Override
+    public Map<String, Boolean> runSmokeTest() {
+        if (!hasAdminRole()) throw new org.springframework.security.access.AccessDeniedException("没有权限");
+        Map<String, Boolean> checks = new LinkedHashMap<>();
+        checks.put("管理员权限", true);
+        AdminUserDO currentUser = null;
+        try {
+            currentUser = adminUserService.getUser(SecurityFrameworkUtils.getLoginUserId());
+            checks.put("当前账号", currentUser != null);
+        } catch (Exception e) {
+            log.warn("自动检查：账号读取失败", e);
+            checks.put("当前账号", false);
+        }
+        if (currentUser != null) {
+            try {
+                oauth2AccessTokenMapper.selectAdminTokenCountsByUserIds(java.util.Collections.singletonList(currentUser.getId()));
+                checks.put("当前账号登录状态读取", true);
+            } catch (Exception e) {
+                log.warn("自动检查：当前账号登录状态读取失败", e);
+                checks.put("当前账号登录状态读取", false);
+            }
+        }
+        try {
+            contractMapper.selectById(-1L);
+            checks.put("合同数据库", true);
+        } catch (Exception e) {
+            log.warn("自动检查：合同数据库读取失败", e);
+            checks.put("合同数据库", false);
+        }
+        try {
+            payDemoOrderMapper.selectById(-1L);
+            checks.put("支付订单数据库", true);
+        } catch (Exception e) {
+            log.warn("自动检查：支付订单数据库读取失败", e);
+            checks.put("支付订单数据库", false);
+        }
+        AdminUserDO userA = null;
+        AdminUserDO userB = null;
+        try {
+            // 固定限定在获准测试的两个账号；不读取其他用户资料。
+            userA = adminUserService.getUserByUsername("zxhtom");
+            userB = adminUserService.getUserByUsername("汪桂林");
+            checks.put("指定测试账号", currentUser != null && userA != null && userB != null
+                    && !userA.getId().equals(userB.getId())
+                    && Objects.equals(currentUser.getTenantId(), userA.getTenantId())
+                    && Objects.equals(userA.getTenantId(), userB.getTenantId()));
+        } catch (Exception e) {
+            log.warn("自动检查：指定测试账号读取失败", e);
+            checks.put("指定测试账号", false);
+        }
+        if (Boolean.TRUE.equals(checks.get("指定测试账号"))) {
+            final AdminUserDO a = userA;
+            final AdminUserDO b = userB;
+            try {
+                String idA = idCardCipherService.resolveToPlain(a.getIdNo());
+                String idB = idCardCipherService.resolveToPlain(b.getIdNo());
+                if (org.apache.commons.lang3.StringUtils.isBlank(idA)
+                        || org.apache.commons.lang3.StringUtils.isBlank(idB)) {
+                    checks.put("双方合同往来（证件资料缺失）", false);
+                } else {
+                    Long count = contractMapper.selectCount(new LambdaQueryWrapperX<ContractDO>()
+                            .and(w -> w.eq(ContractDO::getCreditorId, idA).eq(ContractDO::getIndebtedId, idB))
+                            .or(w -> w.eq(ContractDO::getCreditorId, idB).eq(ContractDO::getIndebtedId, idA)));
+                    checks.put("双方合同往来（" + (count == null ? 0 : count) + "份）", true);
+                }
+            } catch (Exception e) {
+                log.warn("自动检查：双方合同往来读取失败", e);
+                checks.put("双方合同往来读取", false);
+            }
+            try {
+                Long count = payDemoOrderMapper.selectCount(new LambdaQueryWrapperX<PayDemoOrderDO>()
+                        .in(PayDemoOrderDO::getUserId, Arrays.asList(a.getId(), b.getId())));
+                checks.put("两人支付订单（" + (count == null ? 0 : count) + "笔）", true);
+            } catch (Exception e) {
+                log.warn("自动检查：两人支付订单读取失败", e);
+                checks.put("两人支付订单读取", false);
+            }
+            try {
+                oauth2AccessTokenMapper.selectAdminTokenCountsByUserIds(Arrays.asList(a.getId(), b.getId()));
+                checks.put("两人登录状态读取", true);
+            } catch (Exception e) {
+                log.warn("自动检查：两人登录状态读取失败", e);
+                checks.put("两人登录状态读取", false);
+            }
+        } else {
+            checks.put("双方合同往来（账号未找到，未执行）", false);
+            checks.put("两人支付订单（账号未找到，未执行）", false);
+            checks.put("两人登录状态（账号未找到，未执行）", false);
+        }
+        try {
+            stringRedisTemplate.hasKey("money:auto-test:read-only:health");
+            checks.put("Redis 读取", true);
+        } catch (Exception e) {
+            log.warn("自动检查：Redis 读取失败", e);
+            checks.put("Redis 读取", false);
+        }
+        return checks;
+    }
+
+    @Override
+    public Map<String, Boolean> runFacePreflight() {
+        if (!hasAdminRole()) throw new org.springframework.security.access.AccessDeniedException("没有权限");
+        Map<String, Boolean> checks = new LinkedHashMap<>();
+        boolean callbackConfigured = serverDomain != null
+                && serverDomain.startsWith("https://brain.toms.chat/");
+        checks.put("回调域名配置", callbackConfigured);
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL("https://brain.toms.chat/face/print/").openConnection();
+            connection.setRequestMethod("HEAD");
+            connection.setInstanceFollowRedirects(false);
+            connection.setConnectTimeout(4000);
+            connection.setReadTimeout(4000);
+            int status = connection.getResponseCode();
+            checks.put("认证网页连通", status >= 200 && status < 400);
+        } catch (Exception e) {
+            log.warn("人脸预检：认证网页不可达，类型={}", e.getClass().getSimpleName());
+            checks.put("认证网页连通", false);
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+        if (callbackConfigured) {
+            try {
+                String token = baiduFaceAuthService.getVerifyToken(
+                        serverDomain + "/api/mini/callback?status=success",
+                        serverDomain + "/api/mini/callback?status=failed");
+                checks.put("百度认证令牌申请", org.apache.commons.lang3.StringUtils.isNotBlank(token));
+            } catch (Exception e) {
+                // Provider 异常可能包含认证参数；只记类型，不输出异常消息或令牌。
+                log.warn("人脸预检：令牌申请失败，类型={}", e.getClass().getSimpleName());
+                checks.put("百度认证令牌申请", false);
+            }
+        } else {
+            checks.put("百度认证令牌申请（配置异常，未执行）", false);
+        }
+        return checks;
     }
 
     @Override

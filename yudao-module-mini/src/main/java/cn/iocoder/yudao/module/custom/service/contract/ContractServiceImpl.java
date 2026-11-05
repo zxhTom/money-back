@@ -21,7 +21,6 @@ import cn.iocoder.yudao.module.system.framework.idcard.IdCardCipherService;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import lombok.extern.slf4j.Slf4j;
-import me.chanjar.weixin.common.error.WxErrorException;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -55,7 +54,6 @@ import java.util.stream.Collectors;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_NOT_EXISTS;
 import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.CONTRACT_PARTY_SAME;
-import static cn.iocoder.yudao.module.custom.enums.CustomErrorCodeConstants.WECHAT_TEMPLATE_SEND_FAIL;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSWORD_FAILED;
 
 /**
@@ -127,30 +125,39 @@ public class ContractServiceImpl implements ContractService {
             contract.setDeptId(deptId);
         }
         contractMapper.insert(contract);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-//        String formattedDate = now.format(formatter);
+        // 合同已落库；通知属于附加动作，失败不能把成功的创建请求变成 500，诱导用户重复提交。
+        try {
+            sendContractCreatedNotifications(contract, user);
+        } catch (Exception e) {
+            log.warn("合同 {} 已创建，微信模板通知准备失败：{}", contract.getId(), e.getClass().getSimpleName());
+        }
+        return contract.getId();
+    }
+
+    private void sendContractCreatedNotifications(ContractDO contract, AdminUserDO creator) {
+        String creatorName = StrUtil.isNotBlank(creator.getRealname()) ? creator.getRealname()
+                : StrUtil.isNotBlank(creator.getNickname()) ? creator.getNickname() : "合同创建人";
+        Map<String, Object> data = new HashMap<>();
+        data.put("phrase3", creatorName);
+        data.put("character_string9", contract.getId());
+        data.put("time2", (contract.getCreateTime() == null ? LocalDateTime.now() : contract.getCreateTime())
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        data.put("amount6", contract.getSalary());
+        sendContractCreatedNotification(contract.getId(), contract.getCreditorId(), "债权人", data);
+        sendContractCreatedNotification(contract.getId(), contract.getIndebtedId(), "债务人", data);
+    }
+
+    private void sendContractCreatedNotification(Long contractId, String idNo, String party, Map<String, Object> data) {
+        if (StrUtil.isBlank(idNo)) return;
         TemplateVO templateVO = new TemplateVO();
-        templateVO.setIdNo(contract.getCreditorId());
+        templateVO.setIdNo(idNo);
         templateVO.setTemplateId("zQEe3cyJ4Vru_n7SGzSFg4I_2dCs6y8Fp-Xj5blh6oM");
-        templateVO.setDatas(new HashMap<String, Object>() {
-            {
-                put("phrase3", user.getRealname());
-                put("character_string9", contract.getId());
-                put("time2", contract.getCreateTime().format(formatter));
-                put("amount6", contract.getSalary());
-            }
-        });
+        templateVO.setDatas(data);
         try {
             wechatService.send(templateVO);
-            templateVO.setIdNo(contract.getIndebtedId());
-            wechatService.send(templateVO);
-        } catch (WxErrorException e) {
-            String msg = e.getError() != null ? e.getError().getErrorMsg() : e.getMessage();
-            log.error(msg);
-//            throw exception(WECHAT_TEMPLATE_SEND_FAIL, msg != null ? msg : "未知错误");
+        } catch (Exception e) {
+            log.warn("合同 {} 已创建，{}微信模板通知失败：{}", contractId, party, e.getClass().getSimpleName());
         }
-        // 返回
-        return contract.getId();
     }
 
     @Override

@@ -57,4 +57,12 @@ public interface NoticeService {
      */
     NoticeDO getNotice(Long id);
 
+    NoticeDO pushNotice(Long id);
+
+    List<NoticeDO> getRecentPushedNotices(Long userId);
+
+    List<NoticeDO> getActiveUpgradeNotices(Long userId);
+
+    List<NoticeDO> getActiveUpgradeNotices(Long userId, boolean includeScheduled);
+
 }

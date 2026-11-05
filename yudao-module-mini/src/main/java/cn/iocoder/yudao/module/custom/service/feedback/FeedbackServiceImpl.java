@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.custom.service.feedback;
 
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.custom.controller.admin.feedback.vo.FeedbackSubmitReqVO;
 import cn.iocoder.yudao.module.custom.controller.admin.feedback.vo.FeedbackSubmitRespVO;
 import cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO;
@@ -29,6 +30,9 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Resource
     private FeedbackMapper feedbackMapper;
 
+    @Resource
+    private FeedbackNotifyService feedbackNotifyService;
+
     @Override
     public FeedbackSubmitRespVO submitFeedback(FeedbackSubmitReqVO reqVO) {
         // 0. 文本内容安全检测 (FileContentAuditor unavailable)
@@ -53,6 +57,7 @@ public class FeedbackServiceImpl implements FeedbackService {
 
         // 3. 转换为 DO
         FeedbackDO feedback = BeanUtils.toBean(reqVO, FeedbackDO.class);
+        feedback.setTenantId(TenantContextHolder.getRequiredTenantId());
 
         // 4. 处理图片URL数组（转换为JSON字符串存储）
         if (reqVO.getImageUrls() != null && !reqVO.getImageUrls().isEmpty()) {
@@ -68,6 +73,8 @@ public class FeedbackServiceImpl implements FeedbackService {
         // 6. 保存到数据库
         feedbackMapper.insert(feedback);
 
+        feedbackNotifyService.notifyNewFeedback(feedback);
+
         // 7. 返回结果
         FeedbackSubmitRespVO respVO = new FeedbackSubmitRespVO();
         respVO.setId(String.valueOf(feedback.getId()));
@@ -81,6 +88,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         if (userId == null) throw new org.springframework.security.access.AccessDeniedException("请先登录");
         com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<cn.iocoder.yudao.module.custom.dal.dataobject.feedback.FeedbackDO> query =
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+        query.eq("tenant_id", TenantContextHolder.getRequiredTenantId());
         if (!securityFrameworkService.hasAnyRoles("super_admin", "tenant_admin")) query.eq("user_id", userId);
         return feedbackMapper.selectPage(pageReqVO, query.orderByDesc("id"));
     }

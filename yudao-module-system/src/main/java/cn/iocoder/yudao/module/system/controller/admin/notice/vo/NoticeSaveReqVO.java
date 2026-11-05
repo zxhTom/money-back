@@ -6,6 +6,7 @@ import lombok.Data;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
+import java.time.LocalDateTime;
 
 @Schema(description = "管理后台 - 通知公告创建/修改 Request VO")
 @Data
@@ -28,5 +29,12 @@ public class NoticeSaveReqVO {
 
     @Schema(description = "状态，参见 CommonStatusEnum 枚举类", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer status;
+
+    private LocalDateTime displayStartTime;
+    private LocalDateTime displayEndTime;
+    private LocalDateTime maintenanceStartTime;
+    private LocalDateTime maintenanceEndTime;
+    /** 新版管理端显式清空可选停机时段；旧版请求缺失此字段时保持原值。 */
+    private Boolean clearMaintenanceWindow;
 
 }
