@@ -77,6 +77,18 @@ public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
         return selectList(AdminUserDO::getStatus, status);
     }
 
+    default List<AdminUserDO> selectContractCreateCandidates(Long tenantId, Integer status) {
+        return selectList(new LambdaQueryWrapperX<AdminUserDO>()
+                .select(AdminUserDO::getId, AdminUserDO::getUsername, AdminUserDO::getRealname)
+                .eq(AdminUserDO::getTenantId, tenantId)
+                .eq(AdminUserDO::getStatus, status)
+                .isNotNull(AdminUserDO::getRealname)
+                .ne(AdminUserDO::getRealname, "")
+                .isNotNull(AdminUserDO::getIdNo)
+                .ne(AdminUserDO::getIdNo, "")
+                .orderByDesc(AdminUserDO::getId));
+    }
+
     default List<AdminUserDO> selectListByDeptIds(Collection<Long> deptIds) {
         return selectList(AdminUserDO::getDeptId, deptIds);
     }

@@ -881,6 +881,11 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    public List<AdminUserDO> getContractCreateCandidates(Long tenantId) {
+        return userMapper.selectContractCreateCandidates(tenantId, CommonStatusEnum.ENABLE.getStatus());
+    }
+
+    @Override
     public boolean isPasswordMatch(String rawPassword, String encodedPassword) {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }

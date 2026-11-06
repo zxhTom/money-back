@@ -92,6 +92,17 @@ public class ContractController {
                     .exception0(400, "搜索词过长");
         }
         Long tenantId = requiredTenantId();
+        if (search.isEmpty()) {
+            List<AdminUserDO> candidates = contractAdminUserService.getContractCreateCandidates(tenantId);
+            for (AdminUserDO user : candidates) {
+                Map<String, String> item = new HashMap<>();
+                item.put("id", String.valueOf(user.getId()));
+                item.put("username", user.getUsername() == null ? "" : user.getUsername());
+                item.put("realname", user.getRealname());
+                result.add(item);
+            }
+            return success(result);
+        }
         List<AdminUserDO> users = contractAdminUserService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
         if (users == null) return success(result);
         for (AdminUserDO user : users) {
@@ -110,6 +121,28 @@ public class ContractController {
             result.add(item);
             if (!search.isEmpty() && result.size() == 20) break;
         }
+        return success(result);
+    }
+
+    @GetMapping("/admin-create-user/{id}")
+    @Operation(summary = "管理员代拟合同获取选中用户的证件信息")
+    @PreAuthorize("@ss.hasPermission('custom:contract:create') and @ss.hasAnyRoles('super_admin','tenant_admin','contract-manager')")
+    @ApiAccessLog(responseEnable = false)
+    public CommonResult<Map<String, String>> adminCreateUser(@PathVariable("id") @Min(1) Long id) {
+        AdminUserDO user = contractAdminUserService.getUser(id);
+        if (user == null || !java.util.Objects.equals(requiredTenantId(), user.getTenantId())
+                || !java.util.Objects.equals(CommonStatusEnum.ENABLE.getStatus(), user.getStatus())
+                || !org.springframework.util.StringUtils.hasText(user.getRealname())
+                || !org.springframework.util.StringUtils.hasText(user.getIdNo())) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
+                    .exception0(404, "用户不存在或不可用于代拟合同");
+        }
+        Map<String, String> result = new HashMap<>();
+        result.put("id", String.valueOf(user.getId()));
+        result.put("username", user.getUsername() == null ? "" : user.getUsername());
+        result.put("realname", user.getRealname());
+        result.put("idNo", idCardCipherService.storedToCipherForResponse(user.getIdNo()));
+        result.put("idNoDisplay", idCardCipherService.maskFromStored(user.getIdNo()));
         return success(result);
     }
 
