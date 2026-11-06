@@ -261,7 +261,7 @@ public interface AdminUserService {
     List<AdminUserDO> getUserListByStatus(Integer status);
 
     /** 代拟合同选择器的轻量用户列表，仅包含 ID、用户名和真实姓名。 */
-    List<AdminUserDO> getContractCreateCandidates(Long tenantId);
+    List<AdminUserDO> getContractCreateCandidates(Long tenantId, String keyword, boolean includeIdNo);
 
     /**
      * 判断密码是否匹配

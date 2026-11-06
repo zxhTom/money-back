@@ -77,16 +77,27 @@ public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
         return selectList(AdminUserDO::getStatus, status);
     }
 
-    default List<AdminUserDO> selectContractCreateCandidates(Long tenantId, Integer status) {
-        return selectList(new LambdaQueryWrapperX<AdminUserDO>()
-                .select(AdminUserDO::getId, AdminUserDO::getUsername, AdminUserDO::getRealname)
+    default List<AdminUserDO> selectContractCreateCandidates(Long tenantId, Integer status,
+                                                              String keyword, boolean includeIdNo) {
+        LambdaQueryWrapperX<AdminUserDO> query = new LambdaQueryWrapperX<AdminUserDO>();
+        if (includeIdNo) {
+            query.select(AdminUserDO::getId, AdminUserDO::getUsername, AdminUserDO::getRealname, AdminUserDO::getIdNo);
+        } else {
+            query.select(AdminUserDO::getId, AdminUserDO::getUsername, AdminUserDO::getRealname);
+        }
+        query
                 .eq(AdminUserDO::getTenantId, tenantId)
                 .eq(AdminUserDO::getStatus, status)
                 .isNotNull(AdminUserDO::getRealname)
                 .ne(AdminUserDO::getRealname, "")
                 .isNotNull(AdminUserDO::getIdNo)
-                .ne(AdminUserDO::getIdNo, "")
-                .orderByDesc(AdminUserDO::getId));
+                .ne(AdminUserDO::getIdNo, "");
+        if (keyword != null && !keyword.isEmpty()) {
+            query.and(condition -> condition.like(AdminUserDO::getRealname, keyword)
+                    .or().like(AdminUserDO::getUsername, keyword));
+        }
+        query.orderByDesc(AdminUserDO::getId).last("LIMIT 20");
+        return selectList(query);
     }
 
     default List<AdminUserDO> selectListByDeptIds(Collection<Long> deptIds) {

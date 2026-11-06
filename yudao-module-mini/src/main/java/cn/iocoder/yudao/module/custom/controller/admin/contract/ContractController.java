@@ -84,42 +84,28 @@ public class ContractController {
     @PreAuthorize("@ss.hasPermission('custom:contract:create') and @ss.hasAnyRoles('super_admin','tenant_admin','contract-manager')")
     @ApiAccessLog(responseEnable = false)
     public CommonResult<List<Map<String, String>>> adminCreateUsers(
-            @RequestParam(value = "keyword", defaultValue = "") String keyword) {
+            @RequestParam(value = "keyword", defaultValue = "") String keyword,
+            @RequestParam(value = "compact", defaultValue = "false") boolean compact) {
         List<Map<String, String>> result = new ArrayList<>();
-        String search = keyword.trim().toLowerCase(java.util.Locale.ROOT);
+        String search = keyword.trim();
         if (search.length() > 64) {
             throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
                     .exception0(400, "搜索词过长");
         }
         Long tenantId = requiredTenantId();
-        if (search.isEmpty()) {
-            List<AdminUserDO> candidates = contractAdminUserService.getContractCreateCandidates(tenantId);
-            for (AdminUserDO user : candidates) {
-                Map<String, String> item = new HashMap<>();
-                item.put("id", String.valueOf(user.getId()));
-                item.put("username", user.getUsername() == null ? "" : user.getUsername());
-                item.put("realname", user.getRealname());
-                result.add(item);
-            }
-            return success(result);
-        }
-        List<AdminUserDO> users = contractAdminUserService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
-        if (users == null) return success(result);
+        boolean includeIdNo = !compact && !search.isEmpty();
+        List<AdminUserDO> users = contractAdminUserService.getContractCreateCandidates(tenantId, search, includeIdNo);
         for (AdminUserDO user : users) {
-            if (!java.util.Objects.equals(tenantId, user.getTenantId())
-                    || !org.springframework.util.StringUtils.hasText(user.getRealname())
-                    || !org.springframework.util.StringUtils.hasText(user.getIdNo())) continue;
             String username = user.getUsername() == null ? "" : user.getUsername();
-            if (!search.isEmpty() && !user.getRealname().toLowerCase(java.util.Locale.ROOT).contains(search)
-                    && !username.toLowerCase(java.util.Locale.ROOT).contains(search)) continue;
             Map<String, String> item = new HashMap<>();
             item.put("id", String.valueOf(user.getId()));
             item.put("username", username);
             item.put("realname", user.getRealname());
-            item.put("idNo", idCardCipherService.storedToCipherForResponse(user.getIdNo()));
-            item.put("idNoDisplay", idCardCipherService.maskFromStored(user.getIdNo()));
+            if (includeIdNo) {
+                item.put("idNo", idCardCipherService.storedToCipherForResponse(user.getIdNo()));
+                item.put("idNoDisplay", idCardCipherService.maskFromStored(user.getIdNo()));
+            }
             result.add(item);
-            if (!search.isEmpty() && result.size() == 20) break;
         }
         return success(result);
     }

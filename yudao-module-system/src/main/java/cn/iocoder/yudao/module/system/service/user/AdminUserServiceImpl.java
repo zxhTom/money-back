@@ -881,8 +881,8 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
-    public List<AdminUserDO> getContractCreateCandidates(Long tenantId) {
-        return userMapper.selectContractCreateCandidates(tenantId, CommonStatusEnum.ENABLE.getStatus());
+    public List<AdminUserDO> getContractCreateCandidates(Long tenantId, String keyword, boolean includeIdNo) {
+        return userMapper.selectContractCreateCandidates(tenantId, CommonStatusEnum.ENABLE.getStatus(), keyword, includeIdNo);
     }
 
     @Override
