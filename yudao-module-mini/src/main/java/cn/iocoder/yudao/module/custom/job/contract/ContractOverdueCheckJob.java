@@ -9,11 +9,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
- * 合同逾期检查 Job：定时检查合同到期时间，将已到期的合同更新为已逾期状态
+ * 合同逾期检查 Job：截止日期过后的合同才更新为已逾期状态
  *
  * @author zxhtom
  */
@@ -27,6 +29,7 @@ public class ContractOverdueCheckJob implements JobHandler {
      */
     private static final Integer OVERDUE_STATUS = 4;
     private static final Integer RUNNING_STATUS = 2;
+    private static final ZoneId CONTRACT_ZONE = ZoneId.of("Asia/Shanghai");
 
     @Resource
     private ContractMapper contractMapper;
@@ -36,11 +39,11 @@ public class ContractOverdueCheckJob implements JobHandler {
     public String execute(String param) throws Exception {
         log.info("[execute][开始检查合同逾期状态]");
 
-        // 1. 查询所有 end_date < 当前时间 且状态不是已逾期的合同
-        LocalDateTime now = LocalDateTime.now();
+        // 截止日期当天仍可还款；兼容现有合同中 00:00:00 和 08:00:00 两种存储时间。
+        LocalDateTime todayStart = LocalDate.now(CONTRACT_ZONE).atStartOfDay();
         List<ContractDO> overdueContracts = contractMapper.selectList(
                 new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<ContractDO>()
-                        .lt(ContractDO::getEndDate, now)  // end_date < 当前时间
+                        .lt(ContractDO::getEndDate, todayStart)  // 截止日期早于今天
                         .ne(ContractDO::getStatus, OVERDUE_STATUS)  // 状态不是已逾期
                         .eq(ContractDO::getStatus, RUNNING_STATUS)  // 状态是待还款
                         .isNotNull(ContractDO::getEndDate)  // end_date 不为空
