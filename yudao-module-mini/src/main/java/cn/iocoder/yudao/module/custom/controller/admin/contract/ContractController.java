@@ -80,14 +80,13 @@ public class ContractController {
     }
 
     @GetMapping("/admin-create-users")
-    @Operation(summary = "【小程序】管理员代拟合同搜索本租户用户")
+    @Operation(summary = "管理员代拟合同获取本租户可选用户")
     @PreAuthorize("@ss.hasPermission('custom:contract:create') and @ss.hasAnyRoles('super_admin','tenant_admin','contract-manager')")
     @ApiAccessLog(responseEnable = false)
     public CommonResult<List<Map<String, String>>> adminCreateUsers(
             @RequestParam(value = "keyword", defaultValue = "") String keyword) {
         List<Map<String, String>> result = new ArrayList<>();
         String search = keyword.trim().toLowerCase(java.util.Locale.ROOT);
-        if (search.isEmpty()) return success(result);
         if (search.length() > 64) {
             throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil
                     .exception0(400, "搜索词过长");
@@ -100,7 +99,7 @@ public class ContractController {
                     || !org.springframework.util.StringUtils.hasText(user.getRealname())
                     || !org.springframework.util.StringUtils.hasText(user.getIdNo())) continue;
             String username = user.getUsername() == null ? "" : user.getUsername();
-            if (!user.getRealname().toLowerCase(java.util.Locale.ROOT).contains(search)
+            if (!search.isEmpty() && !user.getRealname().toLowerCase(java.util.Locale.ROOT).contains(search)
                     && !username.toLowerCase(java.util.Locale.ROOT).contains(search)) continue;
             Map<String, String> item = new HashMap<>();
             item.put("id", String.valueOf(user.getId()));
@@ -109,7 +108,7 @@ public class ContractController {
             item.put("idNo", idCardCipherService.storedToCipherForResponse(user.getIdNo()));
             item.put("idNoDisplay", idCardCipherService.maskFromStored(user.getIdNo()));
             result.add(item);
-            if (result.size() == 20) break;
+            if (!search.isEmpty() && result.size() == 20) break;
         }
         return success(result);
     }
