@@ -45,6 +45,7 @@ public class RealNameAuthInterceptor implements HandlerInterceptor {
 
     /** 未实名也允许访问的端点（归一化后 startsWith 匹配）：完成认证/查看资料/登录登出所需 */
     private static final List<String> EXEMPT_PREFIXES = java.util.Arrays.asList(
+            "/custom/contract/dashboard/contactMp", // 只读关注校验；登录鉴权仍由 Spring Security 执行
             "/api/faceAuth",          // 人脸核身发起/上报/查询
             "/api/mini/callback",     // 人脸回调
             "/system/auth",           // 登录/登出/刷新令牌

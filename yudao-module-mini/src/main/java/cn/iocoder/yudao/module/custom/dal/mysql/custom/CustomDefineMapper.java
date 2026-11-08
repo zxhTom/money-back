@@ -40,4 +40,8 @@ public interface CustomDefineMapper {
     String selectOffcialOpenIdByUserId(@Param("id") Long id);
 
     List<MpVO> contackMp(@Param("userId") Long userId);
+
+    List<Integer> selectOfficialFollowStates(@Param("userId") Long userId, @Param("tenantId") Long tenantId,
+            @Param("miniAppId") String miniAppId, @Param("officialAppId") String officialAppId,
+            @Param("unionId") String unionId);
 }

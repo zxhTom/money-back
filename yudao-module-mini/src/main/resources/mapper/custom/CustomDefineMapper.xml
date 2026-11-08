@@ -185,4 +185,25 @@
             </if>
         </where>
     </select>
+    <!-- Current WeChat identity takes precedence over mutable business-account bindings. -->
+    <select id="selectOfficialFollowStates" resultType="java.lang.Integer">
+        SELECT mp.subscribe_status FROM mp_user mp
+        WHERE mp.deleted = 0 AND mp.app_id = #{officialAppId}
+        <choose>
+            <when test="unionId != null and unionId != ''">
+                AND mp.union_id = #{unionId}
+            </when>
+            <otherwise>
+                AND EXISTS (
+                    SELECT 1 FROM mini_user mini
+                    JOIN system_users u ON u.id = mini.user_id
+                    WHERE mini.user_id = #{userId} AND u.tenant_id = #{tenantId}
+                        AND u.deleted = 0 AND mini.deleted = 0
+                        AND mini.app_id = #{miniAppId}
+                        AND mini.union_id IS NOT NULL AND mini.union_id != ''
+                        AND mini.union_id = mp.union_id
+                )
+            </otherwise>
+        </choose>
+    </select>
 </mapper>

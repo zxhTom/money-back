@@ -53,6 +53,7 @@ public class PayPasswordInterceptor implements HandlerInterceptor {
      * 第一条最关键：不放行改支付密码接口本身，用户就永远改不掉，等于把自己锁死。
      */
     private static final List<String> EXEMPT_PREFIXES = Arrays.asList(
+            "/custom/contract/dashboard/contactMp", // 只读关注校验；登录鉴权仍由 Spring Security 执行
             "/custom/contract/dashboard/update-pay-password", // 改支付密码本身
             "/system/auth",                                    // 登录/登出/刷新令牌
             "/system/user/profile",                            // 个人资料

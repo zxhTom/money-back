@@ -336,6 +336,16 @@ public class CustomDefineController {
         }
     }
 
+    @Resource
+    private cn.iocoder.yudao.module.custom.service.custom.OfficialAccountFollowService officialAccountFollowService;
+
+    @PostMapping("/contactMp/check")
+    @Operation(summary = "使用当前微信临时凭证确认公众号关注状态")
+    @RateLimiter(time = 60, count = 6, keyResolver = ClientIpRateLimiterKeyResolver.class)
+    public CommonResult<MpVO> checkOfficialFollow(@Valid @RequestBody OfficialFollowCheckReqVO request) {
+        return success(officialAccountFollowService.check(getLoginUserId(), request.getCode()));
+    }
+
     @PostMapping("/send-email-code")
     @Operation(summary = "发送邮箱验证码")
     @Parameter(name = "email", description = "邮箱地址", required = true, example = "user@example.com")

@@ -12,5 +12,6 @@ public class MpVO {
     private String realname;
     private Integer subscribeStatus;
     private Integer code;
+    private String followState; // FOLLOWED / UNFOLLOWED / UNKNOWN
     private String msg;
 }

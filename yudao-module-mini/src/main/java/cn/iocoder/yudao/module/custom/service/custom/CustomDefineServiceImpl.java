@@ -72,6 +72,7 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_PASSW
 @Service
 @Slf4j
 public class CustomDefineServiceImpl implements CustomDefineService{
+    @Resource private OfficialAccountFollowService officialAccountFollowService;
     @Resource private ContractExperienceStore experienceStore;
     @Resource private cn.iocoder.yudao.module.custom.service.contract.ContractPaymentAccessGuard paymentAccessGuard;
     @Resource private cn.iocoder.yudao.module.pay.service.order.PayOrderService payOrderService;
@@ -828,23 +829,7 @@ public class CustomDefineServiceImpl implements CustomDefineService{
 
     @Override
     public MpVO contackMp() {
-        MpVO mpVO = new MpVO();
-        mpVO.setCode(200);
-        List<MpVO> list = customDefineMapper.contackMp(SecurityFrameworkUtils.getLoginUserId());
-        if (CollectionUtils.isNotEmpty(list)) {
-            if (null == list.get(0).getSubscribeStatus() || 1 == list.get(0).getSubscribeStatus()) {
-
-                mpVO.setCode(1500);
-                mpVO.setMsg("请您先关注公众号");
-            } else if (1 == list.get(0).getSubscribeStatus()) {
-                mpVO.setCode(1500);
-                mpVO.setMsg("您之前取消过公众号，请您重新关注公众号");
-            }
-        } else {
-            mpVO.setCode(1500);
-            mpVO.setMsg("请您先关注公众号");
-        }
-        return mpVO;
+        return officialAccountFollowService.check(SecurityFrameworkUtils.getLoginUserId(), null);
     }
 
     @Override
