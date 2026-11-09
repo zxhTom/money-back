@@ -101,6 +101,10 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                     .setTenantId(accessToken.getTenantId()).setScopes(accessToken.getScopes())
                     .setExpiresTime(accessToken.getExpiresTime());
         } catch (ServiceException serviceException) {
+            // 切换会话失效专用错误需要透传，不能静默当做未登录游客处理
+            if (ObjectUtil.equal(serviceException.getCode(), cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.ACCOUNT_SWITCH_SESSION_INVALID.getCode())) {
+                throw serviceException;
+            }
             // 校验 Token 不通过时，考虑到一些接口是无需登录的，所以直接返回 null 即可
             return null;
         }

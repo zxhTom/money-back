@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.service.auth;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
@@ -161,13 +162,13 @@ public class AccountImpersonationService {
             Long actorId = Long.valueOf(parts[0]);
             Long tenantId = Long.valueOf(parts[1]);
             Long targetId = Long.valueOf(parts[2]);
-            if (!tenantId.equals(target.getTenantId()) || !targetId.equals(target.getUserId())) throw denied();
+            if (!tenantId.equals(target.getTenantId()) || !targetId.equals(target.getUserId())) throw sessionInvalid();
             OAuth2AccessTokenDO actor = tokenService.getAccessToken(parts[3]);
             if (actor == null || isImpersonation(actor)
                     || StrUtil.equals(actor.getAccessToken(), actor.getRefreshToken())
                     || !actorId.equals(actor.getUserId())
                     || !tenantId.equals(actor.getTenantId()) || actor.getExpiresTime() == null
-                    || !actor.getExpiresTime().isAfter(LocalDateTime.now())) throw denied();
+                    || !actor.getExpiresTime().isAfter(LocalDateTime.now())) throw sessionInvalid();
             AdminUserDO actorUser = TenantUtils.execute(tenantId, () -> userService.getUserSimple(actorId));
             AdminUserDO targetUser = TenantUtils.execute(tenantId, () -> userService.getUserSimple(targetId));
             if (actorUser == null || !tenantId.equals(actorUser.getTenantId())
@@ -175,12 +176,12 @@ public class AccountImpersonationService {
                     || !TenantUtils.execute(tenantId, () -> permissionService.hasAnyRoles(actorId, "super_admin", "tenant_admin"))
                     || targetUser == null || !tenantId.equals(targetUser.getTenantId())
                     || !CommonStatusEnum.ENABLE.getStatus().equals(targetUser.getStatus())
-                    || !TenantUtils.execute(tenantId, () -> canTarget(actorId, targetId))) throw denied();
+                    || !TenantUtils.execute(tenantId, () -> canTarget(actorId, targetId))) throw sessionInvalid();
             java.util.Map<String, String> info = target.getUserInfo() == null
                     ? new HashMap<>() : new HashMap<>(target.getUserInfo());
             info.put("_impersonatorId", actorId.toString());
             target.setUserInfo(info);
-        } catch (NumberFormatException ex) { throw denied(); }
+        } catch (NumberFormatException ex) { throw sessionInvalid(); }
     }
 
     public static boolean isImpersonation(OAuth2AccessTokenDO token) {
@@ -189,9 +190,9 @@ public class AccountImpersonationService {
 
     private String[] sessionParts(String token) {
         String value = redis.opsForValue().get(KEY_PREFIX + token);
-        if (value == null) throw denied();
+        if (value == null) throw sessionInvalid();
         String[] parts = value.split("\\|", 4);
-        if (parts.length != 4) throw denied();
+        if (parts.length != 4) throw sessionInvalid();
         return parts;
     }
 
@@ -213,6 +214,11 @@ public class AccountImpersonationService {
                 "super_admin", "tenant_admin", "contract-manager", "crm_admin")
                 && !permissionService.hasAnyPermissions(targetId,
                 "system:user:query", "system:role:query", "system:tenant:query", "mini:admin:dashboard");
+    }
+
+    private ServiceException sessionInvalid() {
+        return exception0(GlobalErrorCodeConstants.ACCOUNT_SWITCH_SESSION_INVALID.getCode(),
+                GlobalErrorCodeConstants.ACCOUNT_SWITCH_SESSION_INVALID.getMsg());
     }
 
     private AccessDeniedException denied() { return new AccessDeniedException("账号切换会话无效或无权限"); }

@@ -98,8 +98,10 @@ class AccountImpersonationServiceTest {
         assertDoesNotThrow(() -> service.validate(targetToken, "target-token"));
         assertEquals("42", targetToken.getUserInfo().get("_impersonatorId"));
         when(tokens.getAccessToken("actor-token")).thenReturn(null);
-        assertThrows(AccessDeniedException.class, () -> service.validate(targetToken, "target-token"));
+        ServiceException actorMissing = assertThrows(ServiceException.class, () -> service.validate(targetToken, "target-token"));
+        assertEquals(cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.ACCOUNT_SWITCH_SESSION_INVALID.getCode(), actorMissing.getCode());
         when(values.get("money:account-impersonation:v1:target-token")).thenReturn(null);
-        assertThrows(AccessDeniedException.class, () -> service.validate(targetToken, "target-token"));
+        ServiceException sessionMissing = assertThrows(ServiceException.class, () -> service.validate(targetToken, "target-token"));
+        assertEquals(cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.ACCOUNT_SWITCH_SESSION_INVALID.getCode(), sessionMissing.getCode());
     }
 }
