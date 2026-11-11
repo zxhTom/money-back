@@ -66,3 +66,9 @@ Nginx：只移除 TDK 用户列表的无条件 403；继续由后端校验登录
 - 当前工作机 Chromium 公网直连出现 ERR_EMPTY_RESPONSE，因此页面验收使用 SSH 通道；公网首页及接口另行通过 HTTPS 校验。
 - 后端打包使用 maven.test.skip=true；完整测试编译受既有 RemoteIntegrationRegressionTest 从 mini 模块反向引用 server 模块的错误阻塞，不能宣称全量后端测试通过。本次 2 项认证响应回归测试、18 项相关前端测试、12 项蓝绿脚本测试此前均已通过。
 - 正式环境 Nginx、前端首页、后端 JAR 的校验和及网页/任务容器启动时间保持发布前状态。
+
+补充：2026-11-12 03:36:24 已按用户要求蓝绿切换至正式蓝组
+
+前端 8bd80c9、后端 38e70f98 原包已提升至正式版，ORG/TDK 均使用 39485；后台任务为 money-worker-blue。
+正式认证状态列表、详情与数据库一致，contractmanager 在两个域名均可查询，未登录查询被拒绝。2363 个前端文件及 JAR 与验收清单一致。
+旧 green 网页及任务容器已停止并保留，回滚 dry run 通过；预环境保持可用。详见 deployment-center/docs/blue_green_runbook.md 的 2026-11-12 记录。
