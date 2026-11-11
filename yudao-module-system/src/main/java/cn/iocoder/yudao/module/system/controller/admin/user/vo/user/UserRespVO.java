@@ -66,6 +66,10 @@ public class UserRespVO{
     @DictFormat(DictTypeConstants.COMMON_STATUS)
     private Integer status;
 
+    @Schema(description = "人脸实名认证状态：0 未认证，1 已认证", example = "1")
+    @ExcelIgnore
+    private Integer verified;
+
     @Schema(description = "最后登录 IP", requiredMode = Schema.RequiredMode.REQUIRED, example = "192.168.1.1")
     @ExcelProperty("最后登录IP")
     private String loginIp;

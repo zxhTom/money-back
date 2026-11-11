@@ -30,6 +30,7 @@ public interface UserConvert {
 
     default UserRespVO convert(AdminUserDO user, DeptDO dept) {
         UserRespVO userVO = BeanUtils.toBean(user, UserRespVO.class);
+        userVO.setVerified(Integer.valueOf(1).equals(user.getVerified()) ? 1 : 0);
         if (dept != null) {
             userVO.setDeptName(dept.getName());
         }
